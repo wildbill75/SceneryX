@@ -49,11 +49,26 @@ def _compute_active_highlights_snapshot() -> Dict[str, Dict[str, str]]:
     try:
         import os
         import flight_rig_optimizer as fro
-        path = fro.get_user_cfg_path()
         content = ""
-        if path and os.path.exists(path):
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
+        appdata = os.environ.get("APPDATA", "")
+        ws_dir = os.path.join(appdata, "SceneryX", "custom_profiles")
+        state_file = os.path.join(ws_dir, "active_profile.json")
+        if os.path.exists(state_file):
+            try:
+                with open(state_file, "r", encoding="utf-8") as sf:
+                    aid = (json.load(sf) or {}).get("active_id")
+                if aid:
+                    pfile = os.path.join(ws_dir, f"{aid}.profile.json")
+                    if os.path.exists(pfile):
+                        with open(pfile, "r", encoding="utf-8") as pf:
+                            content = (json.load(pf) or {}).get("content", "")
+            except Exception:
+                content = ""
+        if not content:
+            path = fro.get_user_cfg_path()
+            if path and os.path.exists(path):
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
             staged_dict = getattr(fro, "_staged_user_cfg_settings", {})
             for m, staged in staged_dict.items():
                 for k, v in staged.items():
@@ -512,10 +527,22 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
 
             is_vr_mode = False
             try:
-                if mem and mem.is_attached:
+                if mem:
                     is_vr_mode = mem.is_vr_active()
             except Exception:
                 pass
+
+            nom_prof_vals = {}
+            overrides = {}
+            try:
+                import flight_lod_controller as _flc_mod
+                nom_prof_vals = _flc_mod.get_active_profile_nominal_values(is_vr=is_vr_mode) or {}
+                overrides = _flc_mod.get_live_graphics_overrides() or {}
+                if nom_prof_vals.get("is_vr"):
+                    is_vr_mode = True
+            except Exception:
+                nom_prof_vals = {}
+                overrides = {}
 
             axis_state = {}
             try:
@@ -527,9 +554,9 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             is_ext_af = bool(lod_status.get("external_autofps", False))
             smart_lod_enabled = bool(lod_status.get("enabled", False)) and not is_ext_af
             smart_lod_running = bool(lod_status.get("is_running", False)) and not is_ext_af
-            nom_tlod = float(lod_status.get("nominal_tlod", 100.0))
-            nom_olod = float(lod_status.get("nominal_olod", 100.0))
-            nom_profile = str(lod_status.get("nominal_profile", "Active Profile"))
+            nom_tlod = float(nom_prof_vals.get("tlod", lod_status.get("nominal_tlod", 100.0)))
+            nom_olod = float(nom_prof_vals.get("olod", lod_status.get("nominal_olod", 100.0)))
+            nom_profile = str(nom_prof_vals.get("name", lod_status.get("nominal_profile", "Active Profile")))
 
             if is_ext_af:
                 cur_tlod = _LAST_MANUAL_LOD.get("tlod", nom_tlod)
@@ -587,16 +614,6 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             })
 
             # 8 Live-Editable Graphics Settings + Active Profile Reference + Pinned Keys
-            nom_prof_vals = {}
-            overrides = {}
-            try:
-                import flight_lod_controller as _flc_mod
-                nom_prof_vals = _flc_mod.get_active_profile_nominal_values(is_vr=is_vr_mode) or {}
-                overrides = _flc_mod.get_live_graphics_overrides() or {}
-            except Exception:
-                nom_prof_vals = {}
-                overrides = {}
-
             # Live Cloud Quality (0=Low, 1=Medium, 2=High, 3=Ultra)
             cloud_title_map = {0: "Low", 1: "Medium", 2: "High", 3: "Ultra"}
             cloud_upper_map = {0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA"}
@@ -617,7 +634,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             active_highlights["clouds"] = f"Clouds : {cloud_title_map.get(cur_cloud_q, 'High')}"
 
             profile_graphics = {
-                "max_fps": int(nom_prof_vals.get("max_fps", 36 if is_vr_mode else 60)),
+                "max_fps": int(nom_prof_vals.get("max_fps", 45 if is_vr_mode else 60)),
                 "clouds": int(nom_prof_vals.get("clouds", nom_cloud_q)),
                 "precaching": int(nom_prof_vals.get("precaching", 2)),
                 "terrain_shadows": int(nom_prof_vals.get("terrain_shadows", 256 if is_vr_mode else 512)),
@@ -628,20 +645,22 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             }
 
             live_graphics = dict(profile_graphics)
-            live_graphics["clouds"] = int(cur_cloud_q)
-            try:
-                if mem and mem.is_attached and not mem.safe_read_only:
-                    ram_gfx = mem.read_live_graphics()
-                    if ram_gfx:
-                        for gk, gv in ram_gfx.items():
-                            if gv is not None and gk != "clouds" and gk not in overrides:
-                                live_graphics[gk] = int(gv)
-            except Exception:
-                pass
             for ok, ov in overrides.items():
                 if ov is not None:
                     live_graphics[ok] = int(ov)
             live_graphics["clouds"] = int(cur_cloud_q)
+            try:
+                if mem and mem.is_attached and not mem.safe_read_only:
+                    ram_gfx = mem.read_live_graphics(for_vr=is_vr_mode)
+                    if ram_gfx:
+                        to_sync = {}
+                        for gk, gv in ram_gfx.items():
+                            if gv is not None and gk in live_graphics and int(gv) != int(live_graphics[gk]):
+                                to_sync[gk] = int(live_graphics[gk])
+                        if to_sync:
+                            mem.write_live_graphics(to_sync)
+            except Exception:
+                pass
             if "max_fps" in live_graphics:
                 fps_disp = int(live_graphics["max_fps"])
                 active_highlights["max_fps"] = f"Max FPS : {fps_disp}" if fps_disp > 0 else "Max FPS : OFF"

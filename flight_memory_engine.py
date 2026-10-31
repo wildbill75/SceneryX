@@ -741,23 +741,83 @@ class FlightMemoryEngine:
                 ok_vr = self._write_int32(self.addr_cloud_q_vr, q_clamped)
         return ok_pc or ok_vr
 
+    @staticmethod
+    def is_active_profile_vr() -> bool:
+        """Determine if the currently active graphics profile in SceneryX is a VR profile."""
+        try:
+            import json
+            import re
+            appdata = os.environ.get("APPDATA", "")
+            ws_dir = os.path.join(appdata, "SceneryX", "custom_profiles")
+            state_file = os.path.join(ws_dir, "active_profile.json")
+            if not os.path.exists(state_file):
+                return False
+            mtime = os.path.getmtime(state_file)
+            cache = getattr(FlightMemoryEngine, "_active_prof_vr_cache", None)
+            if cache and cache[0] == mtime:
+                return bool(cache[1])
+            with open(state_file, "r", encoding="utf-8") as f:
+                sdata = json.load(f)
+            aid = str(sdata.get("active_id") or "").strip()
+            if not aid:
+                FlightMemoryEngine._active_prof_vr_cache = (mtime, False)
+                return False
+            pfile = os.path.join(ws_dir, f"{aid}.profile.json")
+            pjson = {}
+            prof_name = aid
+            content = ""
+            if os.path.exists(pfile):
+                with open(pfile, "r", encoding="utf-8") as pf:
+                    pjson = json.load(pf)
+                prof_name = str(pjson.get("name") or aid)
+                content = str(pjson.get("content") or "")
+            pmode = str(pjson.get("mode", "")).strip().upper()
+            if pmode == "VR" or pjson.get("ofxr_mode"):
+                FlightMemoryEngine._active_prof_vr_cache = (mtime, True)
+                return True
+            if pmode == "2D":
+                FlightMemoryEngine._active_prof_vr_cache = (mtime, False)
+                return False
+            label = f"{aid} {prof_name}"
+            if re.search(r"(?:^|[\s_\-])(?:vr|headset|ofxr)(?:$|[\s_\-])", label, re.I):
+                FlightMemoryEngine._active_prof_vr_cache = (mtime, True)
+                return True
+            if re.search(r"(?:^|[\s_\-])2d(?:$|[\s_\-])", label, re.I):
+                FlightMemoryEngine._active_prof_vr_cache = (mtime, False)
+                return False
+            if content:
+                m_2d = re.search(r"\bTargetFrameRate\s+(\d+)", content)
+                m_vr = re.search(r"\bTargetFrameRateVR\s+(\d+)", content)
+                m_fl = re.search(r"\bFrameLimiter\s+(\d+)", content)
+                if m_2d and m_vr and m_fl:
+                    v_2d, v_vr, v_fl = int(m_2d.group(1)), int(m_vr.group(1)), int(m_fl.group(1))
+                    if v_fl == v_vr and v_vr != v_2d:
+                        FlightMemoryEngine._active_prof_vr_cache = (mtime, True)
+                        return True
+            FlightMemoryEngine._active_prof_vr_cache = (mtime, False)
+            return False
+        except Exception:
+            return False
+
     def is_vr_active(self) -> bool:
-        """Indique si le mode VR est actif dans le simulateur."""
+        """Indique si le mode VR est actif dans le simulateur ou si un profil VR est actif."""
+        if self.is_active_profile_vr():
+            return True
         if not self.is_attached or self.safe_read_only or not self.addr_vr_mode:
             return False
         val = self._read_int32(self.addr_vr_mode)
-        return bool(val and val == 1)
+        return bool(val is not None and (val == 1 or (not self.is_2024 and (val & 0xFF) == 1)))
 
     def _get_live_struct_base(self, for_vr: bool = False) -> int:
         if for_vr:
             return self.addr_tlod_vr if self.addr_tlod_vr else 0
         return self.addr_tlod if self.addr_tlod else 0
 
-    def read_live_graphics(self) -> Dict[str, Any]:
+    def read_live_graphics(self, for_vr: Optional[bool] = None) -> Dict[str, Any]:
         """
-        Lit en mémoire MSFS les paramètres graphiques modifiables à chaud :
+        Lit en memoire MSFS les parametres graphiques modifiables a chaud :
         clouds, precaching, terrain_shadows, buildings, trees, plants, grass.
-        Retourne uniquement les clés dont la valeur lue est valide.
+        Retourne uniquement les cles dont la valeur lue est valide.
         """
         out: Dict[str, Any] = {}
         if not self.is_attached or self.safe_read_only:
@@ -770,7 +830,7 @@ class FlightMemoryEngine:
         if not self.is_2024:
             return out
 
-        is_vr = self.is_vr_active()
+        is_vr = self.is_vr_active() if for_vr is None else bool(for_vr)
         base = self._get_live_struct_base(for_vr=is_vr) or self._get_live_struct_base(for_vr=False)
         if not base:
             return out
@@ -896,7 +956,7 @@ class FlightMemoryEngine:
         """Retourne un dictionnaire complet sur l'état du moteur mémoire."""
         is_autofps_up, autofps_pid = self.is_autofps_running()
         is_ofxr_up, ofxr_pid = self.is_ofxr_running()
-        is_vr = self.is_vr_active() if self.is_attached else False
+        is_vr = self.is_vr_active()
         return {
             "is_attached": self.is_attached,
             "safe_read_only": self.safe_read_only,

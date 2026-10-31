@@ -987,7 +987,7 @@ def detect_flight_airports(samples=None, first_valid_gps=None, last_valid_gps=No
                 break
 
     landed_at_end = bool(was_airborne and ended_on_ground)
-    ref_start = first_ground_gps or first_valid_gps
+    ref_start_ground = first_ground_gps
     ref_end = last_ground_gps if ended_on_ground else last_valid_gps
 
     # 1. Vérification de l'OFP SimBrief en mémoire interne (silencieux)
@@ -995,8 +995,8 @@ def detect_flight_airports(samples=None, first_valid_gps=None, last_valid_gps=No
     if sb:
         s_dep, s_arr, s_dep_name, s_arr_name = match_simbrief_plan(
             sb,
-            ref_start[0] if ref_start else None,
-            ref_start[1] if ref_start else None,
+            ref_start_ground[0] if ref_start_ground else None,
+            ref_start_ground[1] if ref_start_ground else None,
             ref_end[0] if ref_end else None,
             ref_end[1] if ref_end else None,
             landed_at_end=landed_at_end
@@ -1055,49 +1055,81 @@ def detect_flight_airports(samples=None, first_valid_gps=None, last_valid_gps=No
 
     return dep_icao, arr_icao, dep_name, arr_name, "Auto-GPS"
 
-def resolve_flight_context(lat=None, lon=None, on_ground=False):
+def resolve_flight_context(lat=None, lon=None, on_ground=False, first_ground_gps=None, first_valid_gps=None, session_dep=None, session_arr=None, locked_simbrief=None):
     """
-    Détermine automatiquement l'appareil, la route, le point de départ
-    ou la position la plus proche selon que le joueur utilise un OFP SimBrief (chargé en sourdine),
-    un profil SceneryX ou vole librement.
+    Détermine automatiquement l'appareil, le départ (DEP), l'arrivée (ARR) et la position actuelle (ACTUAL POSITION)
+    selon que le joueur utilise un OFP SimBrief (chargé en sourdine) ou vole librement.
     """
     mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
-    # 1. Détection GPS de l'aéroport le plus proche dans MSFS
-    near_icao, near_name, dist_nm = find_nearest_airport(lat, lon) if (lat is not None and lon is not None) else (None, "", 999999.0)
+    # 1. Position actuelle en direct (ACTUAL POSITION : aéroport le plus proche de l'avion en temps réel)
+    has_live_gps = (lat is not None and lon is not None and (abs(lat) > 0.001 or abs(lon) > 0.001))
+    near_icao, near_name, dist_nm = find_nearest_airport(lat, lon) if has_live_gps else (None, "", 999999.0)
+    if near_icao:
+        actual_position_display = format_airport_route_item(near_icao, near_name)
+    else:
+        actual_position_display = "Waiting for flight"
 
-    # 2. Vérification silencieuse de l'OFP SimBrief en mémoire interne
+    # 2. Vérification silencieuse de l'OFP SimBrief (en mémoire ou verrouillé pour la session)
     has_simbrief = False
     sb_dep, sb_arr, sb_dname, sb_aname = None, None, None, None
-    sb = get_simbrief_flight_plan()
+    sb = locked_simbrief if locked_simbrief is not None else get_simbrief_flight_plan()
     if sb:
-        # Si on est au sol (ou proche d'un aéroport au départ), on vérifie que l'OFP correspond bien à l'aéroport où se trouve l'avion
-        if on_ground and lat is not None and lon is not None:
-            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
-        elif is_corridor and prof_slug == 'simbrief':
+        if locked_simbrief is not None:
             sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb)
-        elif lat is None or lon is None:
+        elif first_ground_gps and len(first_ground_gps) == 2:
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, first_ground_gps[0], first_ground_gps[1])
+        elif on_ground and has_live_gps:
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
+        else:
+            # En vol sans point sol initial rejeté : on utilise l'OFP SimBrief actif
             sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb)
         if sb_dep and sb_arr:
             dep = sb_dep
             arr = sb_arr
             has_simbrief = True
 
-    # 3. Tag Type de Vol & Libellé Route / Origine
+    # 3. Résolution DEP / ARR / ACTUAL POSITION
     if has_simbrief and dep and arr:
         flight_type_tag = "SIMBRIEF OFP"
-        route_label = "ROUTE :"
-        dep_fmt = format_airport_route_item(dep, sb_dname)
-        arr_fmt = format_airport_route_item(arr, sb_aname)
-        route_display = f"{dep_fmt} ➔ {arr_fmt}"
+        route_label = "ACTUAL POSITION:"
+        dep_display = format_airport_route_item(dep, sb_dname)
+        arr_display = format_airport_route_item(arr, sb_aname)
+        route_display = f"{dep_display} ➔ {arr_display}"
     else:
         flight_type_tag = "FREE FLIGHT"
-        route_label = "ORIGIN :"
-        if near_icao:
-            route_display = format_airport_route_item(near_icao, near_name)
-            dep = near_icao
+        route_label = "ACTUAL POSITION:"
+        # Détection en live du point de départ (verrouillé au point de départ initial dès que disponible)
+        dep_icao_resolved = None
+        dep_name_resolved = ""
+        if session_dep and len(str(session_dep).strip()) == 4 and str(session_dep).upper() not in ("DEP", "UNK", "UNKNOWN"):
+            dep_icao_resolved = str(session_dep).upper().strip()
+            dep_name_resolved = get_airport_city_name(dep_icao_resolved) or dep_icao_resolved
+        elif first_ground_gps and len(first_ground_gps) == 2:
+            g_ic, g_nm, _ = find_nearest_airport(first_ground_gps[0], first_ground_gps[1])
+            if g_ic:
+                dep_icao_resolved = g_ic
+                dep_name_resolved = g_nm
+        elif first_valid_gps and len(first_valid_gps) == 2:
+            v_ic, v_nm, _ = find_nearest_airport(first_valid_gps[0], first_valid_gps[1])
+            if v_ic:
+                dep_icao_resolved = v_ic
+                dep_name_resolved = v_nm
+        elif near_icao:
+            dep_icao_resolved = near_icao
+            dep_name_resolved = near_name
+
+        if dep_icao_resolved:
+            dep = dep_icao_resolved
+            dep_display = format_airport_route_item(dep_icao_resolved, dep_name_resolved)
         else:
-            route_display = "Waiting for flight"
+            dep = "UNKNOWN"
+            dep_display = "Waiting for flight"
+
+        # Sans OFP SimBrief, l'arrivée est UNKNOWN
+        arr = "UNKNOWN"
+        arr_display = "UNKNOWN"
+        route_display = actual_position_display
 
     # 4. Tag Optimisation Scènes
     if is_corridor and dis_count > 0:
@@ -1115,10 +1147,14 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
     return {
         "route_display": route_display,
         "route_label": route_label,
+        "dep_display": dep_display,
+        "arr_display": arr_display,
+        "actual_position_display": actual_position_display,
+        "nearest_icao": near_icao,
         "mode_display": mode_display,
         "flight_type_tag": flight_type_tag,
         "scenery_opt_tag": scenery_opt_tag,
-        "origin_icao": near_icao or (dep if not has_simbrief else None),
+        "origin_icao": dep if dep not in ("DEP", "UNKNOWN", None) else near_icao,
         "has_simbrief": has_simbrief,
         "is_corridor": is_corridor,
         "dep": dep,
@@ -1476,6 +1512,8 @@ class SimConnectTelemetryClient:
         self.aircraft_title = None
         self.lat = None
         self.lon = None
+        self.first_ground_gps = None
+        self.first_valid_gps = None
         self.sim_rate = 1.0
         self.is_paused = False
         self._stop_event = threading.Event()
@@ -1514,6 +1552,8 @@ class SimConnectTelemetryClient:
             self.aircraft_title = None
             self.lat = None
             self.lon = None
+            self.first_ground_gps = None
+            self.first_valid_gps = None
             self.sim_rate = 1.0
             self._accum_fps = 0.0
             self._frame_count = 0
@@ -1669,8 +1709,9 @@ class SimConnectTelemetryClient:
                                     # Est-on en mode VR ?
                                     is_vr = False
                                     try:
-                                        mem_eng = FlightMemoryEngine()
-                                        if mem_eng.is_attached:
+                                        from flight_memory_engine import get_memory_engine
+                                        mem_eng = get_memory_engine()
+                                        if mem_eng:
                                             is_vr = mem_eng.is_vr_active()
                                     except Exception:
                                         pass
@@ -1728,6 +1769,13 @@ class SimConnectTelemetryClient:
                                     else:
                                         self.aircraft_title = None
                                         self.in_flight = False
+                                        self.first_ground_gps = None
+                                        self.first_valid_gps = None
+                                if self.in_flight and not self.is_paused and self.lat is not None and self.lon is not None and (abs(self.lat) > 0.001 or abs(self.lon) > 0.001):
+                                    if self.first_valid_gps is None:
+                                        self.first_valid_gps = (self.lat, self.lon)
+                                    if (self.on_ground or (self.agl_ft is not None and self.agl_ft < 200)) and self.first_ground_gps is None:
+                                        self.first_ground_gps = (self.lat, self.lon)
 
                         last_calc_time = now
 
@@ -1753,7 +1801,9 @@ class SimConnectTelemetryClient:
                 "aircraft": self.aircraft_title,
                 "sim_rate": self.sim_rate,
                 "lat": self.lat,
-                "lon": self.lon
+                "lon": self.lon,
+                "first_ground_gps": self.first_ground_gps,
+                "first_valid_gps": self.first_valid_gps
             }
 
 SIMCONNECT_CLIENT = SimConnectTelemetryClient()
@@ -2448,11 +2498,21 @@ def generate_html_report(csv_path, session_info, samples):
         events = smart_lod_perf.get('events', [])
         if events:
             for ev in events[-8:]:
+                ev_time_disp = ev.get('time_str') or ev.get('timestamp') or '--'
+                old_t = ev.get('old_tlod')
+                new_t = ev.get('new_tlod')
+                single_t = ev.get('tlod')
+                if old_t is not None and new_t is not None and str(old_t) != 'None' and str(new_t) != 'None':
+                    tlod_disp = f"TLOD {old_t} ➔ {new_t}" if old_t != new_t else f"TLOD {new_t}"
+                elif single_t is not None and str(single_t) != 'None':
+                    tlod_disp = f"TLOD {single_t}"
+                else:
+                    tlod_disp = "TLOD Active"
                 event_rows += f"""
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px;">
-                    <td style="padding:6px 12px; color:#94a3b8;">{ev.get('time_str')}</td>
+                    <td style="padding:6px 12px; color:#94a3b8;">{ev_time_disp}</td>
                     <td style="padding:6px 12px; color:#06b6d4;">{ev.get('agl_ft')} ft</td>
-                    <td style="padding:6px 12px; color:#ec4899; font-weight:bold;">TLOD {ev.get('old_tlod')} ➔ {ev.get('new_tlod')}</td>
+                    <td style="padding:6px 12px; color:#ec4899; font-weight:bold;">{tlod_disp}</td>
                     <td style="padding:6px 12px; color:#10b981;">{ev.get('fps')} FPS</td>
                     <td style="padding:6px 12px; color:#cbd5e1;">{ev.get('reason')}</td>
                 </tr>
@@ -2931,7 +2991,7 @@ def generate_html_report(csv_path, session_info, samples):
         <!-- GRAPH 2 : VRAM & RAM MSFS & THERMALS -->
         <div class="chart-box">
             <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between;">
-                <span>2. Memory Footprint</span>
+                <span>2. Memory & Thermals</span>
                 <button type="button" onclick="window.chartInstances['perfChart'] && window.chartInstances['perfChart'].resetZoom()" style="background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; padding:3px 9px; font-size:10px; font-weight:700; cursor:pointer; text-transform:uppercase;">RESET ZOOM</button>
             </div>
             <div class="chart-flex-wrapper">
@@ -3064,6 +3124,20 @@ def generate_html_report(csv_path, session_info, samples):
             chart.update();
         }};
 
+        const commonChartPlugins = {{
+            legend: {{ display: false }},
+            tooltip: {{
+                enabled: true,
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(18, 22, 31, 0.96)',
+                borderColor: '#253046',
+                borderWidth: 1,
+                titleFont: {{ family: 'system-ui, -apple-system, sans-serif', size: 11, weight: 'bold' }},
+                bodyFont: {{ family: 'system-ui, -apple-system, sans-serif', size: 10 }}
+            }}
+        }};
+
         function buildHtmlChartLegend(chart, elId, canvasId) {{
             const container = document.getElementById(elId);
             if (!container || !chart) return;
@@ -3072,9 +3146,28 @@ def generate_html_report(csv_path, session_info, samples):
                 const color = ds.borderColor || ds.backgroundColor || '#38bdf8';
                 const label = document.createElement('label');
                 label.className = 'legend-check-item';
-                label.innerHTML = '<input type="checkbox" checked onchange="toggleHtmlDataset(\'' + canvasId + '\', ' + idx + ', this.checked)" style="accent-color:#06b6d4; cursor:pointer; width:14px; height:14px;" />' +
-                    '<span class="legend-color-dot" style="background-color:' + color + '; box-shadow:0 0 6px ' + color + '66;"></span>' +
-                    '<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + (ds.label || '') + '">' + (ds.label || '') + '</span>';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = chart.isDatasetVisible(idx);
+                cb.style.cssText = 'accent-color:#06b6d4; cursor:pointer; width:14px; height:14px; margin:0; flex-shrink:0;';
+                cb.addEventListener('change', function() {{
+                    window.toggleHtmlDataset(canvasId, idx, this.checked);
+                }});
+
+                const dot = document.createElement('span');
+                dot.className = 'legend-color-dot';
+                dot.style.backgroundColor = color;
+                dot.style.boxShadow = '0 0 6px ' + color + '66';
+
+                const text = document.createElement('span');
+                text.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                text.title = ds.label || '';
+                text.textContent = ds.label || '';
+
+                label.appendChild(cb);
+                label.appendChild(dot);
+                label.appendChild(text);
                 container.appendChild(label);
             }});
         }}
@@ -3247,6 +3340,16 @@ def generate_html_report(csv_path, session_info, samples):
                         yAxisID: 'yFps',
                         pointRadius: 0
                     }},
+                    {f'''{{
+                        label: 'Base FPS',
+                        data: {json.dumps([s.get('base_fps') for s in samples])},
+                        borderColor: '#06b6d4',
+                        borderWidth: 1.5,
+                        borderDash: [4, 4],
+                        tension: 0.2,
+                        yAxisID: 'yFps',
+                        pointRadius: 0
+                    }},''' if any(s.get('base_fps') is not None for s in samples) else ''}
                     {{
                         label: 'MainThread (ms)',
                         data: {json.dumps([s.get('main_thread_ms') for s in samples])},
@@ -3277,7 +3380,8 @@ def generate_html_report(csv_path, session_info, samples):
                     yMs: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'MainThread (ms)', color: '#f59e0b' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#f59e0b' }} }},
                     {f'''yRate: {{ type: 'linear', position: 'right', min: 1, max: 8, title: {{ display: true, text: 'Sim Rate (x)', color: '#eab308' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#eab308', stepSize: 1 }} }},''' if has_sim_compression else ''}
                 }},
-                plugins: {{ legend: {{ display: false }} }}
+                interaction: {{ mode: 'index', intersect: false }},
+                plugins: commonChartPlugins
             }}
         }});
         attachSmartHtmlChartZoomAndPan(chartFps, times.length);
@@ -3365,7 +3469,8 @@ def generate_html_report(csv_path, session_info, samples):
                         max: 105
                     }}
                 }},
-                plugins: {{ legend: {{ display: false }} }}
+                interaction: {{ mode: 'index', intersect: false }},
+                plugins: commonChartPlugins
             }}
         }});
         attachSmartHtmlChartZoomAndPan(chartPerf, times.length);
@@ -3432,7 +3537,8 @@ def generate_html_report(csv_path, session_info, samples):
                     yAlt: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'AGL Altitude (ft)', color: '#06b6d4' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#06b6d4' }} }},
                     yLod: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'LOD (TLOD / OLOD)', color: '#ec4899' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#ec4899' }} }}
                 }},
-                plugins: {{ legend: {{ display: false }} }}
+                interaction: {{ mode: 'index', intersect: false }},
+                plugins: commonChartPlugins
             }}
         }});
         attachSmartHtmlChartZoomAndPan(chartLod, times.length);
@@ -3464,7 +3570,8 @@ def generate_html_report(csv_path, session_info, samples):
                     x: {{ title: {{ display: true, text: 'Elapsed Time', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
                     y: {{ title: {{ display: true, text: 'Mbps', color: '#3b82f6' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#3b82f6' }} }}
                 }},
-                plugins: {{ legend: {{ display: false }} }}
+                interaction: {{ mode: 'index', intersect: false }},
+                plugins: commonChartPlugins
             }}
         }});
         attachSmartHtmlChartZoomAndPan(chartIo, times.length);
@@ -3557,6 +3664,158 @@ def generate_html_report(csv_path, session_info, samples):
         return None
 
 
+
+
+def repair_existing_html_report(html_path):
+    """
+    Repairs any previously generated HTML report on disk so that:
+    1. The unescaped quote JS syntax error in buildHtmlChartLegend (toggleHtmlDataset('')) is replaced with safe DOM construction.
+    2. Interactive multi-metric index tooltips (commonChartPlugins + interaction mode: 'index') are active on all 4 charts.
+    3. Any 'None' Time or 'TLOD None ➔ None' cells in Dynamic Regulation & Trigger Log are repaired from the companion JSON/CSV.
+    """
+    if not html_path or not os.path.exists(html_path):
+        return False
+    try:
+        with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
+            txt = f.read()
+
+        modified = False
+
+        # 1. Fix broken buildHtmlChartLegend quote escaping
+        broken_legend_re = re.compile(
+            r"function\s+buildHtmlChartLegend\s*\(\s*chart\s*,\s*elId\s*,\s*canvasId\s*\)\s*\{[\s\S]*?container\.appendChild\(label\);\s*\}\);\s*\}",
+            re.MULTILINE
+        )
+        safe_legend_js = """const commonChartPlugins = {
+            legend: { display: false },
+            tooltip: {
+                enabled: true,
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(18, 22, 31, 0.96)',
+                borderColor: '#253046',
+                borderWidth: 1,
+                titleFont: { family: 'system-ui, -apple-system, sans-serif', size: 11, weight: 'bold' },
+                bodyFont: { family: 'system-ui, -apple-system, sans-serif', size: 10 }
+            }
+        };
+
+        function buildHtmlChartLegend(chart, elId, canvasId) {
+            const container = document.getElementById(elId);
+            if (!container || !chart) return;
+            container.innerHTML = '';
+            chart.data.datasets.forEach(function(ds, idx) {
+                const color = ds.borderColor || ds.backgroundColor || '#38bdf8';
+                const label = document.createElement('label');
+                label.className = 'legend-check-item';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = chart.isDatasetVisible(idx);
+                cb.style.cssText = 'accent-color:#06b6d4; cursor:pointer; width:14px; height:14px; margin:0; flex-shrink:0;';
+                cb.addEventListener('change', function() {
+                    window.toggleHtmlDataset(canvasId, idx, this.checked);
+                });
+
+                const dot = document.createElement('span');
+                dot.className = 'legend-color-dot';
+                dot.style.backgroundColor = color;
+                dot.style.boxShadow = '0 0 6px ' + color + '66';
+
+                const text = document.createElement('span');
+                text.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                text.title = ds.label || '';
+                text.textContent = ds.label || '';
+
+                label.appendChild(cb);
+                label.appendChild(dot);
+                label.appendChild(text);
+                container.appendChild(label);
+            });
+        }"""
+
+        if "toggleHtmlDataset(''" in txt or "commonChartPlugins" not in txt:
+            if broken_legend_re.search(txt):
+                # Avoid duplicate commonChartPlugins if already present
+                replacement_js = safe_legend_js if "commonChartPlugins" not in txt else safe_legend_js.split("function buildHtmlChartLegend", 1)[1]
+                if "commonChartPlugins" in txt:
+                    replacement_js = "function buildHtmlChartLegend" + replacement_js
+                txt = broken_legend_re.sub(replacement_js, txt, count=1)
+                modified = True
+
+        # 2. Ensure interactive index tooltips on all 4 charts
+        old_plug = "plugins: { legend: { display: false } }"
+        new_plug = "interaction: { mode: 'index', intersect: false },\n                plugins: commonChartPlugins"
+        if old_plug in txt and "commonChartPlugins" in txt:
+            txt = txt.replace(old_plug, new_plug)
+            modified = True
+
+        # 3. Fix 'None' time and 'TLOD None ➔ None' in Dynamic Regulation & Trigger Log using companion JSON
+        if "TLOD None" in txt or ">None</td>" in txt:
+            json_path = html_path.rsplit('.', 1)[0] + '.json'
+            ev_list = []
+            fallback_tlod = None
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as jf:
+                        jdata = json.load(jf)
+                    ev_list = ((jdata.get('session_info') or {}).get('smart_lod') or {}).get('events') or []
+                    tlods = [t for t in ((jdata.get('lod_chart') or {}).get('tlod') or []) if t is not None]
+                    if tlods:
+                        fallback_tlod = round(sum(tlods) / len(tlods))
+                except Exception:
+                    pass
+
+            if ev_list:
+                # Rebuild the rows cleanly from ev_list[-8:]
+                for ev in ev_list[-8:]:
+                    t_disp = ev.get('time_str') or ev.get('timestamp') or '--'
+                    old_t = ev.get('old_tlod')
+                    new_t = ev.get('new_tlod')
+                    single_t = ev.get('tlod') or fallback_tlod
+                    if old_t is not None and new_t is not None and str(old_t) != 'None' and str(new_t) != 'None':
+                        tlod_str = f"TLOD {old_t} ➔ {new_t}" if old_t != new_t else f"TLOD {new_t}"
+                    elif single_t is not None and str(single_t) != 'None':
+                        tlod_str = f"TLOD {single_t}"
+                    else:
+                        tlod_str = "TLOD Active"
+                    txt = txt.replace(">None</td>", f">{t_disp}</td>", 1)
+                    txt = txt.replace("TLOD None ➔ None", tlod_str, 1)
+                    txt = txt.replace("TLOD None -> None", tlod_str, 1)
+                modified = True
+            else:
+                txt = txt.replace(">None</td>", ">--</td>")
+                txt = txt.replace("TLOD None ➔ None", f"TLOD {fallback_tlod}" if fallback_tlod else "TLOD Active")
+                modified = True
+
+            # Also update smart_lod_section inside companion JSON so in-app modal also shows clean Time & TLOD
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as jf:
+                        jdata = json.load(jf)
+                    sl_sec = jdata.get('smart_lod_section') or ''
+                    if 'TLOD None' in sl_sec or '>None</td>' in sl_sec:
+                        for ev in ev_list[-8:]:
+                            t_disp = ev.get('time_str') or ev.get('timestamp') or '--'
+                            single_t = ev.get('tlod') or fallback_tlod
+                            tlod_str = f"TLOD {single_t}" if single_t else "TLOD Active"
+                            sl_sec = sl_sec.replace(">None</td>", f">{t_disp}</td>", 1)
+                            sl_sec = sl_sec.replace("TLOD None ➔ None", tlod_str, 1)
+                        jdata['smart_lod_section'] = sl_sec
+                        with open(json_path, 'w', encoding='utf-8') as jf:
+                            json.dump(jdata, jf, ensure_ascii=False)
+                except Exception:
+                    pass
+
+        if modified:
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(txt)
+        return modified
+    except Exception as e:
+        print(f"[repair_existing_html_report] Error on {html_path}: {e}")
+        return False
+
+
 def load_report_payload(filename_or_path):
     """
     Loads complete report structured data for the in-app interactive modal.
@@ -3575,6 +3834,9 @@ def load_report_payload(filename_or_path):
     json_path = base_stem + '.json'
     html_path = base_stem + '.html'
     csv_path = base_stem + '.csv'
+
+    if os.path.exists(html_path):
+        repair_existing_html_report(html_path)
 
     if os.path.exists(json_path):
         try:
@@ -4217,6 +4479,11 @@ class BlackboxSession:
         self.current_flight_name = ""
         self.current_csv_path = None
         self.last_report_path = None
+        self.session_initial_dep = None
+        self.session_initial_arr = None
+        self.session_first_ground_gps = None
+        self.session_first_valid_gps = None
+        self.session_locked_simbrief_ofp = None
         self.latest_telemetry = {
             "is_tracking": False,
             "is_paused": False,
@@ -4238,6 +4505,9 @@ class BlackboxSession:
             "msfs_active": False,
             "aircraft": "--",
             "route_display": "--",
+            "dep_display": "Waiting for flight",
+            "arr_display": "UNKNOWN",
+            "actual_position_display": "Waiting for flight",
             "mode_display": "BASELINE STANDARD",
             "autofps_active": False
         }
@@ -4401,13 +4671,21 @@ class BlackboxSession:
             self.thread.join(timeout=10.0)
         self._clear_checkpoint()
         self.is_running = False
+        self.session_initial_dep = None
+        self.session_initial_arr = None
+        self.session_first_ground_gps = None
+        self.session_first_valid_gps = None
+        self.session_locked_simbrief_ofp = None
         self.latest_telemetry["is_tracking"] = False
         self.latest_telemetry["is_paused"] = False
         self.latest_telemetry["elapsed_sec"] = 0
         self.latest_telemetry["elapsed_str"] = "00:00"
         self.latest_telemetry["aircraft"] = "Not detected"
         self.latest_telemetry["route_display"] = "Waiting for flight"
-        self.latest_telemetry["route_label"] = "ORIGIN :"
+        self.latest_telemetry["dep_display"] = "Waiting for flight"
+        self.latest_telemetry["arr_display"] = "UNKNOWN"
+        self.latest_telemetry["actual_position_display"] = "Waiting for flight"
+        self.latest_telemetry["route_label"] = "ACTUAL POSITION:"
         self.latest_telemetry["flight_type_tag"] = "FREE FLIGHT"
         self.latest_telemetry["scenery_opt_tag"] = "NO SCENERY OPTIMIZATION"
         self.latest_telemetry["mode_display"] = "FREE FLIGHT - NO SCENERY OPTIMIZATION"
@@ -4437,16 +4715,28 @@ class BlackboxSession:
         telemetry["simconnect_connected"] = sc_connected
         telemetry["autofps_active"] = is_autofps_active()
 
-        # Context (Appareil, Route, Mode)
+        # Context (Appareil, DEP, ARR, ACTUAL POSITION, Mode)
         lat = sc_data.get("lat")
         lon = sc_data.get("lon")
         on_ground = sc_data.get("on_ground", False)
+        eff_first_ground = self.session_first_ground_gps or sc_data.get("first_ground_gps")
+        eff_first_valid = self.session_first_valid_gps or sc_data.get("first_valid_gps")
         try:
-            ctx = resolve_flight_context(lat, lon, on_ground)
+            ctx = resolve_flight_context(
+                lat, lon, on_ground,
+                first_ground_gps=eff_first_ground,
+                first_valid_gps=eff_first_valid,
+                session_dep=self.session_initial_dep,
+                session_arr=self.session_initial_arr,
+                locked_simbrief=self.session_locked_simbrief_ofp
+            )
         except Exception:
             ctx = {
                 "route_display": "Waiting for flight",
-                "route_label": "ORIGIN :",
+                "route_label": "ACTUAL POSITION:",
+                "dep_display": "Waiting for flight",
+                "arr_display": "UNKNOWN",
+                "actual_position_display": "Waiting for flight",
                 "mode_display": "FREE FLIGHT - NO SCENERY OPTIMIZATION",
                 "flight_type_tag": "FREE FLIGHT",
                 "scenery_opt_tag": "NO SCENERY OPTIMIZATION",
@@ -4457,7 +4747,10 @@ class BlackboxSession:
         if not sc_connected:
             telemetry["aircraft"] = "Not detected"
             telemetry["route_display"] = "Waiting for flight"
-            telemetry["route_label"] = "ORIGIN :"
+            telemetry["dep_display"] = "Waiting for flight"
+            telemetry["arr_display"] = "UNKNOWN"
+            telemetry["actual_position_display"] = "Waiting for flight"
+            telemetry["route_label"] = "ACTUAL POSITION:"
             telemetry["mode_display"] = "FREE FLIGHT - NO SCENERY OPTIMIZATION"
             telemetry["flight_type_tag"] = "FREE FLIGHT"
             telemetry["scenery_opt_tag"] = "NO SCENERY OPTIMIZATION"
@@ -4465,9 +4758,11 @@ class BlackboxSession:
             telemetry["has_simbrief"] = False
         else:
             telemetry["aircraft"] = sc_data.get("aircraft") or "Not detected"
-            route_text = ctx["route_display"]
-            telemetry["route_display"] = route_text
-            telemetry["route_label"] = ctx.get("route_label", "ROUTE :")
+            telemetry["route_display"] = ctx["route_display"]
+            telemetry["dep_display"] = ctx.get("dep_display", "Waiting for flight")
+            telemetry["arr_display"] = ctx.get("arr_display", "UNKNOWN")
+            telemetry["actual_position_display"] = ctx.get("actual_position_display", "Waiting for flight")
+            telemetry["route_label"] = ctx.get("route_label", "ACTUAL POSITION:")
             telemetry["mode_display"] = ctx["mode_display"]
             telemetry["flight_type_tag"] = ctx.get("flight_type_tag", "FREE FLIGHT")
             telemetry["scenery_opt_tag"] = ctx.get("scenery_opt_tag", "NO SCENERY OPTIMIZATION")
@@ -4648,35 +4943,53 @@ class BlackboxSession:
             sc_init = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
             init_lat = sc_init.get("lat")
             init_lon = sc_init.get("lon")
+            init_on_ground = sc_init.get("on_ground", False)
+            init_agl = sc_init.get("agl_ft")
+            init_ground_gps = sc_init.get("first_ground_gps")
+            init_valid_gps = sc_init.get("first_valid_gps")
             has_init_gps = (init_lat is not None and init_lon is not None and (abs(init_lat) > 0.01 or abs(init_lon) > 0.01))
+            ground_check_pt = init_ground_gps or ((init_lat, init_lon) if (has_init_gps and (init_on_ground or (init_agl is not None and init_agl < 200))) else None)
 
             if sb_init:
-                if has_init_gps:
-                    m_dep, m_arr, _, _ = match_simbrief_plan(sb_init, init_lat, init_lon)
+                if ground_check_pt:
+                    m_dep, m_arr, _, _ = match_simbrief_plan(sb_init, ground_check_pt[0], ground_check_pt[1])
                     if m_dep and m_arr:
                         locked_simbrief_ofp = sb_init
                         origin_validated = True
                         initial_dep = m_dep
                         initial_arr = m_arr
                     else:
-                        # L'OFP SimBrief ne correspond pas à l'aéroport où se trouve l'avion dans MSFS : on ignore l'OFP
+                        # L'OFP SimBrief ne correspond pas à l'aéroport de départ au sol dans MSFS : on ignore l'OFP
                         locked_simbrief_ofp = None
                         origin_validated = True
+                        near_ic, _, _ = find_nearest_airport(ground_check_pt[0], ground_check_pt[1], max_dist_nm=18.0)
+                        initial_dep = near_ic or dep or cur_dep or "UNKNOWN"
+                        initial_arr = "UNKNOWN"
+                elif has_init_gps:
+                    # Déjà en vol au lancement du monitoring : on utilise l'OFP SimBrief sans le rejeter sur la position en route
+                    m_dep, m_arr, _, _ = match_simbrief_plan(sb_init)
+                    if m_dep and m_arr:
+                        locked_simbrief_ofp = sb_init
+                        origin_validated = True
+                        initial_dep = m_dep
+                        initial_arr = m_arr
+                    else:
                         near_ic, _, _ = find_nearest_airport(init_lat, init_lon, max_dist_nm=18.0)
                         initial_dep = near_ic or dep or cur_dep or "UNKNOWN"
-                        initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                        initial_arr = "UNKNOWN"
                 else:
                     s_orig = sb_init.get('origin', {}).get('icao')
                     s_dest = sb_init.get('destination', {}).get('icao')
                     initial_dep = s_orig or dep or cur_dep or "DEP"
                     initial_arr = s_dest or arr or cur_arr or "UNKNOWN"
             else:
-                if has_init_gps:
-                    near_ic, _, _ = find_nearest_airport(init_lat, init_lon, max_dist_nm=18.0)
+                ref_dep_pt = ground_check_pt or init_valid_gps or ((init_lat, init_lon) if has_init_gps else None)
+                if ref_dep_pt:
+                    near_ic, _, _ = find_nearest_airport(ref_dep_pt[0], ref_dep_pt[1], max_dist_nm=18.0)
                     initial_dep = near_ic or dep or cur_dep or "UNKNOWN"
                 else:
                     initial_dep = dep or cur_dep or "DEP"
-                initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                initial_arr = "UNKNOWN"
 
             initial_aircraft_slug = sanitize_aircraft_slug(aircraft)
             prefix = f"{initial_dep or 'DEP'}_{initial_arr or 'UNKNOWN'}_{initial_aircraft_slug}"
@@ -4716,10 +5029,16 @@ class BlackboxSession:
         no_flight_ticks = 0
 
         # Suivi GPS continu et détection appareil
-        first_valid_gps = tuple(resume_state["first_valid_gps"]) if (resume_state and resume_state.get("first_valid_gps")) else None
-        first_ground_gps = tuple(resume_state["first_ground_gps"]) if (resume_state and resume_state.get("first_ground_gps")) else None
+        sc_seed = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+        first_valid_gps = tuple(resume_state["first_valid_gps"]) if (resume_state and resume_state.get("first_valid_gps")) else sc_seed.get("first_valid_gps")
+        first_ground_gps = tuple(resume_state["first_ground_gps"]) if (resume_state and resume_state.get("first_ground_gps")) else sc_seed.get("first_ground_gps")
         last_valid_gps = tuple(resume_state["last_valid_gps"]) if (resume_state and resume_state.get("last_valid_gps")) else None
         last_ground_gps = tuple(resume_state["last_ground_gps"]) if (resume_state and resume_state.get("last_ground_gps")) else None
+        self.session_initial_dep = initial_dep
+        self.session_initial_arr = initial_arr
+        self.session_first_ground_gps = first_ground_gps
+        self.session_first_valid_gps = first_valid_gps
+        self.session_locked_simbrief_ofp = locked_simbrief_ofp
         best_detected_aircraft = resume_state.get("best_detected_aircraft") if resume_state else None
         ctx = {}
         route_str = (resume_state or {}).get("route_display") or f"{initial_dep or 'DEP'} ➔ {initial_arr or 'UNKNOWN'}"
@@ -4884,7 +5203,10 @@ class BlackboxSession:
                         origin_validated = True
                         sb_cand = locked_simbrief_ofp or get_simbrief_flight_plan()
                         if sb_cand:
-                            m_dep, m_arr, _, _ = match_simbrief_plan(sb_cand, ref_orig_pt[0], ref_orig_pt[1])
+                            if first_ground_gps:
+                                m_dep, m_arr, _, _ = match_simbrief_plan(sb_cand, first_ground_gps[0], first_ground_gps[1])
+                            else:
+                                m_dep, m_arr, _, _ = match_simbrief_plan(sb_cand)
                             if m_dep and m_arr:
                                 locked_simbrief_ofp = sb_cand
                                 initial_dep = m_dep
@@ -4893,13 +5215,26 @@ class BlackboxSession:
                                 locked_simbrief_ofp = None
                                 near_ic, _, _ = find_nearest_airport(ref_orig_pt[0], ref_orig_pt[1], max_dist_nm=18.0)
                                 initial_dep = near_ic or "UNKNOWN"
-                                initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                                initial_arr = "UNKNOWN"
                         else:
                             near_ic, _, _ = find_nearest_airport(ref_orig_pt[0], ref_orig_pt[1], max_dist_nm=18.0)
                             initial_dep = near_ic or "UNKNOWN"
-                            initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                            initial_arr = "UNKNOWN"
 
-            ctx = resolve_flight_context(lat, lon, on_ground)
+            self.session_initial_dep = initial_dep
+            self.session_initial_arr = initial_arr
+            self.session_first_ground_gps = first_ground_gps
+            self.session_first_valid_gps = first_valid_gps
+            self.session_locked_simbrief_ofp = locked_simbrief_ofp
+
+            ctx = resolve_flight_context(
+                lat, lon, on_ground,
+                first_ground_gps=first_ground_gps,
+                first_valid_gps=first_valid_gps,
+                session_dep=initial_dep,
+                session_arr=initial_arr,
+                locked_simbrief=locked_simbrief_ofp
+            )
             final_detected_aircraft = best_detected_aircraft or detected_aircraft or aircraft or "Not detected"
 
             route_str = ctx["route_display"]
@@ -4941,6 +5276,9 @@ class BlackboxSession:
                 "simconnect_connected": sc_connected,
                 "aircraft": final_detected_aircraft,
                 "route_display": route_str,
+                "dep_display": ctx.get("dep_display", "Waiting for flight"),
+                "arr_display": ctx.get("arr_display", "UNKNOWN"),
+                "actual_position_display": ctx.get("actual_position_display", "Waiting for flight"),
                 "mode_display": ctx["mode_display"],
                 "autofps_active": is_autofps_active(),
                 "sim_rate": sim_rate,

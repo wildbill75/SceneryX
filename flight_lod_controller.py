@@ -90,13 +90,39 @@ DEFAULT_CONFIG = {
 VALID_INGAME_PIN_KEYS = ("max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass")
 
 
-_nominal_profile_cache: Dict[bool, Tuple[float, Dict[str, Any]]] = {}
+_nominal_profile_cache: Dict[Any, Tuple[float, Dict[str, Any]]] = {}
+
+
+def _detect_profile_vr_mode(aid: str, prof_name: str, content: str, pjson: Optional[Dict[str, Any]] = None) -> Optional[bool]:
+    """Determine if a saved profile is explicitly a VR profile (True), a 2D profile (False), or ambiguous (None)."""
+    if isinstance(pjson, dict):
+        pmode = str(pjson.get("mode", "")).strip().upper()
+        if pmode == "VR" or pjson.get("ofxr_mode"):
+            return True
+        if pmode == "2D":
+            return False
+    label = f"{aid or ''} {prof_name or ''}"
+    if re.search(r"(?:^|[\s_\-])(?:vr|headset|ofxr)(?:$|[\s_\-])", label, re.I):
+        return True
+    if re.search(r"(?:^|[\s_\-])2d(?:$|[\s_\-])", label, re.I):
+        return False
+    if content:
+        m_2d = re.search(r"\bTargetFrameRate\s+(\d+)", content)
+        m_vr = re.search(r"\bTargetFrameRateVR\s+(\d+)", content)
+        m_fl = re.search(r"\bFrameLimiter\s+(\d+)", content)
+        if m_2d and m_vr and m_fl:
+            v_2d, v_vr, v_fl = int(m_2d.group(1)), int(m_vr.group(1)), int(m_fl.group(1))
+            if v_fl == v_vr and v_vr != v_2d:
+                return True
+            if v_fl == v_2d and v_2d != v_vr:
+                return False
+    return None
 
 
 def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str, Any]:
     """
     Lecture directe ultra-rapide (<1ms) des valeurs nominales TLOD, OLOD, Nuages et
-    paramètres graphiques modifiables à chaud du profil graphique actif sans bloquer
+    parametres graphiques modifiables a chaud du profil graphique actif sans bloquer
     avec build_msfs_settings_matrix(). Isole {GraphicsVR en mode VR et {Graphics en mode 2D.
     """
     global _nominal_profile_cache
@@ -105,15 +131,21 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
             try:
                 import flight_memory_engine
                 mem = flight_memory_engine.get_memory_engine()
-                if mem and mem.is_attached:
+                if mem:
                     is_vr = mem.is_vr_active()
             except Exception:
                 is_vr = False
 
         vr_flag = bool(is_vr)
+        appdata = os.environ.get("APPDATA", "")
+        ws_dir = os.path.join(appdata, "SceneryX", "custom_profiles")
+        state_file = os.path.join(ws_dir, "active_profile.json")
+        state_mtime = os.path.getmtime(state_file) if os.path.exists(state_file) else 0.0
         now_ts = time.time()
-        cached_entry = _nominal_profile_cache.get(vr_flag)
-        if cached_entry and (now_ts - cached_entry[0] < 2.0):
+
+        cache_key = (vr_flag, state_mtime)
+        cached_entry = _nominal_profile_cache.get(cache_key)
+        if cached_entry and (now_ts - cached_entry[0] < 1.5):
             return dict(cached_entry[1])
 
         res: Dict[str, Any] = {
@@ -127,12 +159,9 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
             "trees": 2,
             "plants": 1 if vr_flag else 2,
             "grass": 0 if vr_flag else 2,
-            "max_fps": 36 if vr_flag else 60,
+            "max_fps": 45 if vr_flag else 60,
             "is_vr": vr_flag
         }
-        appdata = os.environ.get("APPDATA", "")
-        ws_dir = os.path.join(appdata, "SceneryX", "custom_profiles")
-        state_file = os.path.join(ws_dir, "active_profile.json")
         if os.path.exists(state_file):
             with open(state_file, "r", encoding="utf-8") as f:
                 sdata = json.load(f)
@@ -140,18 +169,36 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
             if aid:
                 pfile = os.path.join(ws_dir, f"{aid}.profile.json")
                 if os.path.exists(pfile):
+                    pfile_mtime = os.path.getmtime(pfile)
+                    full_cache_key = (vr_flag, aid, state_mtime, pfile_mtime)
+                    cached_full = _nominal_profile_cache.get(full_cache_key)
+                    if cached_full and (now_ts - cached_full[0] < 1.5):
+                        return dict(cached_full[1])
+
                     with open(pfile, "r", encoding="utf-8") as pf:
                         pjson = json.load(pf)
                     res["name"] = pjson.get("name", aid)
                     content = pjson.get("content", "")
 
-                    # Extract TargetFrameRate / TargetFrameRateVR from {Video
+                    prof_vr_mode = _detect_profile_vr_mode(aid, res["name"], content, pjson)
+                    if prof_vr_mode is True:
+                        vr_flag = True
+                        res["is_vr"] = True
+                        res["terrain_shadows"] = 256
+                        res["plants"] = 1
+                        res["grass"] = 0
+                        res["max_fps"] = 45
+
+                    # Extract TargetFrameRate / TargetFrameRateVR from {Video (with FrameLimiter fallback)
                     fps_key = "TargetFrameRateVR" if vr_flag else "TargetFrameRate"
                     m_fps = re.search(rf"\b{fps_key}\s+(\d+)", content)
-                    if m_fps:
-                        fps_v = int(m_fps.group(1))
-                        if fps_v > 0:
-                            res["max_fps"] = fps_v
+                    fps_v = int(m_fps.group(1)) if m_fps else 0
+                    if fps_v <= 0:
+                        m_fl = re.search(r"\bFrameLimiter\s+(\d+)", content)
+                        if m_fl and int(m_fl.group(1)) > 0:
+                            fps_v = int(m_fl.group(1))
+                    if fps_v > 0:
+                        res["max_fps"] = fps_v
 
                     # Isolate section: GraphicsVR for VR, Graphics for 2D
                     if vr_flag and "{GraphicsVR" in content:
@@ -173,7 +220,7 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
                     if m_hfs:
                         hfs_en = int(m_hfs.group(1))
                         hfs_sz = int(m_hfs.group(2))
-                        res["terrain_shadows"] = 0 if hfs_en == 0 else (hfs_sz if hfs_sz in (128, 256, 512, 1024, 2048) else 512)
+                        res["terrain_shadows"] = 0 if hfs_en == 0 else (hfs_sz if hfs_sz in (128, 256, 512, 1024, 2048) else (256 if vr_flag else 512))
                     m_bldg = re.search(r"\{Buildings\s+Quality\s+(\d+)", section)
                     if m_bldg:
                         res["buildings"] = max(0, min(3, int(m_bldg.group(1))))
@@ -195,9 +242,10 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
                     m_olod = re.search(r"\{ObjectsLoD\s+LoDFactor\s+([\d\.]+)", section)
                     if m_olod:
                         res["olod"] = round(float(m_olod.group(1)) * 100.0, 1)
-                    _nominal_profile_cache[vr_flag] = (now_ts, dict(res))
+                    _nominal_profile_cache[full_cache_key] = (now_ts, dict(res))
+                    _nominal_profile_cache[cache_key] = (now_ts, dict(res))
                     return res
-        _nominal_profile_cache[vr_flag] = (now_ts, dict(res))
+        _nominal_profile_cache[cache_key] = (now_ts, dict(res))
         return res
     except Exception as e:
         print(f"[SmartLOD] Notice fast active profile reader: {e}")
@@ -212,7 +260,7 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
         "trees": 2,
         "plants": 1 if is_vr else 2,
         "grass": 0 if is_vr else 2,
-        "max_fps": 36 if is_vr else 60,
+        "max_fps": 45 if is_vr else 60,
         "is_vr": bool(is_vr)
     }
 
@@ -331,7 +379,9 @@ def apply_live_graphics_to_profile(
                 is_vr = False
         vr_flag = bool(is_vr)
 
+        _nominal_profile_cache.clear()
         nom_vals = get_active_profile_nominal_values(is_vr=vr_flag)
+        vr_flag = bool(vr_flag or nom_vals.get("is_vr", False))
         effective_settings: Dict[str, int] = {}
 
         if reset_keys:
@@ -361,8 +411,7 @@ def apply_live_graphics_to_profile(
                     with open(ucfg_path, "r", encoding="utf-8", errors="ignore") as uf:
                         u_content = uf.read()
                     if u_content:
-                        u_patched = _patch_usercfg_live_graphics(u_content, effective_settings, False)
-                        u_patched = _patch_usercfg_live_graphics(u_patched, effective_settings, True)
+                        u_patched = _patch_usercfg_live_graphics(u_content, effective_settings, vr_flag)
                         with open(ucfg_path, "w", encoding="utf-8") as uf:
                             uf.write(u_patched)
             except Exception as ue:
@@ -495,8 +544,9 @@ class SmartLodController:
             try:
                 telemetry = self._get_live_flight_telemetry()
                 base_fps = float(telemetry.get("base_fps", 0) or telemetry.get("displayed_fps", 0) or 0)
-                is_vr = self.engine.is_vr_active() if (self.engine.is_attached and not self.engine.safe_read_only) else False
-                target_fps = float(self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40)))
+                is_vr = self.engine.is_vr_active()
+                prof_fps = _LIVE_GRAPHICS_OVERRIDES.get("max_fps") or get_active_profile_nominal_values(is_vr=is_vr).get("max_fps")
+                target_fps = float(prof_fps if (prof_fps and prof_fps > 0) else (self.config.get("vr_target_fps", 45) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40))))
                 if base_fps > 0 and base_fps < (target_fps - 5):
                     calc_q = max(0, nom_q - 1)
             except Exception:
@@ -587,19 +637,36 @@ class SmartLodController:
 
     def reset_to_active_profile(self, axis: str = "all") -> Dict[str, Any]:
         """
-        Recalibre immédiatement les curseurs et la mémoire MSFS sur les valeurs nominales du profil actif,
-        en supprimant tout débrayage manuel ou temporaire.
-        axis="lod" ne réinitialise que TLOD et OLOD sans toucher aux nuages ni aux surcharges graphiques.
+        Recalibre immediatement les curseurs et la memoire MSFS sur les valeurs nominales du profil actif,
+        en supprimant tout debrayage manuel ou temporaire.
+        axis="lod" ne reinitialise que TLOD et OLOD sans toucher aux nuages ni aux surcharges graphiques.
         """
+        global _nominal_profile_cache
+        _nominal_profile_cache.clear()
+        try:
+            import flight_memory_engine
+            flight_memory_engine.FlightMemoryEngine._active_prof_vr_cache = None
+        except Exception:
+            pass
+
         nom_vals = get_active_profile_nominal_values()
         nom_tlod = nom_vals.get("tlod", 100.0)
         nom_olod = nom_vals.get("olod", 100.0)
         nom_cloud = max(0, min(3, int(nom_vals.get("clouds", 2))))
+        nom_fps = int(nom_vals.get("max_fps", 45 if nom_vals.get("is_vr") else 60))
+        is_vr_prof = bool(nom_vals.get("is_vr", False))
         profile_name = nom_vals.get("name", "Active Profile")
 
         with self._lock:
             if axis == "all":
                 _LIVE_GRAPHICS_OVERRIDES.clear()
+                if nom_fps > 0:
+                    if is_vr_prof:
+                        self.config["vr_target_fps"] = nom_fps
+                    else:
+                        self.config["2d_target_fps"] = nom_fps
+                        self.config["ifr_target_fps"] = nom_fps
+                        self.config["vfr_target_fps"] = nom_fps
             elif axis == "clouds":
                 _LIVE_GRAPHICS_OVERRIDES.pop("clouds", None)
             if axis in ("tlod", "lod", "all"):
@@ -613,6 +680,19 @@ class SmartLodController:
                 self.in_cloud_boost = False
                 self.current_cloud_quality = nom_cloud
 
+        try:
+            import sys
+            frs = sys.modules.get("flight_remote_server")
+            if frs:
+                if axis in ("tlod", "lod", "all"):
+                    frs._LAST_MANUAL_LOD.pop("tlod", None)
+                if axis in ("olod", "lod", "all"):
+                    frs._LAST_MANUAL_LOD.pop("olod", None)
+                if axis == "all" and hasattr(frs, "_compute_active_highlights_snapshot"):
+                    frs._CACHED_ACTIVE_HIGHLIGHTS = frs._compute_active_highlights_snapshot()
+        except Exception:
+            pass
+
         if not self.engine.is_attached:
             self.engine.attach()
 
@@ -623,14 +703,18 @@ class SmartLodController:
                 self.engine.write_olod(nom_olod)
             if axis in ("clouds", "all"):
                 self.engine.write_cloud_quality(nom_cloud)
+            if axis == "all":
+                self.engine.write_live_graphics(nom_vals)
 
         cur_cld = getattr(self, "current_cloud_quality", nom_cloud)
-        print(f"[SmartLOD] Reset ({axis}) to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}, Clouds={cur_cld}")
+        print(f"[SmartLOD] Reset ({axis}) to active profile '{profile_name}' (VR={is_vr_prof}): MaxFPS={nom_fps}, TLOD={nom_tlod}, OLOD={nom_olod}, Clouds={cur_cld}")
         return {
             "success": True,
             "axis": axis,
             "reset_to_profile": True,
             "profile_name": profile_name,
+            "is_vr": is_vr_prof,
+            "max_fps": nom_fps,
             "manual_tlod": False,
             "manual_olod": False,
             "current_tlod": round(self.current_tlod_setpoint, 1),
@@ -1102,7 +1186,8 @@ class SmartLodController:
         main_thread_ms = telemetry.get("main_thread_ms")
         vram_pct = telemetry.get("vram_pct", 0.0) or 0.0
 
-        target_fps = float(self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40)))
+        prof_fps = _LIVE_GRAPHICS_OVERRIDES.get("max_fps") or get_active_profile_nominal_values(is_vr=is_vr).get("max_fps")
+        target_fps = float(prof_fps if (prof_fps and prof_fps > 0) else (self.config.get("vr_target_fps", 45) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40))))
         target_mt_ms = 1000.0 / max(15.0, target_fps)
         deadband = float(self.config.get("deadband_fps", 2))
         step = float(self.config.get("step_size", 5))
@@ -1260,10 +1345,15 @@ class SmartLodController:
                         self.in_cloud_reduction = (new_q < nom_q)
                         self.in_cloud_boost = False
                         self._last_cloud_change_time = now_ts
+                        _ts_now = datetime.now().strftime("%H:%M:%S")
+                        _cur_tlod_rnd = round(self.current_tlod_setpoint)
                         self.trigger_events.append({
-                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "timestamp": _ts_now,
+                            "time_str": _ts_now,
                             "agl_ft": round(agl),
-                            "tlod": round(self.current_tlod_setpoint),
+                            "tlod": _cur_tlod_rnd,
+                            "old_tlod": _cur_tlod_rnd,
+                            "new_tlod": _cur_tlod_rnd,
                             "fps": round(base_fps, 1),
                             "reason": f"Cloud Quality Step-Down: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
                         })
@@ -1277,10 +1367,15 @@ class SmartLodController:
                         self.in_cloud_reduction = (new_q < nom_q)
                         self.in_cloud_boost = False
                         self._last_cloud_change_time = now_ts
+                        _ts_now = datetime.now().strftime("%H:%M:%S")
+                        _cur_tlod_rnd = round(self.current_tlod_setpoint)
                         self.trigger_events.append({
-                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "timestamp": _ts_now,
+                            "time_str": _ts_now,
                             "agl_ft": round(agl),
-                            "tlod": round(self.current_tlod_setpoint),
+                            "tlod": _cur_tlod_rnd,
+                            "old_tlod": _cur_tlod_rnd,
+                            "new_tlod": _cur_tlod_rnd,
                             "fps": round(base_fps, 1),
                             "reason": f"Cloud Quality Restored: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
                         })
@@ -1363,8 +1458,9 @@ class SmartLodController:
         """Retourne l'état complet pour l'UI Web."""
         mem_status = self.engine.get_status()
         is_af_running, af_pid = self.engine.is_autofps_running()
-        is_vr = self.engine.is_vr_active() if (self.engine.is_attached and not self.engine.safe_read_only) else False
+        is_vr = self.engine.is_vr_active()
         nom_vals = get_active_profile_nominal_values(is_vr=is_vr)
+        is_vr = bool(is_vr or nom_vals.get("is_vr", False))
         is_ext = bool(self.config.get("external_autofps", False) or (self.config.get("source") == "external_autofps") or is_af_running)
         nom_cloud_q = max(0, min(3, int(nom_vals.get("clouds", 2))))
         override_cloud_q = _LIVE_GRAPHICS_OVERRIDES.get("clouds")

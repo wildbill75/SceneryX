@@ -60,7 +60,7 @@
     <link rel="stylesheet" href="vendor/fontawesome.all.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <!-- SceneryX Design System Tokens & Components -->
-    <link rel="stylesheet" href="design-system.css?v=1.0.0" />
+    <link rel="stylesheet" href="design-system.css?v=1.2.6" />
     <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -315,15 +315,16 @@
             filter: brightness(1.08);
         }
 
-        /* Standard SceneryX Window Manager Rules */
+        /* Standard SceneryX Window Manager Rules (Strict Flat Design - Fix #3) */
         .sceneryx-modal {
             position: fixed !important;
-            background: rgba(30, 41, 59, 0.92) !important;
-            backdrop-filter: blur(16px) !important;
-            -webkit-backdrop-filter: blur(16px) !important;
-            border: 1px solid rgba(51, 65, 85, 0.60) !important;
-            border-radius: 12px !important; /* rounded-xl */
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+            background: #12161F !important;
+            background-image: none !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border: 1px solid #1E2638 !important;
+            border-radius: 6px !important;
+            box-shadow: none !important;
             overflow: hidden !important;
             display: flex !important;
             flex-direction: column !important;
@@ -630,12 +631,22 @@
         #map,
         .leaflet-container {
             transform: translate3d(0, 0, 0);
-            background-color: #1f2023 !important;
+            background-color: #0D131E !important;
+        }
+        .sceneryx-cluster-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+        .leaflet-map-pane,
+        .leaflet-tile-pane {
+            will-change: transform;
+            transform: translate3d(0, 0, 0);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
         .leaflet-container img.leaflet-tile,
         .leaflet-tile-container img {
             mix-blend-mode: normal !important;
-            will-change: transform;
             backface-visibility: hidden;
             -webkit-backface-visibility: hidden;
         }
@@ -2191,7 +2202,7 @@
 
             <!-- Bottom Right Version & Copyright -->
             <div class="w-full flex justify-end pt-1">
-                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.8 • &copy; 2026 Sidestick Priority</span>
+                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.2.0 • &copy; 2026 Sidestick Priority</span>
             </div>
 
         </div>
@@ -2203,14 +2214,14 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-end gap-2.5">
                 <img src="header_logo.png?v=4" alt="SceneryX" class="h-10 lg:h-11 w-auto object-contain select-none pointer-events-none drop-shadow-sm" />
-                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.8">PRO_1.1.8</span>
+                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.2.0">PRO_1.2.0</span>
             </div>
         </div>
 
-        <!-- CENTER: MAIN HERO STATS & INVESTMENT BANNER (PERFECTLY HORIZONTALLY CENTERED) -->
-        <div id="header-hero-stats" class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center text-center py-1.5 space-y-2 pointer-events-auto">
+        <!-- CENTER: MAIN HERO STATS & INVESTMENT BANNER (PERFECTLY HORIZONTALLY & VERTICALLY CENTERED) -->
+        <div id="header-hero-stats" class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center text-center gap-2 pointer-events-auto">
             <!-- HERO STATS BAR (CLICKABLE INTERACTIVE BADGES FOR INSTANT FILTERING) -->
-            <div class="flex items-center gap-2.5 justify-center flex-nowrap py-1">
+            <div class="flex items-center gap-2.5 justify-center flex-nowrap">
                 <!-- TOTAL AIRPORTS BADGE (ELECTRIC SKY BLUE) -->
                 <div id="stat-pill-total" onclick="filterByPricingPill('All')" data-i18n-title="stat.tooltip_total" title="Click to show ALL airports" class="stat-pill flex items-center gap-1.5 bg-sky-600 border border-sky-500 shadow-sm px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
                     <span id="stat-total" class="font-sans font-bold text-white text-sm lg:text-base leading-none tabular-nums">0</span>
@@ -2243,7 +2254,7 @@
             </div>
 
             <!-- PILOT INSIGHTS & FUN STATS CAROUSEL BANNER -->
-            <div id="fun-stats-banner" class="relative group/ticker flex items-center justify-center max-w-[840px] mx-auto py-0.5 select-none"
+            <div id="fun-stats-banner" class="relative group/ticker flex items-center justify-center max-w-[1060px] mx-auto mt-0.5 select-none"
                  onmouseenter="pauseFunStatsCarousel()"
                  onmouseleave="resumeFunStatsCarousel()">
                 
@@ -2257,10 +2268,10 @@
 
                 <!-- Center Interactive Fact Card -->
                 <div id="investment-card" onclick="handleFunStatsCardClick()"
-                     class="text-xs sm:text-sm lg:text-base font-extrabold text-slate-200 font-sans tracking-wider uppercase flex items-center justify-center text-center cursor-pointer hover:text-white transition-all px-2.5 py-0.5 min-h-[28px] overflow-hidden"
+                     class="text-xs sm:text-sm lg:text-base font-extrabold text-slate-200 font-sans tracking-wider uppercase flex items-center justify-center text-center cursor-pointer hover:text-white transition-all px-2 py-0 leading-tight overflow-hidden"
                      title="Click to explore on map">
-                    <div id="fun-stats-content" class="transition-all duration-300 transform inline-flex items-center justify-center flex-wrap gap-1.5">
-                        <span><span data-i18n="stat.spent_prefix">YOU HAVE SPENT</span> <span id="investment-banner-text" class="text-amber-300 font-semibold text-base lg:text-xl typo-metric tabular-nums mx-1.5 font-sans">$0.00</span> <span data-i18n="stat.spent_suffix">ON PAYWARE SCENERIES SO FAR !</span></span>
+                    <div id="fun-stats-content" class="transition-all duration-300 transform inline-flex items-center justify-center whitespace-nowrap gap-1 leading-tight">
+                        <span><span data-i18n="stat.spent_prefix">YOU HAVE SPENT</span> <span id="investment-banner-text" class="text-amber-300 font-semibold text-base lg:text-xl typo-metric tabular-nums mx-1.5 font-sans">$0.00</span> <span data-i18n="stat.spent_suffix" class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ON PAYWARE SCENERIES)</span></span>
                     </div>
                 </div>
 
@@ -2277,11 +2288,10 @@
             </div>
         </div>
 
-        <!-- RIGHT: SCENERY CONFLICT NAVIGATOR -->
+        <!-- RIGHT: SCENERY CONFLICT NAVIGATOR (Duplicate mini loadout menu removed per Fix #1) -->
         <div class="relative flex items-center gap-2.5 shrink-0 z-20">
-
             <!-- SCENERY CONFLICT ALERT BUTTON (OPENS CONFLICT RESOLUTION MODAL) -->
-            <button id="conflict-nav-pill" onclick="openConflictModal()" class="hidden items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 px-3 py-1.5 rounded-full typo-action-btn text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-95 group" title="Click to resolve scenery conflicts">
+            <button id="conflict-nav-pill" onclick="openConflictModal()" class="hidden items-center gap-1.5 bg-[#12161F] hover:bg-[#181E2B] border border-[#253046] text-slate-200 px-3 py-1.5 rounded typo-action-btn text-xs font-semibold transition-all cursor-pointer" title="Click to resolve scenery conflicts">
                 <span id="conflict-nav-counter" class="typo-metric font-semibold text-amber-400 tabular-nums">0</span>
                 <span data-i18n="conflict.pill_label" class="uppercase tracking-[0.02em] text-[10px] text-slate-300">Conflict</span>
             </button>
@@ -2567,9 +2577,9 @@
                             <span id="classic-lbl-telemetry" data-i18n="classic.telemetry" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">TELEMETRY</span>
                             <span id="classic-badge-telemetry" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
-                        <button type="button" onclick="toggleFloatingWindow('route', event)" id="classic-btn-route" data-i18n-title="classic.flight_route_tooltip" title="SimBrief & Corridor Scenery Isolation to free RAM and VRAM" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-route" data-i18n="classic.flight_route" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">ROUTE OPTIMIZATION</span>
-                            <span id="classic-badge-route" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
+                        <button type="button" onclick="toggleFloatingWindow('route', event)" id="classic-btn-route" data-i18n-title="classic.flight_route_tooltip" title="Unified Scenery Loadouts & Flight Route Optimizer (SimBrief Cross-Audit & Corridor Isolation)" class="w-full h-10 px-3.5 rounded bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-colors flex items-center justify-between cursor-pointer">
+                            <span id="classic-lbl-route" data-i18n="classic.flight_route" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SCENERY &amp; ROUTE</span>
+                            <span id="classic-badge-route" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#10B981] border border-[#253046]">ALL ACTIVE</span>
                         </button>
                     </div>
                 </div>
@@ -2577,9 +2587,84 @@
             </div>
         </aside>
 
-        <!-- LEAFLET MAP CONTAINER -->
+        <!-- LEAFLET MAP & 3D GLOBE CONTAINER -->
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
+
+            <!-- TOUR AIRPORT TARGET RETICLE & HIGHLIGHT (LFPG HUB SPOTLIGHT - SITS ABOVE MAP z-10 AND UNDER ALL MODALS z-[1550]) -->
+            <div id="tour-lfpg-spotlight-target" class="hidden pointer-events-none fixed w-[180px] h-[180px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center select-none" style="z-index: 650; left: -9999px; top: -9999px;">
+                <!-- Glowing illuminated circular radar pulse ring -->
+                <div class="absolute inset-0 rounded-full border-2 border-cyan-400 shadow-[0_0_35px_rgba(56,189,248,0.7)] bg-cyan-400/10 backdrop-blur-[1px] animate-pulse"></div>
+                <div class="absolute inset-3 rounded-full border border-cyan-400/30"></div>
+            </div>
+
+            <!-- 3D TERRESTRIAL GLOBE CONTAINER -->
+            <div id="globe-container" class="hidden absolute inset-0 w-full h-full z-20 bg-[#070A10] select-none overflow-hidden">
+                <canvas id="globe-canvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+                <div id="globe-dom-overlay" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+                <!-- Globe Top-Right Zoom Controls (matches Leaflet zoom control position) -->
+                <div id="globe-zoom-controls" class="absolute top-[10px] right-[10px] z-[400] flex flex-col rounded-md overflow-hidden border border-[#253046] bg-[#12161F]/95 shadow-lg">
+                    <button type="button" onclick="globeZoomStep(0.25)" title="Zoom in" class="w-[30px] h-[30px] flex items-center justify-center text-[#F1F5F9] hover:bg-[#181E2B] font-bold text-lg leading-none border-b border-[#253046] cursor-pointer transition-colors">+</button>
+                    <button type="button" onclick="globeZoomStep(-0.25)" title="Zoom out" class="w-[30px] h-[30px] flex items-center justify-center text-[#F1F5F9] hover:bg-[#181E2B] font-bold text-lg leading-none cursor-pointer transition-colors">&minus;</button>
+                </div>
+            </div>
+
+            <!-- TOP-RIGHT 2D MAP / 3D GLOBE VIEW SWITCHER & STYLE SELECTOR -->
+            <div id="map-projection-switcher" class="absolute top-[10px] right-[52px] z-[400] flex items-center p-1 rounded-lg bg-[#12161F]/95 border border-[#253046] shadow-[0_8px_24px_rgba(0,0,0,0.55)] select-none gap-1">
+                <div id="map-view-mode-group" class="flex items-center gap-1">
+                    <button type="button" id="btn-view-mode-2d" onclick="setMapProjectionMode('2d')" title="2D Flat Map View" class="h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0B0D11] font-sans font-bold text-[11px] uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border border-[#00A8FF]">
+                        <span data-i18n="map.view_2d">2D Map</span>
+                    </button>
+                    <button type="button" id="btn-view-mode-globe" onclick="setMapProjectionMode('globe')" title="3D Terrestrial Globe View" class="h-7 px-2.5 rounded-md bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-sans font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]/40">
+                        <span data-i18n="map.view_globe">3D Globe</span>
+                        <span id="lite-lock-globe" class="hidden inline-flex items-center"></span>
+                    </button>
+                </div>
+                <div class="w-px h-4 bg-[#253046] mx-0.5"></div>
+                <div id="map-theme-select-wrap" class="relative flex items-center rounded-md bg-[#121824] hover:bg-[#182030] border border-[#00A8FF]/40 transition-colors">
+                    <select id="map-theme-select" onchange="setMapStyleTheme(this.value, true)" title="Map Color & Display Style" class="h-7 px-2 rounded-md bg-transparent text-[#E2E8F0] font-sans font-semibold text-[11px] uppercase tracking-wider border-0 cursor-pointer focus:outline-none">
+                        <option value="avionics_blue" class="bg-[#12161F] text-[#F1F5F9]">Avionics Blue</option>
+                        <option value="midnight_navy" class="bg-[#12161F] text-[#F1F5F9]">Deep Navy</option>
+                        <option value="carbon_dark" class="bg-[#12161F] text-[#F1F5F9]">Carbon Dark</option>
+                        <option value="emerald_radar" class="bg-[#12161F] text-[#F1F5F9]">Radar Emerald</option>
+                        <option value="vfr_chart" class="bg-[#12161F] text-[#F1F5F9]">VFR Chart</option>
+                        <option value="ifr_enroute" class="bg-[#12161F] text-[#F1F5F9]">IFR Enroute</option>
+                        <option value="satellite" class="bg-[#12161F] text-[#F1F5F9]">Satellite</option>
+                        <option value="street" class="bg-[#12161F] text-[#F1F5F9]">Street Map</option>
+                    </select>
+                    <span id="lite-lock-map-theme" class="hidden pr-2 inline-flex items-center pointer-events-none"></span>
+                </div>
+                <div class="w-px h-4 bg-[#253046] mx-0.5"></div>
+                <button type="button" id="btn-toggle-day-night" onclick="toggleDayNightTerminator()" title="Toggle Day / Night Solar Visualization & Time Control" class="h-7 px-2.5 rounded-md bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-sans font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]/40">
+                    <span data-i18n="map.day_night">Day / Night</span>
+                    <span id="lite-lock-day-night" class="hidden inline-flex items-center"></span>
+                </button>
+            </div>
+
+            <!-- TOP-RIGHT DAY / NIGHT SOLAR TIME CONTROLLER -->
+            <div id="day-night-time-panel" class="hidden absolute top-[50px] right-[52px] z-[400] w-[340px] p-2.5 rounded-lg bg-[#12161F]/95 border border-[#253046] shadow-[0_12px_28px_rgba(0,0,0,0.65)] select-none space-y-2">
+                <div class="flex items-center justify-between gap-1.5">
+                    <div class="flex items-center gap-1">
+                        <button type="button" id="btn-solar-ref-utc" onclick="setSolarTimeSliderReference('utc')" title="Control & scrub time in UTC (Zulu)" class="h-6 px-2 rounded bg-[#00A8FF] text-[#0B0D11] font-mono font-bold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]">
+                            <span id="solar-utc-display">12:00 UTC</span>
+                        </button>
+                        <button type="button" id="btn-solar-ref-local" onclick="setSolarTimeSliderReference('local')" title="Control & scrub time in Local Time" class="h-6 px-2 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-semibold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]/40">
+                            <span id="solar-local-display">14:00 LOC</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button type="button" onclick="stepLocalTimezoneOffset(-0.5)" title="Decrease Local Time Offset (UTC-)" class="w-5 h-6 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-bold text-xs flex items-center justify-center border border-[#253046] cursor-pointer">&minus;</button>
+                        <span id="solar-tz-offset-badge" onclick="openSettingsModal()" title="Active Local Time Offset (Click to configure in Settings)" class="min-w-[58px] h-6 px-1.5 rounded bg-[#0E121A] border border-[#253046] text-[#38BDF8] font-mono font-bold text-[10px] flex items-center justify-center cursor-pointer">UTC+2</span>
+                        <button type="button" onclick="stepLocalTimezoneOffset(0.5)" title="Increase Local Time Offset (UTC+)" class="w-5 h-6 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-bold text-xs flex items-center justify-center border border-[#253046] cursor-pointer">+</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="adjustSolarTimeMinutes(-60)" title="-1 Hour" class="h-6 px-1.5 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-bold text-[10px] border border-[#253046] cursor-pointer shrink-0">-1H</button>
+                    <input type="range" id="solar-time-slider" min="0" max="1435" step="5" value="720" oninput="onSolarTimeSliderInput(this.value)" class="flex-1 h-1.5 accent-[#00A8FF] bg-[#0E121A] rounded-lg cursor-pointer">
+                    <button type="button" onclick="adjustSolarTimeMinutes(60)" title="+1 Hour" class="h-6 px-1.5 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-bold text-[10px] border border-[#253046] cursor-pointer shrink-0">+1H</button>
+                    <button type="button" id="btn-solar-live" onclick="resetSolarTimeToLive()" title="Sync with Live Real-Time Clock" class="h-6 px-2 rounded bg-[#10B981] text-[#0B0D11] font-mono font-bold text-[10px] uppercase tracking-wider border border-[#10B981] cursor-pointer shrink-0">LIVE</button>
+                </div>
+            </div>
 
             <!-- BOTTOM CENTERED MAP TOOLBAR (SCENERYX DARK COCKPIT DOCK) -->
             <div id="bottom-map-toolbar" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-2 px-3 py-2 rounded-xl bg-[#12161F]/95 border border-[#1E2638] shadow-[0_16px_40px_rgba(0,0,0,0.65)] backdrop-blur-xl select-none">
@@ -2607,7 +2692,7 @@
                     </button>
 
                     <!-- RESCAN BUTTON -->
-                    <button id="btn-rescan-packages" onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-lg bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 active:scale-[0.98] text-[#0B0D11] text-xs font-sans font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_2px_12px_rgba(6,182,212,0.3)]">
+                    <button id="btn-rescan-packages" onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-lg bg-[#00A8FF] hover:bg-[#38BDF8] bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 active:scale-[0.98] text-[#0B0D11] text-xs font-sans font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_2px_12px_rgba(6,182,212,0.3)]">
                         <span id="rescan-icon" data-icon="refresh" class="w-4 h-4 block text-[#0B0D11]"></span>
                         <span data-i18n="footer.rescan_button">Rescan Packages</span>
                     </button>
@@ -3510,7 +3595,7 @@
                 <div id="cfg-simbrief-section" class="pt-3 border-t border-slate-800/80 space-y-2">
                     <div class="flex items-center justify-between">
                         <label id="cfg-simbrief-label" data-i18n="settings.simbrief_section" class="typo-section-title text-slate-400 block">SimBrief</label>
-                        <span id="cfg-simbrief-pro-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
+                        <span id="cfg-simbrief-pro-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center"><span>PRO</span></span>
                     </div>
                     <div class="relative flex items-center">
                         <input type="text" id="cfg-simbrief-id" data-i18n-placeholder="settings.simbrief_placeholder" placeholder="Pilot name or id" class="w-full bg-slate-900 border border-slate-700/60 rounded-md pl-3.5 pr-28 py-2 typo-input-val text-slate-200 focus:outline-none focus:border-slate-400 focus:bg-slate-800 transition-colors">
@@ -3549,6 +3634,21 @@
                         </button>
                     </div>
 
+                    <!-- Map View Mode (2D Map vs 3D Globe) -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <label data-i18n="settings.map_projection" class="typo-setting-label text-slate-300">Map Display Mode</label>
+                                <span id="cfg-map-projection-pro-badge" class="hidden"></span>
+                            </div>
+                            <span data-i18n="settings.map_projection_meta" class="typo-metadata">2D Planisphere or 3D Globe</span>
+                        </div>
+                        <select id="cfg-map-projection" onchange="setMapProjectionMode(this.value, false)" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="2d" data-i18n="settings.map_proj_2d">2D Map (Flat Mercator)</option>
+                            <option value="globe" data-i18n="settings.map_proj_globe">3D Terrestrial Globe</option>
+                        </select>
+                    </div>
+
                     <!-- Default Startup Region -->
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
@@ -3575,11 +3675,11 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.airport_zoom" class="typo-setting-label text-slate-300">Airport Selection Zoom</label>
-                            <span id="cfg-zoom-display" class="typo-metric font-semibold text-slate-200">8.0</span>
+                            <div class="flex items-center gap-2"><span id="cfg-zoom-display" class="typo-metric font-semibold text-slate-200">8.0</span><button type="button" id="cfg-zoom-off-btn" onclick="toggleCameraZoomOff()" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-700 bg-slate-800/80 text-slate-400 hover:text-white hover:border-slate-500 transition-colors cursor-pointer" title="Disable/Enable Airport Selection Zoom">OFF</button></div>
                         </div>
-                        <input type="range" id="cfg-camera-zoom" min="4.0" max="12.0" step="0.5" value="8.0" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
+                        <input type="range" id="cfg-camera-zoom" min="3.5" max="12.0" step="0.5" value="8.0" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer transition-opacity">
                         <div class="flex justify-between">
-                            <span data-i18n="settings.zoom_wide" class="typo-metadata">Wide (4.0)</span>
+                            <span class="typo-metadata">OFF / <span data-i18n="settings.zoom_wide">Wide (4.0)</span></span>
                             <span data-i18n="settings.zoom_regional" class="typo-metadata">Regional (6.0)</span>
                             <span data-i18n="settings.zoom_runway" class="typo-metadata">Runway (12.0)</span>
                         </div>
@@ -3589,11 +3689,11 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.pan_duration" class="typo-setting-label text-slate-300">Camera Pan Duration</label>
-                            <span id="cfg-duration-display" class="typo-metric font-semibold text-slate-200">1.1s</span>
+                            <div class="flex items-center gap-2"><span id="cfg-duration-display" class="typo-metric font-semibold text-slate-200">1.1s</span><button type="button" id="cfg-duration-off-btn" onclick="toggleCameraDurationOff()" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-700 bg-slate-800/80 text-slate-400 hover:text-white hover:border-slate-500 transition-colors cursor-pointer" title="Disable/Enable Camera Pan">OFF</button></div>
                         </div>
-                        <input type="range" id="cfg-camera-duration" min="0.2" max="2.0" step="0.1" value="1.1" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
+                        <input type="range" id="cfg-camera-duration" min="0.0" max="2.0" step="0.1" value="1.1" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer transition-opacity">
                         <div class="flex justify-between">
-                            <span data-i18n="settings.speed_fast" class="typo-metadata">Fast (0.2s)</span>
+                            <span class="typo-metadata">OFF / <span data-i18n="settings.speed_fast">Fast (0.2s)</span></span>
                             <span data-i18n="settings.speed_smooth" class="typo-metadata">Smooth (0.8s)</span>
                             <span data-i18n="settings.speed_cinematic" class="typo-metadata">Cinematic (2.0s)</span>
                         </div>
@@ -3613,6 +3713,13 @@
                             <option value="radial" data-i18n="settings.nav_style_radial">Tactical Radial Menu (Center Hub on Map)</option>
                         </select>
                     </div>
+                    <div class="bg-slate-950/80 p-3 rounded-lg border border-slate-700/60 flex items-center justify-between gap-3">
+                        <div class="space-y-0.5">
+                            <label for="cfg-show-header-stats" data-i18n="settings.show_header_stats" class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">Display Header Insights &amp; Fun Stats</label>
+                            <span data-i18n="settings.show_header_stats_sub" class="typo-metadata text-slate-400 block">Show the dynamic library statistics and aviation records ticker below the quick filter pills</span>
+                        </div>
+                        <input type="checkbox" id="cfg-show-header-stats" checked onchange="previewHeaderStatsSetting(this.checked)" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer shrink-0">
+                    </div>
                 </div>
 
                 <!-- INTERACTIVE TOUR & ASSISTANCE SECTION -->
@@ -3624,14 +3731,14 @@
                     </div>
                     <div class="bg-slate-950/80 p-3.5 rounded-lg border border-slate-800/80 flex items-center justify-between gap-4">
                         <div class="space-y-0.5">
-                            <span data-i18n="settings.tour_card_title" class="text-xs font-bold text-slate-200 block">Guided Walkthrough (25 Steps)</span>
+                            <span data-i18n="settings.tour_card_title" class="text-xs font-bold text-slate-200 block">Guided Walkthrough (32 Steps)</span>
                             <span data-i18n="settings.tour_card_sub" class="text-[11px] text-slate-400 block">Explore the entire UI, airport cards, Smart LOD, in-game panel, scenery export &amp; tools.</span>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             <button type="button" onclick="resetOnboardingPromptFromSettings()" data-i18n-title="settings.reset_tour_prompt_tooltip" title="Reset welcome prompt so it asks on next application launch" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/70 text-xs font-medium transition-colors cursor-pointer">
                                 <span data-i18n="settings.reset_tour_prompt_btn">Reset Prompt</span>
                             </button>
-                            <button type="button" onclick="restartInteractiveTourFromSettings()" class="px-3.5 py-1.5 rounded-md bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-md shadow-cyan-950/30 active:scale-[0.98]">
+                            <button type="button" onclick="restartInteractiveTourFromSettings()" class="px-3.5 py-1.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-md shadow-cyan-950/30 active:scale-[0.98]">
                                 <span data-i18n="settings.start_tour_btn">Launch Tour Now</span>
                             </button>
                         </div>
@@ -3664,6 +3771,58 @@
                             <option value="EUR">EUR (€ - Euro)</option>
                             <option value="GBP">GBP (£ - British Pound)</option>
                             <option value="AUD">AUD (A$ - Australian Dollar)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- LOCAL TIME & DAY/NIGHT SOLAR SETTINGS -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label data-i18n="settings.local_time_section" class="typo-section-title text-slate-400 block">Local Time &amp; Day/Night</label>
+                        <span id="cfg-local-time-pro-badge" class="hidden"></span>
+                    </div>
+                    <div class="space-y-1.5" title="Configure your Local Time Zone (UTC+ / UTC-) for the Day/Night map mode">
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.local_tz_label" class="typo-setting-label text-slate-300">Local Time Zone (UTC Offset)</label>
+                            <span id="cfg-local-tz-preview" class="typo-metadata font-mono text-slate-400">System Local</span>
+                        </div>
+                        <select id="cfg-local-tz-offset" onchange="previewLocalTimezoneOffset(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="auto">Auto (System Local Time)</option>
+                            <option value="-12">UTC-12:00 (Baker Island)</option>
+                            <option value="-11">UTC-11:00 (Pago Pago)</option>
+                            <option value="-10">UTC-10:00 (HST &mdash; Honolulu)</option>
+                            <option value="-9.5">UTC-09:30 (MIT &mdash; Marquesas)</option>
+                            <option value="-9">UTC-09:00 (AKST &mdash; Anchorage)</option>
+                            <option value="-8">UTC-08:00 (PST &mdash; Los Angeles / Vancouver)</option>
+                            <option value="-7">UTC-07:00 (MST &mdash; Denver / Phoenix)</option>
+                            <option value="-6">UTC-06:00 (CST &mdash; Chicago / Mexico City)</option>
+                            <option value="-5">UTC-05:00 (EST &mdash; New York / Toronto)</option>
+                            <option value="-4">UTC-04:00 (AST &mdash; Halifax / Santiago)</option>
+                            <option value="-3.5">UTC-03:30 (NST &mdash; St. John's)</option>
+                            <option value="-3">UTC-03:00 (BRT &mdash; S&atilde;o Paulo / Buenos Aires)</option>
+                            <option value="-2">UTC-02:00 (South Georgia)</option>
+                            <option value="-1">UTC-01:00 (Azores / Cape Verde)</option>
+                            <option value="0">UTC+00:00 (UTC / GMT &mdash; London / Lisbon)</option>
+                            <option value="1">UTC+01:00 (CET &mdash; Paris / Frankfurt / Madrid)</option>
+                            <option value="2">UTC+02:00 (CEST / EET &mdash; Paris Summer / Athens)</option>
+                            <option value="3">UTC+03:00 (MSK / AST &mdash; Istanbul / Riyadh)</option>
+                            <option value="3.5">UTC+03:30 (IRST &mdash; Tehran)</option>
+                            <option value="4">UTC+04:00 (GST &mdash; Dubai / Baku)</option>
+                            <option value="4.5">UTC+04:30 (AFT &mdash; Kabul)</option>
+                            <option value="5">UTC+05:00 (PKT &mdash; Karachi / Tashkent)</option>
+                            <option value="5.5">UTC+05:30 (IST &mdash; New Delhi / Mumbai)</option>
+                            <option value="6">UTC+06:00 (BST &mdash; Dhaka / Almaty)</option>
+                            <option value="6.5">UTC+06:30 (MMT &mdash; Yangon)</option>
+                            <option value="7">UTC+07:00 (ICT &mdash; Bangkok / Jakarta)</option>
+                            <option value="8">UTC+08:00 (CST / SGT &mdash; Singapore / Hong Kong / Beijing)</option>
+                            <option value="9">UTC+09:00 (JST / KST &mdash; Tokyo / Seoul)</option>
+                            <option value="9.5">UTC+09:30 (ACST &mdash; Adelaide / Darwin)</option>
+                            <option value="10">UTC+10:00 (AEST &mdash; Sydney / Melbourne)</option>
+                            <option value="10.5">UTC+10:30 (LHST &mdash; Lord Howe)</option>
+                            <option value="11">UTC+11:00 (SBT &mdash; Noum&eacute;a)</option>
+                            <option value="12">UTC+12:00 (NZST &mdash; Auckland / Fiji)</option>
+                            <option value="13">UTC+13:00 (NZDT &mdash; Auckland Summer)</option>
+                            <option value="14">UTC+14:00 (LINT &mdash; Kiritimati)</option>
                         </select>
                     </div>
                 </div>
@@ -4837,10 +4996,20 @@
                             <span id="opt-mode-opt-tag" class="px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#12161F] border border-[#1E2638] text-[#94A3B8]">NO SCENERY OPTIMIZATION</span>
                         </div>
                     </div>
-                    <!-- Bottom Sub-Row: Route or Origin (Full Width across card) -->
-                    <div class="flex items-center gap-1.5 pt-2 border-t border-[#1E2638] min-w-0">
-                        <span id="opt-live-route-lbl" class="text-[10px] font-bold text-[#64748B] uppercase tracking-wider shrink-0">ORIGIN:</span>
-                        <span id="opt-live-route" class="text-xs font-semibold text-[#CBD5E1] truncate font-sans flex-1" title="Waiting for flight">Waiting for flight</span>
+                    <!-- Bottom Sub-Row: DEP / ARR / ACTUAL POSITION -->
+                    <div class="flex items-center justify-between gap-3 pt-2 border-t border-[#1E2638] min-w-0">
+                        <div class="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span class="text-[10px] font-bold text-[#64748B] uppercase tracking-wider shrink-0">DEP:</span>
+                            <span id="opt-live-dep" class="text-xs font-semibold text-[#CBD5E1] truncate font-sans" title="Waiting for flight">Waiting for flight</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 min-w-0 flex-1 border-l border-[#1E2638] pl-3">
+                            <span class="text-[10px] font-bold text-[#64748B] uppercase tracking-wider shrink-0">ARR:</span>
+                            <span id="opt-live-arr" class="text-xs font-semibold text-[#CBD5E1] truncate font-sans" title="UNKNOWN">UNKNOWN</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 min-w-0 flex-[1.35] border-l border-[#1E2638] pl-3">
+                            <span id="opt-live-route-lbl" class="text-[10px] font-bold text-[#64748B] uppercase tracking-wider shrink-0">ACTUAL POSITION:</span>
+                            <span id="opt-live-route" class="text-xs font-semibold text-[#38BDF8] truncate font-sans flex-1" title="Waiting for flight">Waiting for flight</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4999,141 +5168,509 @@
         </div>
     </div>
 
-    <!-- 5. ROUTE OPTIMIZATION -->
-    <div id="float-win-route-opt"
-         data-modal-id="float-win-route-opt"
-         class="sceneryx-modal floating-window absolute hidden flex-col bg-[#12161F] border border-[#1E2638] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden z-[1200] select-none"
-         style="width: fit-content; max-width: 96vw; height: auto;">
+    <!-- 5. UNIFIED SCENERY & ROUTE OPTIMIZER (v1.2.0) -->
+    <div id="float-win-unified-optimizer"
+         data-modal-id="float-win-unified-optimizer"
+         class="sceneryx-modal floating-window absolute hidden flex-col sx-flat-surface rounded overflow-hidden z-[1250] select-none"
+         style="width: 920px; min-width: 720px; max-width: 96vw; height: auto;">
+
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
-            <div class="flex items-center gap-2">
-                <h3 data-i18n="route.window_title" class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">FLIGHT ROUTE OPTIMIZATION</h3>
-            </div>
-            <button onclick="closeFloatingWindow('route')" title="Close" class="modal-close-btn w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors border-0 outline-none cursor-pointer">
-                <i class="fa-solid fa-xmark text-sm"></i>
-            </button>
-        </div>
-
-        <div class="modal-body p-3 flex flex-row items-center gap-3 overflow-hidden w-fit">
-            <!-- 1. Flight Route Airports (Departure ⇄ Arrival) -->
-            <div class="flex items-center gap-2 bg-[#0E121A] border border-[#2D3A54] rounded-lg p-2 shrink-0">
-                <div id="opt-route-origin-box"
-                     onclick="focusOptimizerAirport('origin')"
-                     class="cursor-pointer hover:bg-[#181E2B] px-2.5 py-1 rounded-md transition-colors w-[110px]"
-                     data-i18n-title="route.dep_tooltip"
-                     title="Click an airport on the map to set Departure">
-                    <span data-i18n="route.dep_label" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Departure</span>
-                    <div class="flex items-baseline gap-1 mt-0.5">
-                        <span id="opt-route-origin-icao" class="font-mono text-xl font-black text-[#F1F5F9] leading-none">----</span>
-                    </div>
-                    <span id="opt-route-origin-name" class="text-[10px] font-mono text-[#94A3B8] truncate block max-w-[100px] leading-tight mt-0.5"></span>
-                </div>
-
-                <button onclick="swapOptimizerRouteAirports()"
-                        type="button"
-                        class="w-7 h-7 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#94A3B8] hover:text-[#00A8FF] flex items-center justify-center transition-colors cursor-pointer shrink-0 outline-none"
-                        data-i18n-title="route.swap_tooltip"
-                        title="Swap Departure and Arrival">
-                    <span class="text-sm font-bold leading-none select-none">⇄</span>
-                </button>
-
-                <div id="opt-route-dest-box"
-                     onclick="focusOptimizerAirport('dest')"
-                     class="cursor-pointer hover:bg-[#181E2B] px-2.5 py-1 rounded-md transition-colors w-[110px] text-right"
-                     data-i18n-title="route.arr_tooltip"
-                     title="Click an airport on the map to set Arrival">
-                    <span data-i18n="route.arr_label" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Arrival</span>
-                    <div class="flex items-baseline justify-end gap-1 mt-0.5">
-                        <span id="opt-route-dest-icao" class="font-mono text-xl font-black text-[#F1F5F9] leading-none">----</span>
-                    </div>
-                    <span id="opt-route-dest-name" class="text-[10px] font-mono text-[#94A3B8] truncate block max-w-[100px] leading-tight mt-0.5 ml-auto"></span>
-                </div>
+            <div class="flex items-center gap-3">
+                <h3 id="unified-opt-window-title"
+                    data-i18n="optimizer.unified_title"
+                    class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">
+                    SCENERY &amp; ROUTE OPTIMIZER
+                </h3>
             </div>
 
-            <!-- 2. Flight Corridor Mode Selector (Segmented control) -->
-            <div class="flex items-center p-1 bg-[#0E121A] border border-[#2D3A54] rounded-lg gap-1 shrink-0">
+            <div class="flex items-center gap-1.5">
+                <span id="unified-opt-sim-lock-badge"
+                      class="hidden px-2 py-0.5 text-[10px] font-mono font-bold uppercase sx-status-err">
+                    SIM RUNNING - LOCKED
+                </span>
                 <button type="button"
-                        id="opt-mode-card-direct"
-                        onclick="setOptimizerMode('DIRECT')"
-                        data-i18n-title="route.mode_direct_tooltip"
-                        title="Isolate only Departure and Arrival sceneries"
-                        class="h-8 px-3 rounded-md bg-[#00A8FF] text-[#0B0D11] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm">
-                    <span data-i18n="route.mode_direct">Direct A &rarr; B</span>
+                        id="unified-opt-btn-back"
+                        onclick="switchUnifiedOptimizerView('MAIN')"
+                        title="Back to Scenery &amp; Route Optimizer"
+                        class="hidden w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent">
+                    <i class="fa-solid fa-arrow-left text-sm"></i>
                 </button>
                 <button type="button"
-                        id="opt-mode-card-corridor"
-                        onclick="setOptimizerMode('CORRIDOR')"
-                        data-i18n-title="route.mode_corridor_tooltip"
-                        title="Activate sceneries along the flight corridor between Departure and Arrival"
-                        class="h-8 px-3 rounded-md bg-transparent hover:bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9] font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center">
-                    <span data-i18n="route.mode_corridor">En-Route Corridor</span>
-                </button>
-                <button type="button"
-                        id="opt-mode-card-simbrief"
-                        onclick="setOptimizerMode('SIMBRIEF')"
-                        data-i18n-title="route.mode_simbrief_tooltip"
-                        title="Import your latest SimBrief OFP route and alternates automatically"
-                        class="h-8 px-3.5 rounded-md bg-transparent hover:bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9] font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center">
-                    <span data-i18n="route.mode_simbrief">Import SimBrief</span>
-                </button>
-            </div>
-
-            <!-- 3. Resource Savings Metrics -->
-            <div class="flex items-center gap-3.5 bg-[#0E121A] border border-[#2D3A54] px-3.5 py-2 rounded-lg shrink-0">
-                <div class="flex flex-col items-center justify-center text-center min-w-[65px]" data-i18n-title="route.isolated_tooltip" title="Number of distant addon sceneries temporarily disabled for this flight">
-                    <span data-i18n="route.isolated_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Isolated</span>
-                    <span id="opt-saving-scenery-count" class="font-mono text-base font-extrabold text-[#10B981] leading-tight mt-0.5">--</span>
-                </div>
-                <div class="h-6 w-px bg-[#253046]"></div>
-                <div class="flex flex-col items-center justify-center text-center min-w-[70px]" data-i18n-title="route.ram_freed_tooltip" title="Estimated System RAM saved by isolating off-route sceneries">
-                    <span data-i18n="route.ram_freed_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">RAM Freed</span>
-                    <span id="opt-saving-ram-val" class="font-mono text-base font-extrabold text-[#00A8FF] leading-tight mt-0.5">0.00 GB</span>
-                </div>
-                <div class="h-6 w-px bg-[#253046]"></div>
-                <div class="flex flex-col items-center justify-center text-center min-w-[70px]" data-i18n-title="route.vram_freed_tooltip" title="Estimated GPU VRAM saved by isolating off-route sceneries">
-                    <span data-i18n="route.vram_freed_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">VRAM Freed</span>
-                    <span id="opt-saving-vram-val" class="font-mono text-base font-extrabold text-[#00A8FF] leading-tight mt-0.5">0 MB</span>
-                </div>
-            </div>
-
-            <!-- 4. Action Buttons -->
-            <div class="flex items-center gap-2 shrink-0">
-                <button onclick="restoreFlightCorridorSceneries()"
-                        id="opt-btn-restore-sceneries"
-                        type="button"
-                        data-i18n="route.restore_btn"
-                        data-i18n-title="route.restore_btn_tooltip"
-                        title="Restore all sceneries to their normal enabled state"
-                        class="hidden h-9 px-3.5 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#F1F5F9] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm">
-                    Restore All
-                </button>
-                <button onclick="clearOptimizerRoutePlanning()"
-                        id="opt-btn-clear-route"
-                        type="button"
-                        data-i18n="route.new_route_btn"
-                        data-i18n-title="route.new_route_tooltip"
-                        class="h-9 px-3.5 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#F1F5F9] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm"
-                        title="Start a new flight route">
-                    New Route
-                </button>
-                <button onclick="applyOptimizerRouteSceneries()"
-                        id="opt-btn-apply-sceneries"
-                        type="button"
-                        data-i18n-title="route.optimize_btn_tooltip"
-                        title="Apply route optimization and disable off-corridor sceneries"
-                        class="h-9 px-5 rounded-md bg-[#10B981] hover:bg-[#059669] text-[#0B0D11] font-extrabold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none shadow-md shadow-emerald-500/20 active:scale-95 flex items-center justify-center">
-                    <span data-i18n="route.optimize_btn">Optimize</span>
+                        onclick="closeFloatingWindow('route')"
+                        title="Close"
+                        class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent">
+                    <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Resize Handle -->
-        <div class="modal-resize-handle absolute bottom-0 right-0 w-3 h-3 cursor-se-resize flex items-end justify-end p-0.5">
-            <svg class="w-2 h-2 text-[#64748B] pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
-                <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
-                <circle cx="5" cy="3" r="0.8"/>
-            </svg>
+        <!-- VIEW 1: MAIN 3-STEP OPTIMIZER WORKFLOW (DEFAULT VIEW) -->
+        <div id="unified-opt-main-view" class="modal-body p-4 flex flex-col gap-3.5 bg-[#12161F] font-sans">
+
+            <!-- BASE ENVIRONMENT (LOADOUT LAYER) -->
+            <div class="sx-flat-card p-3.5 space-y-2.5">
+                <div class="flex items-center justify-between border-b border-[#1E2638] pb-2">
+                    <div class="flex items-center gap-2.5">
+                        <span title="Selects your base scenery profile (categories, regions, or pinned airports) that stays active before any flight route is applied."
+                              class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9] cursor-help">
+                            BASE ENVIRONMENT (LOADOUT RULESET)
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 pt-0.5 flex-nowrap">
+                    <div class="flex items-center gap-2.5 flex-1 min-w-[200px]">
+                        <label for="unified-base-loadout-select"
+                               class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#94A3B8] shrink-0">
+                            BASE RULESET:
+                        </label>
+                        <select id="unified-base-loadout-select"
+                                onchange="onUnifiedBaseLoadoutChange(this.value)"
+                                class="h-8 flex-1 bg-[#0E121A] border border-[#2D3A54] text-[#F1F5F9] text-xs font-mono font-bold uppercase px-3 focus:outline-none focus:border-[#00A8FF] cursor-pointer">
+                            <option value="ALL">ALL ACTIVE (DEFAULT LIBRARY)</option>
+                            <option value="NONE_ROUTE_ONLY">NONE (STRICT ROUTE ISOLATION ONLY)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div id="unified-base-rules-summary"
+                             title="Summary of sceneries matched by your selected Base Ruleset" class="h-8 px-3 bg-[#0E121A] border border-[#1E2638] flex items-center gap-3 text-[10px] font-mono text-[#94A3B8] uppercase whitespace-nowrap cursor-help">
+                            <span>BASE MATCH: <strong id="unified-base-match-count" class="text-[#F1F5F9]">--</strong></span>
+                            <span class="text-[#253046]">|</span>
+                            <span id="unified-base-rules-tags" class="text-[#00A8FF] font-bold">ALL CATEGORIES / ALL REGIONS</span>
+                        </div>
+
+                        <button type="button"
+                                id="unified-btn-edit-loadouts"
+                                onclick="switchUnifiedOptimizerView('BUILDER')"
+                                title="Create or edit custom Loadout profiles (categories, regions, and pinned airports)" class="sx-btn-flat h-8 px-3 text-[11px] whitespace-nowrap">
+                            EDIT LOADOUT RULES
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FLIGHT ROUTE OVERLAY (OPTIONAL ADDITIVE LAYER) -->
+            <div class="sx-flat-card p-3.5 space-y-3">
+                <div class="flex items-center justify-between border-b border-[#1E2638] pb-2 gap-3 flex-nowrap">
+                    <div class="flex items-center gap-2.5">
+                        <span title="Optionally layers a flight route (Direct A to B, En-Route Corridor, or SimBrief OFP) on top of your Base Environment." class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9] cursor-help whitespace-nowrap">
+                            FLIGHT ROUTE OVERLAY (OPTIONAL)
+                        </span>
+                    </div>
+
+                    <div class="flex items-center p-1 bg-[#0E121A] border border-[#2D3A54] gap-1">
+                        <button type="button"
+                                id="opt-mode-card-none"
+                                onclick="setOptimizerMode('NONE')" title="Use only the Base Environment profile without adding a flight route"
+                                class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                            NO ROUTE OVERLAY
+                        </button>
+                        <button type="button"
+                                id="opt-mode-card-direct"
+                                onclick="setOptimizerMode('DIRECT')" title="Keep Departure and Arrival airports active on top of your Base Environment"
+                                class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                            DIRECT A TO B
+                        </button>
+                        <button type="button"
+                                id="opt-mode-card-corridor"
+                                onclick="setOptimizerMode('CORRIDOR')" title="Keep Departure, Arrival, and all airports within the flight corridor active on top of your Base Environment"
+                                class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                            EN-ROUTE CORRIDOR
+                        </button>
+                        <button type="button"
+                                id="opt-mode-card-simbrief"
+                                onclick="setOptimizerMode('SIMBRIEF')" title="Import your latest SimBrief OFP (Departure, Arrival, and Alternates) on top of your Base Environment"
+                                class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                            IMPORT SIMBRIEF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Route Selection Row: Departure / Swap / Arrival + Route Additive Info -->
+                <div id="unified-route-controls-row" class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 bg-[#0E121A] border border-[#2D3A54] p-2 shrink-0">
+                        <div id="opt-route-origin-box"
+                             onclick="focusOptimizerAirport('origin')"
+                             class="cursor-pointer hover:bg-[#181E2B] px-3 py-1 border border-transparent hover:border-[#253046] w-[135px]"
+                             title="Click an airport on the map to set Departure">
+                            <span data-i18n="route.dep_label"
+                                  class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                DEPARTURE
+                            </span>
+                            <span id="opt-route-origin-icao"
+                                  class="font-mono text-lg font-black text-[#F1F5F9] leading-none block mt-0.5">
+                                ----
+                            </span>
+                            <span id="opt-route-origin-name"
+                                  class="text-[10px] font-mono text-[#94A3B8] truncate block max-w-[120px] leading-tight mt-0.5">
+                                CLICK MAP TO SET
+                            </span>
+                        </div>
+
+                        <button type="button"
+                                onclick="swapOptimizerRouteAirports()"
+                                title="Swap Departure and Arrival"
+                                class="sx-btn-flat h-8 px-2.5 text-[10px] font-mono font-bold uppercase shrink-0">
+                            SWAP
+                        </button>
+
+                        <div id="opt-route-dest-box"
+                             onclick="focusOptimizerAirport('dest')"
+                             class="cursor-pointer hover:bg-[#181E2B] px-3 py-1 border border-transparent hover:border-[#253046] w-[135px] text-right"
+                             title="Click an airport on the map to set Arrival">
+                            <span data-i18n="route.arr_label"
+                                  class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                ARRIVAL
+                            </span>
+                            <span id="opt-route-dest-icao"
+                                  class="font-mono text-lg font-black text-[#F1F5F9] leading-none block mt-0.5">
+                                ----
+                            </span>
+                            <span id="opt-route-dest-name"
+                                  class="text-[10px] font-mono text-[#94A3B8] truncate block max-w-[120px] leading-tight mt-0.5 ml-auto">
+                                CLICK MAP TO SET
+                            </span>
+                        </div>
+                    </div>
+
+                    <div id="unified-route-additions-zone"
+                         title="Additional custom sceneries (Departure, Arrival, Alternates, or Corridor) kept active for your route on top of the Base Environment."
+                         class="flex-1 sx-flat-well p-2.5 flex items-center justify-between gap-3 h-full cursor-help">
+                        <div class="font-mono text-[11px] text-[#94A3B8] uppercase whitespace-nowrap">
+                            ROUTE OVERLAY ADDITIONS:
+                            <strong id="unified-route-added-count" class="text-[#00A8FF]">+0 SCENERIES</strong>
+                        </div>
+
+                        <button type="button"
+                                id="opt-btn-clear-route"
+                                onclick="clearOptimizerRoutePlanning()"
+                                class="sx-btn-flat py-1.5 px-3 text-[10px] shrink-0">
+                            CLEAR ROUTE
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SIMBRIEF INLINE PILOT ID SETUP -->
+                <div id="simbrief-inline-setup" class="hidden w-full sx-flat-well p-2.5 flex items-center justify-between gap-3">
+                    <span class="text-[11px] font-sans font-bold uppercase tracking-wider text-[#94A3B8]">
+                        SIMBRIEF PILOT ID OR USERNAME:
+                    </span>
+                    <div class="flex items-center gap-2">
+                        <input type="text"
+                               id="simbrief-inline-id-input"
+                               placeholder="EX: 123456 OR PILOT_NAME"
+                               onkeydown="if(event.key==='Enter'){saveAndFetchSimbriefInline();}"
+                               class="h-7 w-52 bg-[#12161F] border border-[#2D3A54] px-2.5 text-xs font-mono font-bold text-[#F1F5F9] uppercase focus:outline-none focus:border-[#00A8FF]">
+                        <button type="button"
+                                onclick="saveAndFetchSimbriefInline()"
+                                class="sx-btn-flat sx-btn-flat-primary h-7">
+                            SAVE &amp; FETCH OFP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SIMBRIEF PRE-FLIGHT CROSS-AUDIT -->
+                <div id="simbrief-cross-audit-panel" class="hidden w-full border-t border-[#1E2638] pt-2.5 space-y-2">
+                    <div id="simbrief-audit-summary-bar"
+                         class="sx-flat-well px-3 py-2 flex items-center justify-between gap-4 text-[11px] font-mono">
+                        <div class="flex items-center gap-3.5 flex-wrap">
+                            <span id="sb-audit-global-badge"
+                                  class="px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase sx-status-ok">
+                                ALL CLEAR: ROUTE SCENERIES &amp; GSX READY
+                            </span>
+                            <div id="sb-audit-ofp-meta" class="flex items-center gap-3 text-[11px]">
+                                <span><strong class="text-[#64748B]">FLIGHT:</strong> <span id="sb-audit-flight" class="text-[#F1F5F9] font-bold">--</span></span>
+                                <span><strong class="text-[#64748B]">AIRCRAFT:</strong> <span id="sb-audit-acft" class="text-[#00A8FF] font-bold">--</span></span>
+                                <span><strong class="text-[#64748B]">CRUISE:</strong> <span id="sb-audit-fl" class="text-[#F1F5F9]">--</span></span>
+                                <span><strong class="text-[#64748B]">DIST:</strong> <span id="sb-audit-dist" class="text-[#F1F5F9]">--</span></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button type="button"
+                                    id="sb-audit-toggle-details-btn"
+                                    onclick="toggleSimbriefAuditMatrix()"
+                                    class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                                VIEW DETAILS
+                            </button>
+                            <button type="button"
+                                    onclick="syncSimBriefFlightPlan()"
+                                    class="sx-btn-flat py-1 px-2.5 text-[10px]">
+                                REFRESH OFP
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="simbrief-cross-audit-matrix" class="hidden space-y-1.5 font-sans">
+                        <div id="simbrief-cross-audit-rows" class="space-y-1.5"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SYSTEM IMPACT & UNIFIED APPLY FOOTER -->
+            <div class="sx-flat-card p-3.5 flex items-center justify-between gap-3 flex-nowrap">
+                <div class="flex items-center gap-3 shrink-0">
+                    <span title="Live summary of active vs. isolated sceneries and estimated RAM/VRAM savings before applying changes to MSFS." class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9] shrink-0 whitespace-nowrap cursor-help">
+                        SYSTEM IMPACT
+                    </span>
+
+                    <div title="Preview of active sceneries, isolated (parked) sceneries, and estimated system RAM / GPU VRAM savings." class="flex items-center gap-3 bg-[#0E121A] border border-[#2D3A54] px-3 py-1.5 shrink-0 cursor-help">
+                        <div class="flex flex-col items-center justify-center text-center min-w-[68px]">
+                            <span class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                ACTIVE SCENERIES
+                            </span>
+                            <span id="opt-total-active-scenery-count"
+                                  class="font-mono text-sm font-extrabold text-[#10B981] leading-tight mt-0.5">
+                                --
+                            </span>
+                        </div>
+                        <div class="h-5 w-px bg-[#253046]"></div>
+                        <div class="flex flex-col items-center justify-center text-center min-w-[68px]">
+                            <span data-i18n="route.isolated_label"
+                                  class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                PARKED / ISOLATED
+                            </span>
+                            <span id="opt-saving-scenery-count"
+                                  class="font-mono text-sm font-extrabold text-[#F59E0B] leading-tight mt-0.5">
+                                --
+                            </span>
+                        </div>
+                        <div class="h-5 w-px bg-[#253046]"></div>
+                        <div class="flex flex-col items-center justify-center text-center min-w-[68px]">
+                            <span data-i18n="route.ram_freed_label"
+                                  class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                EST. RAM SAVED
+                            </span>
+                            <span id="opt-saving-ram-val"
+                                  class="font-mono text-sm font-extrabold text-[#00A8FF] leading-tight mt-0.5">
+                                0.00 GB
+                            </span>
+                        </div>
+                        <div class="h-5 w-px bg-[#253046]"></div>
+                        <div class="flex flex-col items-center justify-center text-center min-w-[68px]">
+                            <span data-i18n="route.vram_freed_label"
+                                  class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">
+                                EST. VRAM SAVED
+                            </span>
+                            <span id="opt-saving-vram-val"
+                                  class="font-mono text-sm font-extrabold text-[#00A8FF] leading-tight mt-0.5">
+                                0 MB
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button"
+                            id="opt-btn-restore-sceneries"
+                            onclick="restoreFlightCorridorSceneries()"
+                            title="Restore all isolated sceneries back to active in MSFS" class="hidden sx-btn-flat h-9 px-3 text-xs whitespace-nowrap">
+                        RESTORE ALL
+                    </button>
+                    <button type="button"
+                            id="opt-btn-apply-sceneries"
+                            onclick="applyUnifiedOptimization()"
+                            title="Apply the active Base Environment and Flight Route Overlay to your MSFS scenery library" class="sx-btn-flat sx-btn-flat-apply h-9 px-4 text-xs font-extrabold tracking-wider whitespace-nowrap">
+                        <span id="opt-btn-apply-label" data-i18n="route.optimize_btn">OPTIMIZE &amp; APPLY</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: LOADOUT RULESET BUILDER SUB-MENU (COLLAPSIBLE LEFT PANEL + RULES RIGHT PANEL) -->
+        <div id="unified-opt-builder-view" class="hidden modal-body p-4 flex items-stretch gap-4 bg-[#12161F] font-sans">
+
+            <!-- Left Column: Horizontally Retractable Saved Loadouts Panel -->
+            <div id="loadout-left-panel"
+                 class="w-[410px] shrink-0 flex flex-col justify-between sx-flat-well p-3 transition-all duration-200 overflow-hidden">
+
+                <!-- Expanded Content -->
+                <div id="loadout-left-expanded-content" class="flex-1 flex flex-col justify-between space-y-3 min-w-0">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B]">
+                                SAVED LOADOUT PROFILES
+                            </span>
+                            <button type="button"
+                                    id="loadout-left-collapse-btn"
+                                    onclick="toggleLoadoutLeftPanel()"
+                                    title="Collapse profiles panel"
+                                    class="sx-btn-flat w-6 h-6 p-0 flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#253046] border-[#2D3A54] shrink-0">
+                                <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                            </button>
+                        </div>
+                        <div id="loadout-profiles-list" class="space-y-1.5 max-h-[380px] overflow-y-auto custom-scrollbar pr-0.5">
+                            <!-- Populated dynamically by renderLoadoutProfilesListUI() -->
+                        </div>
+                    </div>
+                    <button type="button"
+                            onclick="createNewLoadoutDraft()"
+                            class="sx-btn-flat w-full text-center py-2">
+                        NEW LOADOUT PROFILE
+                    </button>
+                </div>
+
+                <!-- Collapsed Slim Rail Content (Shown when retracted horizontally) -->
+                <div id="loadout-left-collapsed-rail"
+                     onclick="toggleLoadoutLeftPanel()"
+                     title="Expand Saved Loadout Profiles"
+                     class="hidden flex-1 flex-col items-center justify-start gap-4 py-1 cursor-pointer select-none">
+                    <button type="button"
+                            onclick="event.stopPropagation(); toggleLoadoutLeftPanel()"
+                            title="Expand profiles panel"
+                            class="sx-btn-flat w-6 h-6 p-0 flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#253046] border-[#2D3A54] shrink-0">
+                        <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                    </button>
+                    <span class="text-[10px] font-sans font-bold uppercase tracking-widest text-[#64748B] hover:text-[#F1F5F9] transition-colors"
+                          style="writing-mode: vertical-rl; transform: rotate(180deg);">
+                        SAVED LOADOUT PROFILES
+                    </span>
+                </div>
+            </div>
+
+            <!-- Right Column: Ruleset Builder (No Profile Name / Save Profile box — grouped on the left) -->
+            <div id="loadout-right-panel" class="flex-1 min-w-[540px] sx-flat-card p-3.5 space-y-3.5">
+
+                <!-- Rule 1: Scenery Categories -->
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">
+                        1. INCLUDE SCENERY CATEGORIES
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button"
+                                id="loadout-rule-cat-payware"
+                                onclick="toggleLoadoutCategoryRule('Payware')"
+                                class="py-2 px-2.5 text-xs font-mono font-bold uppercase sx-cat-payware cursor-pointer text-center">
+                            PAYWARE: ON
+                        </button>
+                        <button type="button"
+                                id="loadout-rule-cat-freeware"
+                                onclick="toggleLoadoutCategoryRule('Freeware')"
+                                class="py-2 px-2.5 text-xs font-mono font-bold uppercase sx-cat-freeware cursor-pointer text-center">
+                            FREEWARE: ON
+                        </button>
+                        <button type="button"
+                                id="loadout-rule-cat-asobo"
+                                onclick="toggleLoadoutCategoryRule('Asobo')"
+                                class="py-2 px-2.5 text-xs font-mono font-bold uppercase sx-cat-asobo cursor-pointer text-center">
+                            ASOBO: ON
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Rule 2: Regions & Countries -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <label class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">
+                            2. REGIONS &amp; COUNTRIES
+                        </label>
+                        <button type="button"
+                                id="loadout-btn-clear-regions"
+                                onclick="clearLoadoutRegionPrefixes()"
+                                class="sx-btn-flat py-0.5 px-2 text-[10px]">
+                            GLOBAL (CLEAR SELECTION)
+                        </button>
+                    </div>
+
+                    <!-- Exact 11 Region Filter Buttons -->
+                    <div class="flex flex-wrap items-center gap-1 bg-[#0E121A] border border-[#2D3A54] p-1.5">
+                        <button type="button" id="loadout-zone-tab-ALL" onclick="setLoadoutRegionZoneFilter('ALL')" class="sx-btn-flat sx-btn-flat-primary py-1 px-2 text-[10px]">GLOBAL (ALL)</button>
+                        <button type="button" id="loadout-zone-tab-weurope" onclick="setLoadoutRegionZoneFilter('weurope')" class="sx-btn-flat py-1 px-2 text-[10px]">WESTERN EUROPE</button>
+                        <button type="button" id="loadout-zone-tab-eeurope" onclick="setLoadoutRegionZoneFilter('eeurope')" class="sx-btn-flat py-1 px-2 text-[10px]">EASTERN EUROPE</button>
+                        <button type="button" id="loadout-zone-tab-namerica" onclick="setLoadoutRegionZoneFilter('namerica')" class="sx-btn-flat py-1 px-2 text-[10px]">NORTH AMERICA</button>
+                        <button type="button" id="loadout-zone-tab-camerica_caribbean" onclick="setLoadoutRegionZoneFilter('camerica_caribbean')" class="sx-btn-flat py-1 px-2 text-[10px]">CENTRAL AMERICA</button>
+                        <button type="button" id="loadout-zone-tab-samerica" onclick="setLoadoutRegionZoneFilter('samerica')" class="sx-btn-flat py-1 px-2 text-[10px]">SOUTH AMERICA</button>
+                        <button type="button" id="loadout-zone-tab-asia" onclick="setLoadoutRegionZoneFilter('asia')" class="sx-btn-flat py-1 px-2 text-[10px]">ASIA</button>
+                        <button type="button" id="loadout-zone-tab-middleeast" onclick="setLoadoutRegionZoneFilter('middleeast')" class="sx-btn-flat py-1 px-2 text-[10px]">MIDDLE EAST</button>
+                        <button type="button" id="loadout-zone-tab-nafrica" onclick="setLoadoutRegionZoneFilter('nafrica')" class="sx-btn-flat py-1 px-2 text-[10px]">NORTH AFRICA</button>
+                        <button type="button" id="loadout-zone-tab-ssafrica" onclick="setLoadoutRegionZoneFilter('ssafrica')" class="sx-btn-flat py-1 px-2 text-[10px]">SUB-SAHARAN AFRICA</button>
+                        <button type="button" id="loadout-zone-tab-oceania" onclick="setLoadoutRegionZoneFilter('oceania')" class="sx-btn-flat py-1 px-2 text-[10px]">OCEANIA</button>
+                        <button type="button" id="loadout-zone-tab-pacific" onclick="setLoadoutRegionZoneFilter('pacific')" class="sx-btn-flat py-1 px-2 text-[10px]">PACIFIC OCEAN</button>
+                    </div>
+
+                    <!-- Grouped Multi-Select Country Matrix -->
+                    <div id="loadout-region-zones-container"
+                         class="sx-flat-well p-2 max-h-[215px] overflow-y-auto custom-scrollbar space-y-2">
+                        <!-- Dynamically populated by renderLoadoutRegionSelectorUI() -->
+                    </div>
+                </div>
+
+                <!-- Rule 3: Manual Airport Overrides (Interactive Map Pin Mode + Save Pins) -->
+                <div class="space-y-1.5">
+                    <div class="flex items-center justify-between gap-2 flex-wrap">
+                        <label class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">
+                            3. PINNED AIRPORTS (ALWAYS KEEP ACTIVE)
+                        </label>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button"
+                                    id="loadout-btn-pin-mode"
+                                    onclick="toggleLoadoutPinAirportsMode()"
+                                    class="sx-btn-flat py-0.5 px-2.5 text-[10px]">
+                                PIN AIRPORTS ON MAP
+                            </button>
+                            <button type="button"
+                                    id="loadout-btn-save-pins"
+                                    onclick="savePinnedAirportsAndExitPinMode()"
+                                    class="sx-btn-flat sx-btn-flat-primary py-0.5 px-2.5 text-[10px] hidden">
+                                SAVE PINS
+                            </button>
+                        </div>
+                    </div>
+                    <input type="text"
+                           id="loadout-edit-manual-icaos"
+                           oninput="onLoadoutDraftRuleChange()"
+                           placeholder="CLICK 'PIN AIRPORTS ON MAP' THEN CLICK AIRPORT STARS (EX: KJFK, LFPG)"
+                           class="w-full h-8 bg-[#0E121A] border border-[#2D3A54] px-3 text-xs font-mono text-[#F1F5F9] uppercase focus:outline-none focus:border-[#00A8FF]">
+                </div>
+
+                <!-- Rule Preview Bar -->
+                <div class="sx-flat-well p-2.5 flex items-center justify-between text-xs font-mono">
+                    <div class="flex items-center gap-4">
+                        <span><strong class="text-[#64748B]">BASE ACTIVE:</strong> <span id="loadout-preview-active" class="text-[#10B981] font-bold">0</span></span>
+                        <span><strong class="text-[#64748B]">BASE PARKED:</strong> <span id="loadout-preview-parked" class="text-[#F59E0B] font-bold">0</span></span>
+                    </div>
+                    <span id="loadout-preview-ram" class="text-[#00A8FF] font-bold">EST. RAM SAVED: 0.00 GB</span>
+                </div>
+
+                <!-- Builder Footer Actions: APPLY PROFILE button -->
+                <div class="pt-2 border-t border-[#253046] flex items-center justify-end gap-2">
+                    <button type="button"
+                            id="loadout-btn-apply"
+                            onclick="saveAndApplyActivatedLoadout()"
+                            class="sx-btn-flat sx-btn-flat-apply py-1.5 px-6 text-xs font-extrabold tracking-wider">
+                        APPLY PROFILE
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Explanatory Modal when user tries to turn off all 3 add-on categories (2 sentences max) -->
+        <div id="loadout-default-airports-info-modal"
+             class="hidden absolute inset-0 z-[1350] bg-[#0B0D11]/80 flex items-center justify-center p-4">
+            <div class="sx-flat-surface w-full max-w-[440px] border border-[#2D3A54] bg-[#12161F] font-sans select-none">
+                <div class="h-[36px] px-4 bg-[#0E121A] border-b border-[#1E2638] flex items-center justify-between">
+                    <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">
+                        CATEGORY SELECTION REQUIRED
+                    </span>
+                    <button type="button"
+                            onclick="closeLoadoutCategoriesInfoModal()"
+                            title="Close"
+                            class="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+                <div class="p-4 text-xs text-[#CBD5E1] leading-relaxed">
+                    At least one add-on category (<span class="text-[#9333EA] font-bold">PAYWARE</span>, <span class="text-[#00A8FF] font-bold">FREEWARE</span>, or <span class="text-[#F59E0B] font-bold">ASOBO</span>) must remain active. Standard <strong class="text-[#F1F5F9]">Default MSFS</strong> airports are built into the core simulator and cannot be managed as Loadout Profiles.
+                </div>
+                <div class="px-4 py-2.5 bg-[#0E121A] border-t border-[#1E2638] flex items-center justify-end">
+                    <button type="button"
+                            onclick="closeLoadoutCategoriesInfoModal()"
+                            class="sx-btn-flat sx-btn-flat-primary py-1.5 px-5 text-xs font-bold uppercase">
+                        UNDERSTOOD
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -6387,13 +6924,6 @@
             <rect id="tour-spotlight-glow" x="0" y="0" width="0" height="0" rx="8" ry="8" fill="none" stroke="#64748B" stroke-width="1.5" opacity="0" />
         </svg>
 
-        <!-- TOUR AIRPORT TARGET RETICLE & HIGHLIGHT (LFPG HUB SPOTLIGHT) -->
-        <div id="tour-lfpg-spotlight-target" class="hidden pointer-events-none absolute w-[180px] h-[180px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center select-none" style="z-index: 9995; left: -9999px; top: -9999px;">
-            <!-- Glowing illuminated circular radar pulse ring -->
-            <div class="absolute inset-0 rounded-full border-2 border-cyan-400 shadow-[0_0_35px_rgba(56,189,248,0.7)] bg-cyan-400/10 backdrop-blur-[1px] animate-pulse"></div>
-            <div class="absolute inset-3 rounded-full border border-cyan-400/30"></div>
-        </div>
-
         <!-- Floating Tour Tooltip Card (Standard SceneryX Card Surface & Controls) -->
         <div id="tour-tooltip-card" class="absolute pointer-events-auto w-[360px] max-w-[calc(100vw-32px)] bg-[#12161F] border border-[#253046] rounded-lg shadow-2xl p-4 text-left flex flex-col gap-3 transition-all duration-200" style="z-index: 9998 !important;">
             <!-- Header row: Step counter tag + Exit button -->
@@ -6433,6 +6963,46 @@
         </div>
     </div>
 
+    <!-- DORMANT SCENERIES (DISABLED ADDONS) MODAL -->
+    <div id="dormant-sceneries-backdrop" onclick="closeDormantSceneriesModal()" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm hidden z-[5500] transition-opacity"></div>
+    <div id="dormant-sceneries-modal" class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[920px] max-w-[95vw] max-h-[84vh] bg-[#12161F] border border-[#253046] rounded-xl shadow-2xl hidden flex-col overflow-hidden z-[5501]">
+        <!-- Header -->
+        <div class="px-5 py-4 bg-[#0E121A] border-b border-[#1E2638] flex items-center justify-between gap-4 shrink-0">
+            <div class="min-w-0">
+                <h3 data-i18n="dormant.modal_title" class="text-sm font-bold text-slate-100 tracking-wide uppercase truncate">Dormant Hangar (Disabled Sceneries)</h3>
+                <p data-i18n="dormant.modal_subtitle" class="text-[11px] text-slate-400 truncate mt-0.5">Deactivated addon sceneries currently stored on your disk (1 row per airport)</p>
+            </div>
+            <button type="button" onclick="closeDormantSceneriesModal()" class="w-7 h-7 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0">✕</button>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="px-5 py-3 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between gap-3 shrink-0">
+            <div class="relative flex-1">
+                <input type="text" id="dormant-sceneries-search" oninput="filterDormantSceneriesList(this.value)" data-i18n-placeholder="dormant.search_placeholder" placeholder="Search by ICAO, airport name, studio, or disk path..." class="w-full bg-[#0B0E14] border border-[#253046] rounded-lg pl-3.5 pr-8 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500/60 transition-colors">
+            </div>
+            <span id="dormant-sceneries-size-badge" class="text-xs font-mono font-semibold text-slate-400 shrink-0">0 MB</span>
+        </div>
+
+        <!-- Column Headers -->
+        <div class="px-5 py-2 bg-[#0E121A]/80 border-b border-[#1E2638] grid grid-cols-12 gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 select-none">
+            <div class="col-span-3" data-i18n="dormant.col_airport">Airport</div>
+            <div class="col-span-2" data-i18n="dormant.col_creator">Creator / Studio</div>
+            <div class="col-span-1 text-center" data-i18n="dormant.col_type">Type</div>
+            <div class="col-span-5" data-i18n="dormant.col_location">Disk Location</div>
+            <div class="col-span-1 text-right" data-i18n="dormant.col_folder">Folder</div>
+        </div>
+
+        <!-- Scrollable List (1 row per airport) -->
+        <div id="dormant-sceneries-list" class="flex-1 overflow-y-auto divide-y divide-[#1E2638]/70 px-2 py-1"></div>
+
+        <!-- Footer -->
+        <div class="px-5 py-3 bg-[#0E121A] border-t border-[#1E2638] flex items-center justify-end shrink-0">
+            <button type="button" onclick="closeDormantSceneriesModal()" class="px-4 py-1.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-xs font-semibold text-slate-200 hover:text-white transition-colors cursor-pointer">
+                <span data-i18n="dormant.close">Close</span>
+            </button>
+        </div>
+    </div>
+
     <!-- GLOBAL TOAST NOTIFICATION CONTAINER (CENTERED ABOVE BOTTOM SEARCH TOOLBAR) -->
     <div id="toast-container" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200">
         <div id="sceneryx-toast" class="opacity-0 translate-y-2 pointer-events-none transition-all duration-300 transform bg-slate-900 border border-slate-700/60 rounded-lg shadow-2xl px-4 py-2.5 flex items-center justify-center select-none max-w-full text-center"></div>
@@ -6445,6 +7015,6 @@
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
     <script src="capitals_data.js?v=1.0.5"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.29"></script>
+    <script src="app.js?v=1.2.6"></script>
 </body>
 </html>

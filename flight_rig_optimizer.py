@@ -447,7 +447,134 @@ except Exception:
 
 _cached_gpu_info = None
 
-def detect_gpu_info(force: bool = False) -> Dict[str, Any]:
+
+def _normalize_wmi_nvidia_driver(drv_str: str) -> str:
+    """Converts Windows WMI/Registry NVIDIA driver strings (e.g. '32.0.16.2101') to standard format ('621.01')."""
+    if not drv_str:
+        return "Unknown"
+    s = str(drv_str).strip()
+    parts = s.split(".")
+    if len(parts) == 4 and all(p.isdigit() for p in parts):
+        tail = (parts[2][-1:] if parts[2] else "") + parts[3].zfill(4)
+        if len(tail) == 5 and tail.isdigit():
+            return f"{tail[:3]}.{tail[3:]}"
+    return s
+
+
+def _detect_gpu_via_winreg_and_wmi() -> Dict[str, Any]:
+    """
+    Ultra-lightweight GPU & 64-bit VRAM detection (~0.1ms via Windows Display Class Registry + in-process WMI COM fallback).
+    Reads 64-bit QWORD 'HardwareInformation.qwMemorySize' to avoid the 4GB 32-bit UInt32 overflow in Win32_VideoController.AdapterRAM.
+    """
+    best_gpu = {
+        "name": "Unknown GPU",
+        "driver_version": "Unknown",
+        "vram_bytes": 0,
+        "vendor": "Unknown"
+    }
+    virtual_tokens = ("PARSEC", "MICROSOFT BASIC", "VIRTUAL DESKTOP", "CITRIX", "RDPUDD", "VMWARE", "VBOX", "HYPER-V")
+
+    # Strategy 1: Windows Display Class Registry (64-bit qwMemorySize, ~0.10ms, zero subprocesses)
+    display_class_path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, display_class_path) as class_key:
+            idx = 0
+            while True:
+                try:
+                    subkey_name = winreg.EnumKey(class_key, idx)
+                    idx += 1
+                except OSError:
+                    break
+                if not (len(subkey_name) == 4 and subkey_name.isdigit()):
+                    continue
+                try:
+                    with winreg.OpenKey(class_key, subkey_name) as dev_key:
+                        desc = ""
+                        drv_ver = "Unknown"
+                        vram_bytes = 0
+                        try:
+                            desc = str(winreg.QueryValueEx(dev_key, "DriverDesc")[0] or "").strip()
+                        except OSError:
+                            pass
+                        if not desc or any(tok in desc.upper() for tok in virtual_tokens):
+                            continue
+                        try:
+                            drv_ver = str(winreg.QueryValueEx(dev_key, "DriverVersion")[0] or "Unknown").strip()
+                        except OSError:
+                            pass
+                        for mem_val_name in ("HardwareInformation.qwMemorySize", "HardwareInformation.MemorySize"):
+                            try:
+                                raw_val, val_type = winreg.QueryValueEx(dev_key, mem_val_name)
+                                if isinstance(raw_val, int) and raw_val > 0:
+                                    vram_bytes = int(raw_val)
+                                    break
+                                elif isinstance(raw_val, (bytes, bytearray)) and len(raw_val) in (4, 8):
+                                    vram_bytes = int.from_bytes(raw_val, byteorder="little", signed=False)
+                                    if vram_bytes > 0:
+                                        break
+                            except OSError:
+                                continue
+
+                        desc_up = desc.upper()
+                        vendor = "NVIDIA" if ("NVIDIA" in desc_up or "GEFORCE" in desc_up or "RTX" in desc_up or "GTX" in desc_up) else (
+                            "AMD" if ("AMD" in desc_up or "RADEON" in desc_up) else (
+                                "INTEL" if ("INTEL" in desc_up or "ARC" in desc_up) else "Unknown"
+                            )
+                        )
+                        if vendor == "NVIDIA":
+                            drv_ver = _normalize_wmi_nvidia_driver(drv_ver)
+
+                        is_discrete = vendor in ("NVIDIA", "AMD")
+                        best_is_discrete = best_gpu["vendor"] in ("NVIDIA", "AMD")
+                        if (vram_bytes > best_gpu["vram_bytes"]) or (
+                            vram_bytes == best_gpu["vram_bytes"] and is_discrete and not best_is_discrete
+                        ) or best_gpu["name"] == "Unknown GPU":
+                            best_gpu = {
+                                "name": desc,
+                                "driver_version": drv_ver,
+                                "vram_bytes": vram_bytes,
+                                "vendor": vendor
+                            }
+                except OSError:
+                    continue
+    except Exception:
+        pass
+
+    # Strategy 2: In-Process WMI COM Win32_VideoController (~5ms, no PowerShell subprocess) if Registry yielded no GPU or 0 VRAM
+    if best_gpu["name"] == "Unknown GPU" or best_gpu["vram_bytes"] <= 0:
+        try:
+            import win32com.client
+            wmi = win32com.client.GetObject("winmgmts:")
+            for vc in wmi.ExecQuery("SELECT Name, DriverVersion, AdapterRAM FROM Win32_VideoController"):
+                name = str(getattr(vc, "Name", "") or "").strip()
+                if not name or any(tok in name.upper() for tok in virtual_tokens):
+                    continue
+                drv_ver = str(getattr(vc, "DriverVersion", "") or "Unknown").strip()
+                raw_ram = getattr(vc, "AdapterRAM", 0) or 0
+                # Handle signed 32-bit overflow in WMI AdapterRAM
+                vram_bytes = int(raw_ram) & 0xFFFFFFFF if int(raw_ram) < 0 else int(raw_ram)
+                name_up = name.upper()
+                vendor = "NVIDIA" if ("NVIDIA" in name_up or "GEFORCE" in name_up or "RTX" in name_up or "GTX" in name_up) else (
+                    "AMD" if ("AMD" in name_up or "RADEON" in name_up) else (
+                        "INTEL" in name_up and "INTEL" or "Unknown"
+                    )
+                )
+                if vendor == "NVIDIA":
+                    drv_ver = _normalize_wmi_nvidia_driver(drv_ver)
+                if best_gpu["name"] == "Unknown GPU" or vram_bytes > best_gpu["vram_bytes"]:
+                    best_gpu = {
+                        "name": name,
+                        "driver_version": drv_ver,
+                        "vram_bytes": max(best_gpu["vram_bytes"], vram_bytes),
+                        "vendor": vendor
+                    }
+        except Exception:
+            pass
+
+    return best_gpu
+
+
+def detect_gpu_info(force: bool = False, fast_boot: bool = False) -> Dict[str, Any]:
     """Détecte la carte graphique NVIDIA/AMD, VRAM totale et Re-Size BAR (mis en cache)."""
     global _cached_gpu_info
     if _cached_gpu_info is not None and not force:
@@ -466,28 +593,51 @@ def detect_gpu_info(force: bool = False) -> Dict[str, Any]:
         "is_rbar_active": False,
         "vendor": "Unknown"
     }
-    
-    # 1. Requête standard nvidia-smi pour nom, pilote et VRAM totale
-    try:
-        cmd = [
-            'nvidia-smi',
-            '--query-gpu=name,driver_version,memory.total',
-            '--format=csv,noheader,nounits'
-        ]
-        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW).strip()
-        parts = [p.strip() for p in out.split(',')]
-        if len(parts) >= 3:
-            result["name"] = parts[0]
-            result["name_simplified"] = simplify_gpu_name(result["name"])
-            result["driver_version"] = parts[1]
-            result["vram_total_mb"] = int(float(parts[2]))
-            result["vram_total_gb"] = round(result["vram_total_mb"] / 1024.0, 1)
-            result["vendor"] = "NVIDIA"
-    except Exception:
-        pass
 
-    # 2. Requête nvidia-smi pour Re-Size BAR (BAR1 Memory Usage)
-    if result["vendor"] == "NVIDIA":
+    # 1. Fast 64-bit Windows Registry + In-Process WMI COM scan (~0.1ms)
+    reg_gpu = _detect_gpu_via_winreg_and_wmi()
+    if reg_gpu["name"] != "Unknown GPU":
+        result["name"] = reg_gpu["name"]
+        result["name_simplified"] = simplify_gpu_name(result["name"])
+        result["driver_version"] = reg_gpu["driver_version"]
+        result["vendor"] = reg_gpu["vendor"]
+        if reg_gpu["vram_bytes"] > 0:
+            result["vram_total_mb"] = int(round(reg_gpu["vram_bytes"] / (1024.0 * 1024.0)))
+            result["vram_total_gb"] = round(result["vram_total_mb"] / 1024.0, 1)
+
+    # 2. If fast_boot is requested and 64-bit Registry already resolved GPU & VRAM, return immediately (<0.2ms)
+    if fast_boot and result["name"] != "Unknown GPU" and result["vram_total_gb"] > 0:
+        return result
+
+    # 3. Standard nvidia-smi query for NVIDIA GPUs (verifies exact VRAM & driver version)
+    if result["vendor"] in ("NVIDIA", "Unknown"):
+        try:
+            cmd = [
+                'nvidia-smi',
+                '--query-gpu=name,driver_version,memory.total',
+                '--format=csv,noheader,nounits'
+            ]
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW).strip()
+            first_line = out.splitlines()[0] if out else ""
+            parts = [p.strip() for p in first_line.split(',')]
+            if len(parts) >= 3:
+                result["name"] = parts[0]
+                result["name_simplified"] = simplify_gpu_name(result["name"])
+                result["driver_version"] = parts[1]
+                smi_mb = int(float(parts[2]))
+                # Keep largest/most accurate 64-bit VRAM reading (e.g. 16384 MB -> 16.0 GB)
+                if smi_mb > 0 and result["vram_total_mb"] <= 0:
+                    result["vram_total_mb"] = smi_mb
+                    result["vram_total_gb"] = round(smi_mb / 1024.0, 1)
+                elif smi_mb > 0:
+                    result["vram_total_mb"] = max(result["vram_total_mb"], smi_mb)
+                    result["vram_total_gb"] = round(result["vram_total_mb"] / 1024.0, 1)
+                result["vendor"] = "NVIDIA"
+        except Exception:
+            pass
+
+    # 4. Requête nvidia-smi pour Re-Size BAR (BAR1 Memory Usage)
+    if result["vendor"] == "NVIDIA" and not fast_boot:
         try:
             cmd_bar = ['nvidia-smi', '-q', '-d', 'MEMORY']
             out_bar = subprocess.check_output(cmd_bar, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
@@ -498,29 +648,8 @@ def detect_gpu_info(force: bool = False) -> Dict[str, Any]:
                 result["is_rbar_active"] = result["bar1_memory_mb"] >= 2048
         except Exception:
             pass
-    else:
-        # 3. Fallback via PowerShell / WMI pour AMD / Intel / générique
-        try:
-            ps_cmd = 'Get-CimInstance Win32_VideoController | Select-Object -Property Name, DriverVersion, AdapterRAM | ConvertTo-Json'
-            out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
-            data = json.loads(out)
-            if isinstance(data, list):
-                data = data[0]
-            result["name"] = data.get("Name", "Unknown GPU").strip()
-            result["name_simplified"] = simplify_gpu_name(result["name"])
-            result["driver_version"] = data.get("DriverVersion", "Unknown")
-            raw_ram = data.get("AdapterRAM", 0)
-            if raw_ram and raw_ram > 0:
-                result["vram_total_mb"] = int(raw_ram / (1024 * 1024))
-                result["vram_total_gb"] = round(result["vram_total_mb"] / 1024.0, 1)
-            if "NVIDIA" in result["name"].upper():
-                result["vendor"] = "NVIDIA"
-            elif "AMD" in result["name"].upper() or "RADEON" in result["name"].upper():
-                result["vendor"] = "AMD"
-        except Exception:
-            pass
 
-    # 4. Vérification de la fraîcheur du pilote graphique (TechPowerUp)
+    # 5. Vérification de la fraîcheur du pilote graphique (TechPowerUp)
     try:
         online_ver = get_latest_online_versions()
         latest_drv = online_ver.get("driver")
@@ -538,15 +667,53 @@ def detect_gpu_info(force: bool = False) -> Dict[str, Any]:
     return result
 
 
-def detect_ram_and_xmp() -> Dict[str, Any]:
-    """Détecte la RAM totale, la fréquence en MHz et l'activation du profil XMP/EXPO via WMI COM (~12ms)."""
+# Alias for backward compatibility across modules
+detect_gpu = detect_gpu_info
+
+
+def detect_system_ram_gb() -> float:
+    """
+    Ultra-lightweight Total System RAM detection (in GB) via Win32 GlobalMemoryStatusEx (~0.03ms, zero external dependencies).
+    Snaps to standard physical DIMM capacity tiers (8, 12, 16, 24, 32, 48, 64, 96, 128 GB) to account for BIOS/hardware-reserved memory.
+    """
+    try:
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ('dwLength', ctypes.c_ulong),
+                ('dwMemoryLoad', ctypes.c_ulong),
+                ('ullTotalPhys', ctypes.c_ulonglong),
+                ('ullAvailPhys', ctypes.c_ulonglong),
+                ('ullTotalPageFile', ctypes.c_ulonglong),
+                ('ullAvailPageFile', ctypes.c_ulonglong),
+                ('ullTotalVirtual', ctypes.c_ulonglong),
+                ('ullAvailVirtual', ctypes.c_ulonglong),
+                ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
+            ]
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)) and stat.ullTotalPhys > 0:
+            raw_gb = stat.ullTotalPhys / (1024.0 ** 3)
+            for tier in (8.0, 12.0, 16.0, 24.0, 32.0, 48.0, 64.0, 96.0, 128.0, 192.0, 256.0):
+                if abs(raw_gb - tier) <= 1.2:
+                    return tier
+            return round(raw_gb, 1)
+    except Exception:
+        pass
+    return 16.0
+
+
+def detect_ram_and_xmp(fast_boot: bool = False) -> Dict[str, Any]:
+    """Détecte la RAM totale (~0.03ms via GlobalMemoryStatusEx), la fréquence en MHz et le profil XMP/EXPO via WMI COM (~12ms)."""
     result = {
-        "total_gb": 0.0,
+        "total_gb": detect_system_ram_gb(),
         "speed_mhz": 0,
         "is_xmp_active": False,
         "stick_count": 0
     }
-    # Stratégie 1 : WMI COM In-Process (~12ms, 0 sous-processus PowerShell)
+    if fast_boot and result["total_gb"] > 0:
+        return result
+
+    # Stratégie 1 : WMI COM In-Process (~12ms, 0 sous-processus PowerShell) pour fréquence MHz & XMP/EXPO
     try:
         import win32com.client
         wmi = win32com.client.GetObject('winmgmts:')
@@ -569,27 +736,6 @@ def detect_ram_and_xmp() -> Dict[str, Any]:
                 if result["speed_mhz"] >= 3200:
                     result["is_xmp_active"] = True
             return result
-    except Exception:
-        pass
-
-    # Stratégie 2 : Windows GlobalMemoryStatusEx (~0.05ms pour total_gb)
-    try:
-        class MEMORYSTATUSEX(ctypes.Structure):
-            _fields_ = [
-                ('dwLength', ctypes.c_ulong),
-                ('dwMemoryLoad', ctypes.c_ulong),
-                ('ullTotalPhys', ctypes.c_ulonglong),
-                ('ullAvailPhys', ctypes.c_ulonglong),
-                ('ullTotalPageFile', ctypes.c_ulonglong),
-                ('ullAvailPageFile', ctypes.c_ulonglong),
-                ('ullTotalVirtual', ctypes.c_ulonglong),
-                ('ullAvailVirtual', ctypes.c_ulonglong),
-                ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
-            ]
-        stat = MEMORYSTATUSEX()
-        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
-            result["total_gb"] = round(stat.ullTotalPhys / (1024**3), 1)
     except Exception:
         pass
 
@@ -2006,13 +2152,442 @@ def set_active_profile_id(profile_id: str):
         pass
 
 
+_last_boot_hardware_sync: Optional[Dict[str, Any]] = None
+
+
+def get_recommended_texture_settings(vram_gb: float, flight_profile: str = "LINER") -> Dict[str, str]:
+    """
+    Returns calibrated MSFS Texture Resolution and Terrain Detail recommendations
+    based on detected GPU VRAM capacity (in GB) and flight profile ('LINER' or 'GA').
+    """
+    vram = float(vram_gb or 0.0)
+    if vram >= 20.0:
+        tex_2d_liner = "High"
+        tex_2d_ga = "Ultra"
+        tex_vr_liner = "Medium"
+        tex_vr_ga = "High"
+        terrain_detail = "HIGH"
+    elif vram >= 15.0:
+        tex_2d_liner = "High"
+        tex_2d_ga = "Ultra"
+        tex_vr_liner = "Medium"
+        tex_vr_ga = "High"
+        terrain_detail = "HIGH"
+    elif vram >= 11.0:
+        tex_2d_liner = "Medium"
+        tex_2d_ga = "High"
+        tex_vr_liner = "Low"
+        tex_vr_ga = "Medium"
+        terrain_detail = "MEDIUM"
+    else:
+        tex_2d_liner = "Low"
+        tex_2d_ga = "Medium"
+        tex_vr_liner = "Low"
+        tex_vr_ga = "Low"
+        terrain_detail = "LOW"
+
+    is_liner = str(flight_profile or "LINER").strip().upper() != "GA"
+    return {
+        "texture_2d": tex_2d_liner if is_liner else tex_2d_ga,
+        "texture_vr": tex_vr_liner if is_liner else tex_vr_ga,
+        "texture_2d_liner": tex_2d_liner,
+        "texture_2d_ga": tex_2d_ga,
+        "texture_vr_liner": tex_vr_liner,
+        "texture_vr_ga": tex_vr_ga,
+        "terrain_detail": terrain_detail,
+    }
+
+
+def get_recommended_cpu_ram_settings(
+    cpu_info: Dict[str, Any],
+    ram_gb: float,
+    flight_profile: str = "LINER",
+) -> Dict[str, Any]:
+    """
+    Returns calibrated CPU & System RAM-bound MSFS settings (Terrain LOD, Object LOD,
+    and Offscreen Terrain Pre-Caching) based on detected CPU architecture (cores,
+    threads, 3D V-Cache) and Total System RAM capacity (in GB).
+    """
+    cpu_name = str((cpu_info or {}).get("name") or "").upper()
+    cores = int((cpu_info or {}).get("cores") or 0)
+    threads = int((cpu_info or {}).get("threads") or 0)
+    ram = float(ram_gb or 0.0)
+
+    is_x3d = bool((cpu_info or {}).get("is_x3d")) or ("X3D" in cpu_name)
+    is_flagship_cpu = (
+        is_x3d
+        or cores >= 12
+        or threads >= 20
+        or any(tag in cpu_name for tag in ("13900", "14900", "285K", "7950", "9950"))
+    )
+    is_mid_high_cpu = (
+        cores >= 8
+        or threads >= 16
+        or any(tag in cpu_name for tag in ("12700", "13600", "13700", "14600", "14700", "265K", "5800", "7700", "9700"))
+    )
+
+    # 1. Calibrate 2D & VR Terrain LOD (TLOD) and Object LOD (OLOD) across CPU + System RAM tiers
+    if ram >= 60.0:
+        # 64GB+ System RAM: unrestricted terrain & scenery streaming buffer
+        if is_flagship_cpu:
+            tlod_2d_liner, olod_2d_liner = 150, 140
+            tlod_2d_ga, olod_2d_ga = 200, 150
+            tlod_vr_liner, olod_vr_liner = 100, 110
+            tlod_vr_ga, olod_vr_ga = 135, 125
+        elif is_mid_high_cpu:
+            tlod_2d_liner, olod_2d_liner = 125, 120
+            tlod_2d_ga, olod_2d_ga = 165, 135
+            tlod_vr_liner, olod_vr_liner = 100, 100
+            tlod_vr_ga, olod_vr_ga = 120, 115
+        else:
+            tlod_2d_liner, olod_2d_liner = 105, 105
+            tlod_2d_ga, olod_2d_ga = 135, 120
+            tlod_vr_liner, olod_vr_liner = 85, 90
+            tlod_vr_ga, olod_vr_ga = 105, 100
+        offscreen_precaching = "Ultra"
+
+    elif ram >= 28.0:
+        # 32GB–48GB System RAM: sweet-spot capacity for complex airliners & dense hubs
+        if is_flagship_cpu:
+            tlod_2d_liner, olod_2d_liner = (140, 130) if is_x3d else (135, 125)
+            tlod_2d_ga, olod_2d_ga = 175, 140
+            tlod_vr_liner, olod_vr_liner = 100, 100
+            tlod_vr_ga, olod_vr_ga = 125, 115
+        elif is_mid_high_cpu:
+            tlod_2d_liner, olod_2d_liner = 115, 115
+            tlod_2d_ga, olod_2d_ga = 150, 130
+            tlod_vr_liner, olod_vr_liner = 100, 100
+            tlod_vr_ga, olod_vr_ga = 115, 110
+        else:
+            tlod_2d_liner, olod_2d_liner = 100, 100
+            tlod_2d_ga, olod_2d_ga = 125, 115
+            tlod_vr_liner, olod_vr_liner = 85, 85
+            tlod_vr_ga, olod_vr_ga = 100, 100
+        offscreen_precaching = "Ultra" if is_flagship_cpu else "High"
+
+    elif ram >= 14.0:
+        # 16GB–24GB System RAM: RAM-constrained streaming buffer — cap TLOD/OLOD to prevent pagefile stutters
+        if is_flagship_cpu or is_mid_high_cpu:
+            tlod_2d_liner, olod_2d_liner = 100, 100
+            tlod_2d_ga, olod_2d_ga = 125, 115
+            tlod_vr_liner, olod_vr_liner = 85, 85
+            tlod_vr_ga, olod_vr_ga = 100, 100
+        else:
+            tlod_2d_liner, olod_2d_liner = 85, 85
+            tlod_2d_ga, olod_2d_ga = 110, 100
+            tlod_vr_liner, olod_vr_liner = 75, 75
+            tlod_vr_ga, olod_vr_ga = 90, 90
+        offscreen_precaching = "Medium"
+
+    else:
+        # <= 12GB System RAM: strict memory budget
+        tlod_2d_liner, olod_2d_liner = 75, 75
+        tlod_2d_ga, olod_2d_ga = 95, 90
+        tlod_vr_liner, olod_vr_liner = 65, 65
+        tlod_vr_ga, olod_vr_ga = 80, 80
+        offscreen_precaching = "Low"
+
+    is_liner = str(flight_profile or "LINER").strip().upper() != "GA"
+    return {
+        "tlod_2d": tlod_2d_liner if is_liner else tlod_2d_ga,
+        "olod_2d": olod_2d_liner if is_liner else olod_2d_ga,
+        "tlod_vr": tlod_vr_liner if is_liner else tlod_vr_ga,
+        "olod_vr": olod_vr_liner if is_liner else olod_vr_ga,
+        "tlod_2d_liner": tlod_2d_liner,
+        "olod_2d_liner": olod_2d_liner,
+        "tlod_2d_ga": tlod_2d_ga,
+        "olod_2d_ga": olod_2d_ga,
+        "tlod_vr_liner": tlod_vr_liner,
+        "olod_vr_liner": olod_vr_liner,
+        "tlod_vr_ga": tlod_vr_ga,
+        "olod_vr_ga": olod_vr_ga,
+        "offscreen_precaching": offscreen_precaching,
+        "cpu_tier": "FLAGSHIP" if is_flagship_cpu else ("HIGH" if is_mid_high_cpu else "ENTRY"),
+        "ram_tier": "64GB+" if ram >= 60.0 else ("32GB" if ram >= 28.0 else ("16GB" if ram >= 14.0 else "LOW_RAM")),
+    }
+
+
+def get_hardware_profile_cache_path() -> str:
+    """Returns path to the persistent hardware profile cache file in %APPDATA%\\SceneryX."""
+    appdata = os.environ.get("APPDATA") or os.path.expanduser("~")
+    sceneryx_dir = os.path.join(appdata, "SceneryX")
+    os.makedirs(sceneryx_dir, exist_ok=True)
+    return os.path.join(sceneryx_dir, "hardware_profile_cache.json")
+
+
+def load_cached_hardware_profile() -> Optional[Dict[str, Any]]:
+    """Loads the previously cached hardware profile from disk."""
+    cache_path = get_hardware_profile_cache_path()
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8", errors="ignore") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and data.get("gpu_name"):
+                    return data
+        except Exception:
+            pass
+    return None
+
+
+def save_cached_hardware_profile(specs: Dict[str, Any]) -> None:
+    """Persists the detected hardware profile to hardware_profile_cache.json and settings.json."""
+    cache_path = get_hardware_profile_cache_path()
+    payload = dict(specs)
+    payload["updated_at"] = datetime.now().isoformat()
+    try:
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+    # Also mirror into %APPDATA%\SceneryX\settings.json safely via scanner lock
+    try:
+        import scanner
+        load_fn = getattr(scanner, "load_settings", scanner.get_settings)
+        settings_data = load_fn()
+        if isinstance(settings_data, dict):
+            settings_data["cached_hardware_profile"] = payload
+            scanner.save_settings(settings_data)
+    except Exception:
+        pass
+
+
+def _update_adapter_in_cfg_content(content: str, gpu_name: str) -> str:
+    """Updates the Adapter line inside the {Video block of UserCfg.opt content."""
+    if not content or not gpu_name or gpu_name == "Unknown GPU":
+        return content
+    return re.sub(
+        r'(\bAdapter\s+")[^"]+(")',
+        rf'\g<1>{gpu_name}\g<2>',
+        content,
+        count=1,
+        flags=re.IGNORECASE
+    )
+
+
+def sync_hardware_profile_on_boot(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Runs on EVERY application startup:
+    1. Performs an ultra-lightweight hardware scan (<1ms via Windows Registry + WMI COM + GlobalMemoryStatusEx).
+    2. Compares the detected hardware (GPU model, 64-bit VRAM capacity, CPU, and Total System RAM) against the cached profile.
+    3. If a hardware change is detected (e.g., swapping an 8GB GPU for a 16GB GPU, upgrading 16GB RAM to 32GB, or swapping CPUs)
+       or cache is missing/stale, overwrites the cached hardware specs, invalidates in-memory caches, and recalibrates
+       both standard profiles and the active profile (Texture Resolution, Terrain LOD, Object LOD, Offscreen Pre-Caching) automatically.
+    """
+    global _cached_gpu_info, _cached_hardware_specs, _last_boot_hardware_sync
+    t0 = time.perf_counter()
+
+    cpu = detect_cpu_info()
+    ram_gb = detect_system_ram_gb()
+    gpu_fast = detect_gpu_info(force=True, fast_boot=True)
+    vram_gb = float(gpu_fast.get("vram_total_gb") or 0.0)
+
+    tex_recs = get_recommended_texture_settings(vram_gb, "LINER")
+    cpu_ram_recs = get_recommended_cpu_ram_settings(cpu, ram_gb, "LINER")
+
+    current_specs = {
+        "gpu_name": str(gpu_fast.get("name") or "Unknown GPU").strip(),
+        "gpu_vendor": str(gpu_fast.get("vendor") or "Unknown").strip(),
+        "vram_total_mb": int(gpu_fast.get("vram_total_mb") or 0),
+        "vram_total_gb": round(vram_gb, 1),
+        "driver_version": str(gpu_fast.get("driver_version") or "Unknown").strip(),
+        "cpu_name": str(cpu.get("name") or "Unknown CPU").strip(),
+        "cpu_cores": int(cpu.get("cores") or 0),
+        "cpu_threads": int(cpu.get("threads") or 0),
+        "ram_total_gb": round(ram_gb, 1),
+        "recommended_texture_2d": tex_recs["texture_2d_liner"],
+        "recommended_texture_vr": tex_recs["texture_vr_liner"],
+        "recommended_terrain_detail": tex_recs["terrain_detail"],
+        "recommended_tlod_2d": int(cpu_ram_recs["tlod_2d_liner"]),
+        "recommended_olod_2d": int(cpu_ram_recs["olod_2d_liner"]),
+        "recommended_tlod_vr": int(cpu_ram_recs["tlod_vr_liner"]),
+        "recommended_olod_vr": int(cpu_ram_recs["olod_vr_liner"]),
+        "recommended_offscreen_precaching": str(cpu_ram_recs["offscreen_precaching"]),
+    }
+
+    cached_specs = load_cached_hardware_profile()
+    profiles_dir = get_custom_profiles_dir()
+    std_2d_file = os.path.join(profiles_dir, "profile_2d_display_standard.profile.json")
+    std_vr_file = os.path.join(profiles_dir, "profile_vr_headset_standard.profile.json")
+
+    gpu_changed = (not cached_specs) or (
+        str(cached_specs.get("gpu_name") or "").strip().upper() != current_specs["gpu_name"].upper()
+    )
+    vram_changed = (not cached_specs) or (
+        abs(float(cached_specs.get("vram_total_gb") or 0.0) - current_specs["vram_total_gb"]) >= 0.5
+    )
+    cpu_changed = (not cached_specs) or (
+        str(cached_specs.get("cpu_name") or "").strip().upper() != current_specs["cpu_name"].upper()
+        or int(cached_specs.get("cpu_cores") or 0) != current_specs["cpu_cores"]
+        or int(cached_specs.get("cpu_threads") or 0) != current_specs["cpu_threads"]
+    )
+    ram_changed = (not cached_specs) or (
+        abs(float(cached_specs.get("ram_total_gb") or 0.0) - current_specs["ram_total_gb"]) >= 1.0
+    )
+
+    profile_stale = False
+    if os.path.exists(std_2d_file):
+        try:
+            with open(std_2d_file, "r", encoding="utf-8", errors="ignore") as pf:
+                p2d = json.load(pf)
+            sig = p2d.get("hardware_signature") or {}
+            if not sig:
+                profile_stale = True
+            elif (
+                str(sig.get("gpu_name") or "").strip().upper() != current_specs["gpu_name"].upper()
+                or abs(float(sig.get("vram_total_gb") or 0.0) - current_specs["vram_total_gb"]) >= 0.5
+                or str(sig.get("cpu_name") or "").strip().upper() != current_specs["cpu_name"].upper()
+                or abs(float(sig.get("ram_total_gb") or 0.0) - current_specs["ram_total_gb"]) >= 1.0
+                or str(sig.get("texture_2d") or "") != current_specs["recommended_texture_2d"]
+                or int(sig.get("tlod_2d") or 0) != current_specs["recommended_tlod_2d"]
+                or int(sig.get("olod_2d") or 0) != current_specs["recommended_olod_2d"]
+            ):
+                profile_stale = True
+        except Exception:
+            profile_stale = True
+
+    hardware_changed = bool(gpu_changed or vram_changed or cpu_changed or ram_changed or profile_stale)
+    previous_gpu = cached_specs.get("gpu_name") if cached_specs else None
+    previous_vram_gb = cached_specs.get("vram_total_gb") if cached_specs else None
+    previous_cpu = cached_specs.get("cpu_name") if cached_specs else None
+    previous_ram_gb = cached_specs.get("ram_total_gb") if cached_specs else None
+
+    if hardware_changed:
+        # Run full GPU detection (including Re-Size BAR & driver status) and invalidate cached diagnostics
+        full_gpu = detect_gpu_info(force=True, fast_boot=False)
+        if full_gpu.get("vram_total_gb", 0.0) > 0:
+            vram_gb = float(full_gpu["vram_total_gb"])
+            tex_recs = get_recommended_texture_settings(vram_gb, "LINER")
+            current_specs["gpu_name"] = str(full_gpu.get("name") or current_specs["gpu_name"]).strip()
+            current_specs["vram_total_mb"] = int(full_gpu.get("vram_total_mb") or current_specs["vram_total_mb"])
+            current_specs["vram_total_gb"] = round(vram_gb, 1)
+            current_specs["driver_version"] = str(full_gpu.get("driver_version") or current_specs["driver_version"]).strip()
+            current_specs["recommended_texture_2d"] = tex_recs["texture_2d_liner"]
+            current_specs["recommended_texture_vr"] = tex_recs["texture_vr_liner"]
+            current_specs["recommended_terrain_detail"] = tex_recs["terrain_detail"]
+
+        _cached_hardware_specs = None
+        save_cached_hardware_profile(current_specs)
+
+        hw_sig = {
+            "gpu_name": current_specs["gpu_name"],
+            "vram_total_gb": current_specs["vram_total_gb"],
+            "cpu_name": current_specs["cpu_name"],
+            "cpu_cores": current_specs["cpu_cores"],
+            "cpu_threads": current_specs["cpu_threads"],
+            "ram_total_gb": current_specs["ram_total_gb"],
+            "texture_2d": tex_recs["texture_2d_liner"],
+            "texture_vr": tex_recs["texture_vr_liner"],
+            "tlod_2d": current_specs["recommended_tlod_2d"],
+            "olod_2d": current_specs["recommended_olod_2d"],
+            "tlod_vr": current_specs["recommended_tlod_vr"],
+            "olod_vr": current_specs["recommended_olod_vr"],
+            "offscreen_precaching": current_specs["recommended_offscreen_precaching"],
+        }
+
+        # Collect target profile files to override: standard 2D/VR profiles + the currently active profile
+        active_id = get_active_profile_id()
+        active_file = os.path.join(profiles_dir, f"{active_id}.profile.json") if active_id else None
+        target_files = []
+        for pfile in (std_2d_file, std_vr_file, active_file):
+            if pfile and os.path.exists(pfile) and pfile not in target_files:
+                target_files.append(pfile)
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for pfile in target_files:
+            try:
+                with open(pfile, "r", encoding="utf-8", errors="ignore") as pf:
+                    pdata = json.load(pf)
+                content = pdata.get("content", "")
+                if content:
+                    content = _update_adapter_in_cfg_content(content, current_specs["gpu_name"])
+                    if gpu_changed or vram_changed or profile_stale:
+                        content = apply_setting_to_content(content, "2D", "texture_resolution", tex_recs["texture_2d_liner"])
+                        content = apply_setting_to_content(content, "VR", "texture_resolution", tex_recs["texture_vr_liner"])
+                    if cpu_changed or ram_changed or profile_stale:
+                        content = apply_setting_to_content(content, "2D", "tlod", str(current_specs["recommended_tlod_2d"]))
+                        content = apply_setting_to_content(content, "2D", "olod", str(current_specs["recommended_olod_2d"]))
+                        content = apply_setting_to_content(content, "2D", "offscreen_precaching", current_specs["recommended_offscreen_precaching"])
+                        content = apply_setting_to_content(content, "VR", "tlod", str(current_specs["recommended_tlod_vr"]))
+                        content = apply_setting_to_content(content, "VR", "olod", str(current_specs["recommended_olod_vr"]))
+                        content = apply_setting_to_content(content, "VR", "offscreen_precaching", current_specs["recommended_offscreen_precaching"])
+                    pdata["content"] = content
+                pdata["hardware_signature"] = hw_sig
+                pdata["updated_at"] = now_str
+                with open(pfile, "w", encoding="utf-8") as pf:
+                    json.dump(pdata, pf, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"[HardwareSync] Warning updating profile '{os.path.basename(pfile)}': {e}")
+
+        # If UserCfg.opt exists and active profile was updated, also sync UserCfg.opt immediately
+        cfg_path = user_cfg_path or get_user_cfg_path()
+        if active_file and os.path.exists(active_file) and cfg_path and os.path.exists(cfg_path) and not has_staged_settings():
+            try:
+                with open(active_file, "r", encoding="utf-8", errors="ignore") as af:
+                    active_content = (json.load(af) or {}).get("content", "")
+                if active_content:
+                    ensure_original_user_cfg_backup(cfg_path)
+                    with open(cfg_path, "w", encoding="utf-8") as cf:
+                        cf.write(active_content)
+            except Exception as e:
+                print(f"[HardwareSync] Warning syncing active profile to UserCfg.opt: {e}")
+
+    elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+    sync_result = {
+        "hardware_changed": hardware_changed,
+        "gpu_changed": bool(gpu_changed),
+        "vram_changed": bool(vram_changed),
+        "cpu_changed": bool(cpu_changed),
+        "ram_changed": bool(ram_changed),
+        "previous_gpu": previous_gpu,
+        "previous_vram_gb": previous_vram_gb,
+        "previous_cpu": previous_cpu,
+        "previous_ram_gb": previous_ram_gb,
+        "current_gpu": current_specs["gpu_name"],
+        "current_vram_gb": current_specs["vram_total_gb"],
+        "current_cpu": current_specs["cpu_name"],
+        "current_ram_gb": current_specs["ram_total_gb"],
+        "recommended_texture_2d": current_specs["recommended_texture_2d"],
+        "recommended_texture_vr": current_specs["recommended_texture_vr"],
+        "recommended_terrain_detail": current_specs["recommended_terrain_detail"],
+        "recommended_tlod_2d": current_specs["recommended_tlod_2d"],
+        "recommended_olod_2d": current_specs["recommended_olod_2d"],
+        "recommended_tlod_vr": current_specs["recommended_tlod_vr"],
+        "recommended_olod_vr": current_specs["recommended_olod_vr"],
+        "recommended_offscreen_precaching": current_specs["recommended_offscreen_precaching"],
+        "scan_time_ms": elapsed_ms,
+    }
+    _last_boot_hardware_sync = sync_result
+
+    if hardware_changed:
+        print(
+            f"[HardwareSync] Hardware update detected in {elapsed_ms}ms "
+            f"(GPU: {previous_gpu or 'Initial'} {previous_vram_gb or 0}GB -> {current_specs['gpu_name']} {current_specs['vram_total_gb']}GB VRAM | "
+            f"CPU/RAM: {previous_cpu or 'Initial'} / {previous_ram_gb or 0}GB -> {current_specs['cpu_name']} / {current_specs['ram_total_gb']}GB RAM). "
+            f"Updated cached specs & recommendations (2D Tex={current_specs['recommended_texture_2d']}, "
+            f"TLOD={current_specs['recommended_tlod_2d']}, OLOD={current_specs['recommended_olod_2d']})."
+        )
+    else:
+        print(
+            f"[HardwareSync] Boot hardware check complete in {elapsed_ms}ms: "
+            f"{current_specs['gpu_name']} ({current_specs['vram_total_gb']} GB VRAM) | "
+            f"{current_specs['cpu_name']} ({current_specs['ram_total_gb']} GB RAM) — cache up to date."
+        )
+
+    return sync_result
+
+
 def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
-    """Ensures that the currently saved active profile is strictly applied to UserCfg.opt on disk."""
+    """Ensures that hardware changes are synced and the active profile is strictly applied to UserCfg.opt on disk."""
     if has_staged_settings():
         return {"status": "skipped", "message": "Unsaved staged settings present."}
     path = user_cfg_path or get_user_cfg_path()
+
+    # Always verify hardware on boot and recalibrate cached profile if GPU/VRAM changed
+    hw_sync = sync_hardware_profile_on_boot(path)
+
     if not path or not os.path.exists(path):
-        return {"status": "error", "message": "UserCfg.opt not found on system."}
+        return {"status": "error", "message": "UserCfg.opt not found on system.", "hardware_sync": hw_sync}
 
     profiles_dir = get_custom_profiles_dir()
     cleanup_legacy_profiles(profiles_dir)
@@ -2023,18 +2598,18 @@ def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[s
             active_id = profiles[0].get("id", "")
 
     if not active_id:
-        return {"status": "skipped", "message": "No active profile defined."}
+        return {"status": "skipped", "message": "No active profile defined.", "hardware_sync": hw_sync}
 
     profile_file = os.path.join(profiles_dir, f"{active_id}.profile.json")
     if not os.path.exists(profile_file):
-        return {"status": "error", "message": f"Profile file for '{active_id}' not found."}
+        return {"status": "error", "message": f"Profile file for '{active_id}' not found.", "hardware_sync": hw_sync}
 
     try:
         with open(profile_file, "r", encoding="utf-8", errors="ignore") as pf:
             pdata = json.load(pf)
         content = pdata.get("content", "")
         if not content:
-            return {"status": "error", "message": "Profile content is empty."}
+            return {"status": "error", "message": "Profile content is empty.", "hardware_sync": hw_sync}
 
         ensure_original_user_cfg_backup(path)
 
@@ -2054,11 +2629,12 @@ def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[s
             "status": "success",
             "profile_id": active_id,
             "profile_name": pdata.get("name"),
-            "synced": True
+            "synced": True,
+            "hardware_sync": hw_sync
         }
     except Exception as e:
         print(f"[Optimizer] Error applying active profile: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": str(e), "hardware_sync": hw_sync}
 
 
 def has_staged_settings() -> bool:
@@ -2208,7 +2784,7 @@ def rename_custom_profile(profile_id: str, new_name: str) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
-def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, user_cfg_path: Optional[str] = None, mode: Optional[str] = None) -> Dict[str, Any]:
     """Saves current settings as a profile named cleanly on disk, or overwrites an existing profile."""
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
@@ -2222,6 +2798,7 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
 
         clean_name = sanitize_profile_filename(name)
         profiles_dir = get_custom_profiles_dir()
+        eff_mode = str(mode).upper() if mode and str(mode).upper() in ("2D", "VR") else None
 
         if overwrite_id:
             old_file = os.path.join(profiles_dir, f"{overwrite_id}.profile.json")
@@ -2253,6 +2830,7 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
                 **old_data,
                 "id": profile_id,
                 "name": name,
+                "mode": eff_mode or old_data.get("mode") or ("VR" if "vr" in name.lower() else "2D"),
                 "created_at": created_at,
                 "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "content": content,
@@ -2273,6 +2851,7 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
             profile_data = {
                 "id": profile_id,
                 "name": name,
+                "mode": eff_mode or ("VR" if "vr" in name.lower() else "2D"),
                 "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "content": content,
                 "is_active": True
@@ -2290,6 +2869,13 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
 
         # Clear staged overrides now saved
         clear_staged_settings()
+
+        # Resynchronize live MSFS memory and Smart LOD controller setpoints if active
+        try:
+            import flight_lod_controller
+            flight_lod_controller.get_smart_lod_controller().reset_to_active_profile("all")
+        except Exception as e:
+            print(f"[Optimizer] Smart LOD sync on save notice: {e}")
 
         return {
             "status": "success",
@@ -3041,7 +3627,11 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     return content
 
 
-def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[Dict[str, Any]]:
+def generate_default_rig_profiles(
+    user_cfg_path: Optional[str] = None,
+    preserve_active: bool = False,
+    missing_only: bool = False
+) -> List[Dict[str, Any]]:
     """
     Generates, saves, and activates calibrated default profiles for each of the 3 MSFS categories
     (Shared, 2D Display, and 3D / VR Headset) based on detected rig hardware specifications.
@@ -3061,9 +3651,10 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
         except Exception:
             base_content = ""
 
-    # Hardware detection
+    # Hardware detection (force fresh GPU scan)
     cpu = detect_cpu_info()
-    gpu = detect_gpu_info()
+    ram_gb = detect_system_ram_gb()
+    gpu = detect_gpu_info(force=True)
     disp = detect_display_info()
     vr = detect_vr_headset()
 
@@ -3074,8 +3665,11 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     is_nvidia = "NVIDIA" in gpu_name or "GEFORCE" in gpu_name or "RTX" in gpu_name or "GTX" in gpu_name
     has_dlss = is_nvidia and any(k in gpu_name for k in ["RTX", "20", "30", "40", "50"])
     vram_gb = float((gpu or {}).get("vram_total_gb") or 16.0)
+    tex_recs = get_recommended_texture_settings(vram_gb, "LINER")
+    cpu_ram_recs = get_recommended_cpu_ram_settings(cpu, ram_gb, "LINER")
     is_flagship_gpu = any(k in gpu_name for k in ["5090", "5080", "4090", "4080", "7900 XTX", "7900XTX"]) or vram_gb >= 20.0
     is_high_tier_gpu = is_flagship_gpu or any(k in gpu_name for k in ["4070 TI", "4070TI", "4070 SUPER", "4070", "3090", "3080", "7900 XT", "7900XT", "7900 GRE", "6800", "6900"]) or vram_gb >= 12.0
+    is_entry_gpu = any(k in gpu_name for k in ["1660", "1060", "1070", "1650", "3050", "2060", "6600", "580", "570"]) or (0.0 < vram_gb <= 8.5)
 
     screen_hz = int(disp.get("refresh_rate_int", 60))
     native_w = int(disp.get("width", 2560))
@@ -3126,6 +3720,8 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
             "}\n"
             f'InstalledPackagesPath "{fallback_pkg_dir}"\n'
         )
+    else:
+        base_content = _update_adapter_in_cfg_content(base_content, str(gpu.get("name") or ""))
 
     # 1. Optimal Shared (COMMON) Settings
     common_settings = {
@@ -3145,28 +3741,29 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
         "characters_quality": "LOW",
         "fauna_density": "OFF",
         "seatbelt_visibility": "OFF",
-        "texture_resolution": "Low",
+        "texture_resolution": tex_recs["texture_2d_liner"],
         "anisotropic_filtering": "16X",
         "foveated_scale": "50%"
     }
 
     # 2. Optimal 2D Display Settings
     m2d_settings = {
-        "anti_aliasing": "DLSS (Quality)" if has_dlss else "TAA",
-        "frame_generation": "DLSSG (2X)" if has_dlssg else "OFF",
-        "framerate_multiplier": "1" if has_dlssg else "0",
+        "texture_resolution": tex_recs["texture_2d_liner"],
+        "anti_aliasing": ("DLSS (Quality)" if not is_entry_gpu else "DLSS (Balanced)") if has_dlss else "TAA",
+        "frame_generation": "DLSSG (2X)" if has_dlssg else ("FSR3 (2X)" if not is_nvidia and not is_entry_gpu else "OFF"),
+        "framerate_multiplier": "1" if (has_dlssg or (not is_nvidia and not is_entry_gpu)) else "0",
         "max_frame_rate": str(target_2d_fps),
         "reflex": "ON",
         "dynamic_settings": "OFF",
-        "tlod": "100",
-        "olod": "100",
-        "offscreen_precaching": "High",
+        "tlod": str(cpu_ram_recs["tlod_2d_liner"]),
+        "olod": str(cpu_ram_recs["olod_2d_liner"]),
+        "offscreen_precaching": str(cpu_ram_recs["offscreen_precaching"]),
         "displacement_mapping": "OFF",
-        "buildings": "High",
-        "trees": "High",
+        "buildings": "High" if not is_entry_gpu else "Medium",
+        "trees": "High" if not is_entry_gpu else "Medium",
         "grass": "Low",
-        "water_waves": "High (512)",
-        "volumetric_clouds": "High",
+        "water_waves": "High (512)" if not is_entry_gpu else "Medium (256)",
+        "volumetric_clouds": "High" if not is_entry_gpu else "Medium",
         "shadow_maps": "High (1536)",
         "terrain_shadows": "High (512)",
         "contact_shadows": "High",
@@ -3184,25 +3781,26 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
 
     # 3. Optimal 3D (VR) Settings
     mvr_settings = {
+        "texture_resolution": tex_recs["texture_vr_liner"],
         "primary_scaling_vr": "100%",
         "max_frame_rate": str(target_vr_fps),
         "sharpen_amount_vr": "0.20",
         "reprojection_mode": "OFF",
         "foveated_rendering": "ON",
         "foveated_scale": "50%",
-        "anti_aliasing": "DLSS (Quality)" if has_dlss else "TAA",
+        "anti_aliasing": ("DLSS (Quality)" if (is_flagship_gpu or is_high_tier_gpu) else "DLSS (Balanced)") if has_dlss else "TAA",
         "frame_generation": "OFF",
         "reflex": "ON",
         "dynamic_settings": "OFF",
-        "tlod": "100",
-        "olod": "100",
-        "offscreen_precaching": "High",
+        "tlod": str(cpu_ram_recs["tlod_vr_liner"]),
+        "olod": str(cpu_ram_recs["olod_vr_liner"]),
+        "offscreen_precaching": str(cpu_ram_recs["offscreen_precaching"]),
         "displacement_mapping": "OFF",
-        "buildings": "High",
-        "trees": "High",
+        "buildings": "High" if (is_flagship_gpu or is_high_tier_gpu) else "Medium",
+        "trees": "High" if (is_flagship_gpu or is_high_tier_gpu) else "Medium",
         "grass": "Low",
-        "water_waves": "High (512)",
-        "volumetric_clouds": "High",
+        "water_waves": "High (512)" if (is_flagship_gpu or is_high_tier_gpu) else "Medium (256)",
+        "volumetric_clouds": "High" if (is_flagship_gpu or is_high_tier_gpu) else "Medium",
         "shadow_maps": "Medium (1024)",
         "terrain_shadows": "Medium (256)",
         "contact_shadows": "Medium",
@@ -3242,20 +3840,40 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     id_vr = "profile_vr_headset_standard"
     id_2d = "profile_2d_display_standard"
 
+    hw_sig = {
+        "gpu_name": str(gpu.get("name") or "Unknown GPU").strip(),
+        "vram_total_gb": round(vram_gb, 1),
+        "cpu_name": str(cpu.get("name") or "Unknown CPU").strip(),
+        "cpu_cores": int(cpu.get("cores") or 0),
+        "cpu_threads": int(cpu.get("threads") or 0),
+        "ram_total_gb": round(ram_gb, 1),
+        "texture_2d": tex_recs["texture_2d_liner"],
+        "texture_vr": tex_recs["texture_vr_liner"],
+        "tlod_2d": int(cpu_ram_recs["tlod_2d_liner"]),
+        "olod_2d": int(cpu_ram_recs["olod_2d_liner"]),
+        "tlod_vr": int(cpu_ram_recs["tlod_vr_liner"]),
+        "olod_vr": int(cpu_ram_recs["olod_vr_liner"]),
+        "offscreen_precaching": str(cpu_ram_recs["offscreen_precaching"]),
+    }
+
     prof_2d = {
         "id": id_2d,
         "name": "2D Display Standard",
+        "mode": "2D",
         "created_at": t_2d,
         "updated_at": t_2d,
         "content": content_2d,
+        "hardware_signature": hw_sig,
         "is_active": True
     }
     prof_vr = {
         "id": id_vr,
         "name": "VR Headset Standard",
+        "mode": "VR",
         "created_at": t_vr,
         "updated_at": t_vr,
         "content": content_vr,
+        "hardware_signature": hw_sig,
         "is_active": False
     }
 
@@ -3265,23 +3883,46 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     # Save both standard profiles to profiles_dir
     for pdata in [prof_2d, prof_vr]:
         pfile = os.path.join(profiles_dir, f"{pdata['id']}.profile.json")
+        if missing_only and os.path.exists(pfile):
+            continue
         try:
             with open(pfile, "w", encoding="utf-8") as pf:
                 json.dump(pdata, pf, indent=2, ensure_ascii=False)
         except Exception:
             pass
 
-    # Set 2D Display Standard as the active profile
-    set_active_profile_id(id_2d)
+    save_cached_hardware_profile({
+        "gpu_name": hw_sig["gpu_name"],
+        "gpu_vendor": str(gpu.get("vendor") or "Unknown").strip(),
+        "vram_total_mb": int(gpu.get("vram_total_mb") or 0),
+        "vram_total_gb": hw_sig["vram_total_gb"],
+        "driver_version": str(gpu.get("driver_version") or "Unknown").strip(),
+        "cpu_name": hw_sig["cpu_name"],
+        "cpu_cores": int(cpu.get("cores") or 0),
+        "cpu_threads": int(cpu.get("threads") or 0),
+        "ram_total_gb": hw_sig["ram_total_gb"],
+        "recommended_texture_2d": tex_recs["texture_2d_liner"],
+        "recommended_texture_vr": tex_recs["texture_vr_liner"],
+        "recommended_terrain_detail": tex_recs["terrain_detail"],
+        "recommended_tlod_2d": hw_sig["tlod_2d"],
+        "recommended_olod_2d": hw_sig["olod_2d"],
+        "recommended_tlod_vr": hw_sig["tlod_vr"],
+        "recommended_olod_vr": hw_sig["olod_vr"],
+        "recommended_offscreen_precaching": hw_sig["offscreen_precaching"],
+    })
 
-    # Immediately activate 2D Display Standard in MSFS UserCfg.opt on disk
-    if path and os.path.exists(path):
-        try:
-            ensure_original_user_cfg_backup(path)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(content_2d)
-        except Exception:
-            pass
+    # Set 2D Display Standard as the active profile unless preserve_active is requested and an active profile exists
+    existing_active = get_active_profile_id() if preserve_active else ""
+    if not existing_active:
+        set_active_profile_id(id_2d)
+        # Immediately activate 2D Display Standard in MSFS UserCfg.opt on disk
+        if path and os.path.exists(path):
+            try:
+                ensure_original_user_cfg_backup(path)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(content_2d)
+            except Exception:
+                pass
 
     clear_staged_settings()
     return [prof_2d, prof_vr]
@@ -7928,44 +8569,65 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '2')
     tex_vr_val = tex_q_map.get(tex_vr_raw, 'Medium')
 
-    # Texture 2D Rating
+    tex_recs_curr = get_recommended_texture_settings(vram_gb, flight_profile)
+    rec_tex_2d_str = tex_recs_curr["texture_2d"].upper()
+    rec_tex_vr_str = tex_recs_curr["texture_vr"].upper()
+
+    # Texture 2D Rating (dynamically calibrated to detected GPU VRAM)
     if is_liner:
         if tex_2d_val == "Low":
-            tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW saves 6-8 GB VRAM, preventing D3D12 paging freezes at busy hubs while cockpit vector screens remain sharp.\nRecommendation: Maintain LOW for all airliner flights (VRAM Optimization)."
-            tex_2d_reason = "VRAM Optimization: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs while vector instruments stay sharp."
+            if vram_gb >= 15.0:
+                tex_2d_rating, tex_2d_color, tex_2d_label = "acceptable", "amber", "ACCEPTABLE"
+                tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW conserves VRAM, though your GPU has {vram_gb:.0f} GB VRAM.\nRecommendation: Increase to {rec_tex_2d_str} or MEDIUM to take advantage of your {vram_gb:.0f} GB VRAM buffer."
+                tex_2d_reason = f"Conservative VRAM setting; your {vram_gb:.0f} GB GPU comfortably supports {rec_tex_2d_str} textures."
+            else:
+                tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
+                tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW saves 6-8 GB VRAM, preventing D3D12 paging freezes at busy hubs while cockpit vector screens remain sharp.\nRecommendation: Maintain LOW for airliner flights on 8-10 GB GPUs (VRAM Optimization)."
+                tex_2d_reason = "VRAM Optimization: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs while vector instruments stay sharp."
         elif tex_2d_val == "Medium":
-            tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM provides balanced textures with safe VRAM headroom for airliners.\nRecommendation: LOW is preferred for maximum stability at heavy airports; MEDIUM is safe with 16+ GB VRAM."
-            tex_2d_reason = "Balanced texture resolution with adequate VRAM headroom for airliners."
+            if vram_gb >= 11.0:
+                tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
+                tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM provides balanced textures with safe VRAM headroom on {vram_gb:.0f} GB GPUs.\nRecommendation: MEDIUM or {rec_tex_2d_str} is optimal for {vram_gb:.0f} GB VRAM."
+                tex_2d_reason = f"Balanced texture resolution with safe VRAM headroom for airliners on {vram_gb:.0f} GB VRAM."
+            else:
+                tex_2d_rating, tex_2d_color, tex_2d_label = "acceptable", "amber", "ACCEPTABLE"
+                tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM uses moderate VRAM on your {vram_gb:.0f} GB GPU.\nRecommendation: Switch to LOW at heavy payware hubs to prevent D3D12 paging."
+                tex_2d_reason = f"Moderate VRAM usage on {vram_gb:.0f} GB GPU; LOW is safer at heavy hubs."
         elif tex_2d_val == "High":
-            tex_2d_rating = "acceptable" if vram_gb >= 16.0 else "suboptimal"
-            tex_2d_color = "amber" if vram_gb >= 16.0 else "orange"
-            tex_2d_label = "ACCEPTABLE" if vram_gb >= 16.0 else "SUBOPTIMAL"
-            tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: HIGH consumes significant VRAM (~12-14 GB with complex airliners). Your GPU has {vram_gb:.0f} GB VRAM.\nRecommendation: Switch to LOW or MEDIUM for airliner flights to avoid sudden D3D12 memory paging freezes during landing."
-            tex_2d_reason = f"High textures approach VRAM budget limits with airliners on {vram_gb:.0f} GB VRAM."
+            if vram_gb >= 15.0:
+                tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
+                tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: HIGH delivers crisp 2K/4K cockpit and airport textures, well within your {vram_gb:.0f} GB VRAM budget.\nRecommendation: Maintain HIGH (recommended for {vram_gb:.0f} GB VRAM)."
+                tex_2d_reason = f"Crisp cockpit and airport textures calibrated for your {vram_gb:.0f} GB VRAM capacity."
+            else:
+                tex_2d_rating = "acceptable" if vram_gb >= 12.0 else "suboptimal"
+                tex_2d_color = "amber" if vram_gb >= 12.0 else "orange"
+                tex_2d_label = "ACCEPTABLE" if vram_gb >= 12.0 else "SUBOPTIMAL"
+                tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: HIGH consumes significant VRAM (~12-14 GB with complex airliners). Your GPU has {vram_gb:.0f} GB VRAM.\nRecommendation: Switch to {rec_tex_2d_str} for airliner flights to avoid sudden D3D12 memory paging freezes during landing."
+                tex_2d_reason = f"High textures approach VRAM budget limits with airliners on {vram_gb:.0f} GB VRAM."
         else:
-            tex_2d_rating, tex_2d_color, tex_2d_label = "hazard", "rose", "HAZARD"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: ULTRA textures consume 6-8 GB extra VRAM, triggering heavy D3D12 paging freezes on airliners.\nRecommendation: Switch to LOW immediately for airliner flights."
+            tex_2d_rating, tex_2d_color, tex_2d_label = ("acceptable", "amber", "ACCEPTABLE") if vram_gb >= 20.0 else ("hazard", "rose", "HAZARD")
+            tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: ULTRA textures consume 6-8 GB extra VRAM.\nRecommendation: Switch to {rec_tex_2d_str} for airliner flights."
             tex_2d_reason = "ULTRA textures cause severe VRAM overflow and heavy stuttering on complex airliners."
     else:
         if tex_2d_val == "Ultra":
-            tex_2d_rating = "optimum" if vram_gb >= 16.0 else "acceptable"
-            tex_2d_color = "emerald" if vram_gb >= 16.0 else "amber"
-            tex_2d_label = "OPTIMUM" if vram_gb >= 16.0 else "ACCEPTABLE"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: ULTRA provides maximum visual fidelity for low-altitude VFR flights.\nRecommendation: ULTRA is recommended for GA aircraft since they consume minimal VRAM."
+            tex_2d_rating = "optimum" if vram_gb >= 15.0 else "acceptable"
+            tex_2d_color = "emerald" if vram_gb >= 15.0 else "amber"
+            tex_2d_label = "OPTIMUM" if vram_gb >= 15.0 else "ACCEPTABLE"
+            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: ULTRA provides maximum visual fidelity for low-altitude VFR flights.\nRecommendation: ULTRA is recommended for GA aircraft on 16GB+ GPUs since they consume minimal VRAM."
             tex_2d_reason = "Maximum visual fidelity for low-altitude VFR. GA aircraft consume minimal VRAM."
         elif tex_2d_val == "High":
             tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
             tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: HIGH offers crisp ground and cockpit textures with ample headroom for GA flights.\nRecommendation: Maintain HIGH or ULTRA for general aviation."
             tex_2d_reason = "Crisp ground and cockpit textures with ample headroom for GA flights."
         elif tex_2d_val == "Medium":
-            tex_2d_rating, tex_2d_color, tex_2d_label = "acceptable", "amber", "ACCEPTABLE"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM provides good performance but slight texture blur at low altitude.\nRecommendation: Increase to HIGH or ULTRA for sharper scenery during VFR flights."
-            tex_2d_reason = "Good performance, slight texture blur at low altitude."
+            tex_2d_rating = "optimum" if vram_gb < 11.0 else "acceptable"
+            tex_2d_color = "emerald" if vram_gb < 11.0 else "amber"
+            tex_2d_label = "OPTIMUM" if vram_gb < 11.0 else "ACCEPTABLE"
+            tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM provides good performance.\nRecommendation: {'Maintain MEDIUM for 8 GB VRAM.' if vram_gb < 11.0 else f'Increase to {rec_tex_2d_str} for sharper scenery during VFR flights.'}"
+            tex_2d_reason = "Balanced VFR performance for 8 GB VRAM." if vram_gb < 11.0 else "Good performance, slight texture blur at low altitude."
         else:
             tex_2d_rating, tex_2d_color, tex_2d_label = "suboptimal", "orange", "SUBOPTIMAL"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW causes visible texture blurring during low-altitude sightseeing.\nRecommendation: Increase to HIGH or ULTRA for VFR general aviation."
+            tex_2d_tip = f"Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW causes visible texture blurring during low-altitude sightseeing.\nRecommendation: Increase to {rec_tex_2d_str} for VFR general aviation."
             tex_2d_reason = "Unnecessarily blurry for VFR sightseeing flights when VRAM is plentiful."
 
     # Texture VR Rating
@@ -8530,7 +9192,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("framerate_multiplier", "Framerate Multiplier", "1 (2X Interpolation)" if not fg_2d.startswith("OFF") else "OFF (Inactive)", mult_2d, False, "optimum" if not fg_2d.startswith("OFF") else "acceptable", "emerald" if not fg_2d.startswith("OFF") else "amber", "OPTIMUM" if not fg_2d.startswith("OFF") else "INACTIVE", f"Description: Number of interpolated frames generated per native frame via Optical Flow Accelerator (OFA).\nCurrent: {'1 (2X Interpolation)' if not fg_2d.startswith('OFF') else 'OFF (Inactive)'}.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active. Generates 1 AI frame per native frame with zero CPU MainThread cost.", ["1 (2X Interpolation)"] if not fg_2d.startswith("OFF") else ["OFF (Inactive)"], page=1, tag_reason="Standard 2X optical flow interpolation factor (1 generated frame per native frame)." if not fg_2d.startswith("OFF") else "Frame Generation is inactive; optical flow multiplier is idle.", rec_guidance="1 (2X) • Standard Optical Flow DLSS 3 multiplier", is_vr=False),
 
         # PAGE 2: TERRAIN & TEXTURES (6)
-        make_setting_item("texture_resolution", "Texture Resolution", format_tex_display(tex_2d_val), tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, tex_options, page=2, tag_reason=tex_2d_reason, rec_guidance="LOW (IFR Liners & VRAM budget) or ULTRA (VFR/GA on 16GB+ GPUs)", is_vr=False),
+        make_setting_item("texture_resolution", "Texture Resolution", format_tex_display(tex_2d_val), tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, tex_options, page=2, tag_reason=tex_2d_reason, rec_guidance=f"{rec_tex_2d_str} (Recommended for {vram_gb:.0f} GB VRAM) • {'ULTRA for VFR/GA' if is_liner and vram_gb >= 15.0 else 'Calibrated for D3D12 stability'}", is_vr=False),
         make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_2d_val, aniso_2d_raw, True, "optimum" if aniso_2d_val == "16X" else "acceptable", "emerald" if aniso_2d_val == "16X" else "amber", "OPTIMUM" if aniso_2d_val == "16X" else "ACCEPTABLE", "Description: Global texture sampling filter. Prevents runway markings and taxiway lines from blurring at acute angles.\nRecommendation: 16X.", aniso_options, page=2, tag_reason="16X keeps markings sharp at glancing angles.", rec_guidance="16X • Crisp runway markings and lines at acute angles", is_vr=False),
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, f"Description: Terrain mesh geometric complexity and photogrammetry draw distance. Major driver of CPU MainThread frame time! Direct numeric input supported up to 400.\nCurrent: {tlod_2d_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: {'Airliners: Keep 100-120 (or dynamic with AutoFPS) to ensure CPU MainThread stays under 25ms during landing flare.' if is_liner else 'GA: 150-200 provides rich ground relief and mountain detail.'}", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_2d_reason, rec_guidance="100 - 120 (IFR Liners) • 150 - 200 (GA/VFR low altitude)", is_vr=False),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, olod_2d_rating, olod_2d_color, olod_2d_label, f"Description: Geometric draw distance for 3D airport buildings, hangars, and autogen. Direct numeric input supported up to 400.\nCurrent: {olod_2d_val}.\nRecommendation: 100-120 for airliners; 120-150 for GA. Values above 200 severely increase CPU draw calls at busy airports.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=olod_2d_reason, rec_guidance="100 - 120 • Optimal balance for airport 3D object draw calls", is_vr=False),
@@ -8806,7 +9468,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("foveated_scale", "Foveated Scale", fov_scale_pct, fov_scale_raw, False, "optimum" if "50%" in fov_scale_pct else "acceptable", "emerald" if "50%" in fov_scale_pct else "amber", "SWEET SPOT" if "50%" in fov_scale_pct else "ACCEPTABLE", f"Description: Inner foveal resolution radius.\nCurrent: {fov_scale_pct}.\nRecommendation: 50% offers the calibrated optical sweet spot between peripheral performance gain and full cockpit avionics clarity.", fov_scale_options, page=2, tag_reason="Optimal 50% foveal radius covering cockpit avionics with 10-15% peripheral GPU savings." if "50%" in fov_scale_pct else "Foveal resolution radius calibrated for VR optics.", rec_guidance="50% • Optimal balance of central clarity and GPU savings", is_vr=True, is_active=(fov_vr_val == "ON")),
 
         # PAGE 3: TERRAIN & TEXTURES VR (5)
-        make_setting_item("texture_resolution", "Texture Resolution (VR)", format_tex_display(tex_vr_val), tex_vr_raw, True, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, tex_options, page=3, tag_reason=tex_vr_reason, rec_guidance="LOW • Saves 6-8 GB VRAM, preventing compositor crashes in VR", is_vr=True),
+        make_setting_item("texture_resolution", "Texture Resolution (VR)", format_tex_display(tex_vr_val), tex_vr_raw, True, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, tex_options, page=3, tag_reason=tex_vr_reason, rec_guidance=f"{rec_tex_vr_str} • Recommended for {vram_gb:.0f} GB VRAM in VR stereo", is_vr=True),
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, tlod_vr_rating, tlod_vr_color, tlod_vr_label, f"Description: Terrain mesh and photogrammetry draw distance in VR stereo. Direct numeric input supported up to 400.\nCurrent: {tlod_vr_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: Keep TLOD <= 100 in VR on ground to protect stereo frame time budget and prevent motion reprojection drops.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_vr_reason, rec_guidance="80 - 100 • Protects MainThread to avoid stereo reprojection drops", is_vr=True),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, olod_vr_rating, olod_vr_color, olod_vr_label, f"Description: 3D objects distance in VR up to 400.\nCurrent: {olod_vr_val}.\nRecommendation: Keep OLOD <= 100 in VR.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=olod_vr_reason, rec_guidance="80 - 100 • Reduces 3D object draw calls in both eye viewports", is_vr=True),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", format_precaching_display(pre_vr_val), pre_vr_raw, False, "optimum" if pre_vr_val == "High" else "acceptable", "emerald" if pre_vr_val == "High" else "amber", "OPTIMUM" if pre_vr_val == "High" else "ACCEPTABLE", f"Description: Scenery pre-caching in VR.\nCurrent: {pre_vr_val}.\nRecommendation: HIGH is essential for smooth head rotation in VR without stutter.", precaching_options, page=3, tag_reason="Essential for smooth head rotation without border popping in VR.", rec_guidance="HIGH • Mandatory in VR to eliminate head-turning micro-stutters", is_vr=True),
@@ -9171,21 +9833,37 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
     else:
         target_2d_fps = 60
 
-    gpu = detect_gpu()
+    cpu = detect_cpu_info()
+    ram_gb = detect_system_ram_gb()
+    gpu = detect_gpu_info()
     gpu_name = (gpu.get("name") or "").upper()
-    vram_gb = float(gpu.get("vram_gb") or 0.0)
-    is_flagship_gpu = any(x in gpu_name for x in ["4090", "4080", "5090", "5080", "7900 XTX"]) or (vram_gb >= 16.0)
-    is_high_tier_gpu = any(x in gpu_name for x in ["4070", "3080", "3090", "7900 XT", "7800 XT", "6900", "6950"]) or (vram_gb >= 12.0)
+    vram_gb = float(gpu.get("vram_total_gb") or gpu.get("vram_gb") or 0.0)
+    tex_recs = get_recommended_texture_settings(vram_gb, flight_profile)
+    cpu_ram_recs = get_recommended_cpu_ram_settings(cpu, ram_gb, flight_profile)
+    has_dlssg = any(k in gpu_name for k in ["RTX 40", "RTX 50", "4060", "4070", "4080", "4090", "5060", "5070", "5080", "5090"])
+    is_nvidia = "NVIDIA" in gpu_name or "GEFORCE" in gpu_name or "RTX" in gpu_name or "GTX" in gpu_name
+    has_dlss = is_nvidia and any(k in gpu_name for k in ["RTX", "20", "30", "40", "50"])
+    is_flagship_gpu = any(x in gpu_name for x in ["4090", "4080", "5090", "5080", "7900 XTX", "7900XTX"]) or (vram_gb >= 16.0)
+    is_high_tier_gpu = is_flagship_gpu or any(x in gpu_name for x in ["4070", "3080", "3090", "7900 XT", "7800 XT", "7900 GRE", "6800", "6900", "6950"]) or (vram_gb >= 12.0)
+    is_entry_gpu = any(x in gpu_name for x in ["1660", "1060", "1070", "1650", "3050", "2060", "6600", "580", "570"]) or (0.0 < vram_gb <= 8.5)
 
     try:
         if mode == '2D':
-            tex_val = 'Low' if is_liner else 'High'
-            tlod_val = '100' if is_liner else '150'
+            tex_val = tex_recs["texture_2d"]
+            tlod_val = str(cpu_ram_recs["tlod_2d"])
+            olod_val = str(cpu_ram_recs["olod_2d"])
+            precache_val = str(cpu_ram_recs["offscreen_precaching"])
             glass_val = 'Medium (Half)' if is_liner else 'High (Full)'
+            aa_val_2d = ('DLSS (Quality)' if not is_entry_gpu else 'DLSS (Balanced)') if has_dlss else 'TAA'
+            fg_val_2d = 'DLSSG (2X)' if has_dlssg else ('FSR3 (2X)' if not is_nvidia and not is_entry_gpu else 'OFF')
+            cld_val_2d = 'High' if not is_entry_gpu else 'Medium'
+            bld_val_2d = 'High' if not is_entry_gpu else 'Medium'
+            tree_val_2d = 'High' if not is_entry_gpu else 'Medium'
+            water_val_2d = 'High (512)' if not is_entry_gpu else 'Medium (256)'
             
             # Page 1
-            update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'anti_aliasing', aa_val_2d, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'frame_generation', fg_val_2d, path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'max_frame_rate', str(target_2d_fps), path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path, create_backup=False)
@@ -9194,14 +9872,14 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             
             # Page 2
             update_msfs_user_cfg_setting('2D', 'tlod', tlod_val, path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'olod', '100', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'offscreen_precaching', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'volumetric_clouds', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'buildings', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'trees', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'olod', olod_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'offscreen_precaching', precache_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'volumetric_clouds', cld_val_2d, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'buildings', bld_val_2d, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'trees', tree_val_2d, path, create_backup=False)
             grass_val_2d = 'Low' if is_liner else 'High'
             update_msfs_user_cfg_setting('2D', 'grass', grass_val_2d, path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'water_waves', 'High (512)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'water_waves', water_val_2d, path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path, create_backup=False)
             
             # Page 3
@@ -9215,10 +9893,13 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('2D', 'anisotropic_filtering', '16X', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'windshield_effects', 'High', path, create_backup=False)
         else:
-            tex_val = 'Low' if is_liner else 'Medium'
+            tex_val = tex_recs["texture_vr"]
+            tlod_vr_val = str(cpu_ram_recs["tlod_vr"])
+            olod_vr_val = str(cpu_ram_recs["olod_vr"])
+            precache_vr_val = str(cpu_ram_recs["offscreen_precaching"])
             glass_val = 'Low (Quarter)' if is_liner else 'Medium (Half)'
             grass_val_vr = 'Low' if is_liner else 'Medium'
-            aa_val_vr = 'DLSS (Quality)' if (is_flagship_gpu or is_high_tier_gpu) else 'DLSS (Balanced)'
+            aa_val_vr = ('DLSS (Quality)' if (is_flagship_gpu or is_high_tier_gpu) else 'DLSS (Balanced)') if has_dlss else 'TAA'
             cld_val_vr = 'High' if (is_flagship_gpu or is_high_tier_gpu) else 'Medium'
             bld_val_vr = 'High' if (is_flagship_gpu or is_high_tier_gpu) else 'Medium'
             tree_val_vr = 'High' if (is_flagship_gpu or is_high_tier_gpu) else 'Medium'
@@ -9236,9 +9917,9 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('VR', 'reprojection_mode', 'OFF', path, create_backup=False)
             
             # Page 2
-            update_msfs_user_cfg_setting('VR', 'tlod', '100', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'olod', '100', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'tlod', tlod_vr_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'olod', olod_vr_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'offscreen_precaching', precache_vr_val, path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'volumetric_clouds', cld_val_vr, path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'buildings', bld_val_vr, path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'trees', tree_val_vr, path, create_backup=False)
@@ -9424,21 +10105,27 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     """
     screen_hz = float(user_specs.get("screen_hz", 180.0))
     vram_gb = float(user_specs.get("vram_gb", 16.0))
+    ram_gb = float(user_specs.get("ram_gb") or detect_system_ram_gb() or 32.0)
+    cpu_info = user_specs.get("cpu") or detect_cpu_info()
     studio_id = user_specs.get("studio_id", "fslabs").lower()
     has_frame_gen = bool(user_specs.get("frame_gen", True))
-    
+    is_liner_studio = studio_id in ["fslabs", "fenix", "inibuilds", "pmdg", "flybywire"]
+    flight_prof = "LINER" if is_liner_studio else "GA"
+
     studio_profile = AIRCRAFT_STUDIO_PROFILES.get(studio_id, AIRCRAFT_STUDIO_PROFILES["fslabs"])
     pacing = calculate_frame_pacing(screen_hz, use_frame_gen=has_frame_gen)
+    tex_recs = get_recommended_texture_settings(vram_gb, flight_prof)
+    cpu_ram_recs = get_recommended_cpu_ram_settings(cpu_info, ram_gb, flight_prof)
 
-    if vram_gb <= 12.0:
+    if vram_gb <= 10.5:
         terrain_detail = "LOW"
         dlss_preset = "Balanced"
-        vram_risk = "High (Probable D3D12 paging on Ultra textures)"
-    elif vram_gb <= 16.0:
+        vram_risk = "High (Probable D3D12 paging on High/Ultra textures)"
+    elif vram_gb < 15.0:
         if studio_id in ["fslabs", "fenix", "inibuilds"]:
-            terrain_detail = "LOW"
+            terrain_detail = "MEDIUM"
             dlss_preset = "Quality"
-            vram_risk = "Moderate to Controlled (Low Terrain Detail frees ~7 GB VRAM)"
+            vram_risk = "Moderate to Controlled (Medium textures keep safe VRAM margin)"
         else:
             terrain_detail = "MEDIUM"
             dlss_preset = "Quality"
@@ -9446,7 +10133,7 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     else:
         terrain_detail = "HIGH"
         dlss_preset = "Quality"
-        vram_risk = "Zero (Comfortable VRAM headroom)"
+        vram_risk = "Zero (Comfortable VRAM headroom on 16GB+ GPU)"
 
     autofps = {
         "target_fps": pacing["displayed_fps_target"],
@@ -9459,7 +10146,13 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
 
     user_cfg_recommendations = {
         "FrameLimiter": pacing["displayed_fps_target"],
-        "TerrainLoD": 100 if terrain_detail == "LOW" else 150,
+        "TerrainLoD": int(cpu_ram_recs["tlod_2d"]),
+        "ObjectLoD": int(cpu_ram_recs["olod_2d"]),
+        "TerrainLoDVR": int(cpu_ram_recs["tlod_vr"]),
+        "ObjectLoDVR": int(cpu_ram_recs["olod_vr"]),
+        "OffscreenTerrainPreCaching": cpu_ram_recs["offscreen_precaching"],
+        "TextureResolution": tex_recs["texture_2d"],
+        "TextureResolutionVR": tex_recs["texture_vr"],
         "DLSSMode": dlss_preset,
         "FrameGeneration": 1 if has_frame_gen else 0,
         "VSync": 1
@@ -9476,6 +10169,11 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
         "pacing": pacing,
         "studio_profile": studio_profile,
         "terrain_detail": terrain_detail,
+        "texture_resolution": tex_recs["texture_2d"],
+        "texture_resolution_vr": tex_recs["texture_vr"],
+        "terrain_lod": int(cpu_ram_recs["tlod_2d"]),
+        "object_lod": int(cpu_ram_recs["olod_2d"]),
+        "offscreen_precaching": cpu_ram_recs["offscreen_precaching"],
         "vram_risk": vram_risk,
         "autofps": autofps,
         "user_cfg": user_cfg_recommendations,
@@ -9491,7 +10189,7 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     global _cached_hardware_specs
     if force_refresh or _cached_hardware_specs is None:
         cpu = detect_cpu_info()
-        gpu = detect_gpu_info()
+        gpu = detect_gpu_info(force=force_refresh)
         ram = detect_ram_and_xmp()
         storage = detect_msfs_storage()
         network = detect_network_info()
@@ -9564,6 +10262,8 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     initial_specs = {
         "screen_hz": disp["refresh_rate_hz"],
         "vram_gb": gpu["vram_total_gb"],
+        "ram_gb": ram.get("total_gb") or detect_system_ram_gb(),
+        "cpu": cpu,
         "studio_id": "fslabs",
         "frame_gen": True
     }
@@ -9595,7 +10295,8 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
         },
         "recommended_profile": initial_profile,
         "settings_matrix": matrix_data,
-        "backups": backups
+        "backups": backups,
+        "hardware_sync": _last_boot_hardware_sync
     }
 
 

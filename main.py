@@ -6,6 +6,14 @@ import re
 import threading
 import urllib.request
 import webbrowser
+
+# Force WebView2 / Chromium to use the dedicated high-performance GPU (e.g. NVIDIA RTX)
+# with hardware GPU rasterization, zero-copy textures, and accelerated 2D/WebGL canvas.
+os.environ.setdefault(
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+    "--ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --enable-accelerated-2d-canvas --enable-oop-rasterization --force-high-performance-gpu --num-raster-threads=4"
+)
+
 import webview
 from datetime import datetime
 import flight_rig_optimizer
@@ -84,12 +92,17 @@ def auto_resolve_known_conflicts():
                     clean_sec = sec_name[:-9] if sec_name.endswith('.disabled') else sec_name
                     sec_path = os.path.join(cd, clean_sec)
                     dis_path = sec_path + '.disabled'
-                    if (os.path.exists(sec_path) or os.path.islink(sec_path)) and not os.path.exists(dis_path):
+                    if os.path.exists(sec_path) or os.path.islink(sec_path) or (hasattr(os.path, 'isjunction') and os.path.isjunction(sec_path)):
                         try:
-                            safe_rename_path(sec_path, dis_path)
+                            disable_physical_package(sec_path)
                             print(f"[CONFLICT SAFEGUARD] Kept secondary package disabled on disk: {clean_sec}")
                         except Exception as e:
                             print(f"Error disabling secondary package {clean_sec}: {e}")
+                    elif os.path.exists(dis_path) or os.path.islink(dis_path) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_path)):
+                        try:
+                            disable_physical_package(dis_path)
+                        except Exception as e:
+                            print(f"Error ensuring manifest/layout disabled on {dis_path}: {e}")
 
         # 2. MSFS Content.xml
         all_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
@@ -120,39 +133,44 @@ def auto_resolve_known_conflicts():
 PROTECTED_SYSTEM_KEYWORDS = [
     'modellib', 'commonlibrary', 'projectairports', 'genericairports',
     'travelbook', 'worlddiscovery', 'bush-trip', 'bushtrip', 'activities',
-    'instruments', 'navdata', 'fs-base', 'freeflight', 'mission',
-    'tutorial', 'discovery', 'point-of-interest', 'simobjects',
-    'passiveaircraft', 'ships', 'animals', 'vehicles', 'pgg',
+    'instruments', 'navdata', 'fs-base', 'freeflight',
+    'tutorial', 'point-of-interest', 'simobjects',
+    'passiveaircraft', 'animals', 'vehicles',
     'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx', 'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
     'chaseplane', 'p42-util', 'aircraft', 'livery', 'liveries', 'fleet',
-    'gsx', 'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic', 'raas',
-    'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph',
-    'fnx', 'fenix', 'pmdg', 'flybywire', 'fbw', 'a320', 'a319', 'a321', 'a350',
-    'a220', 'b737', 'b747', 'b777', 'b787', 'crj', 'justflight-aircraft', 'justflight-traffic', 'blackbox',
-    'headwind', 'horizon', 'maddog', 'tfdi', 'workingtitle',
-    'wt21', 'avionics', 'sound', 'effects', 'visualeffect',
+    'fsdreamteam-gsx', 'gsx-pro', 'gsx-efb', 'gsx-world-of-jetways', 'kt-gsx',
+    'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic',
+    'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'navigraph',
+    'fenix', 'pmdg', 'flybywire', 'a320', 'a319', 'a321', 'a350',
+    'a220', 'b737', 'b747', 'b777', 'b787', 'justflight-aircraft', 'justflight-traffic', 'blackbox',
+    'headwind', 'maddog', 'workingtitle',
+    'avionics', 'effects', 'visualeffect',
     'inibuilds-aircraft', 'aerosoft-aircraft', 'milviz', 'blackbird',
-    'cowan', 'hpg-', 'got-friends', 'salty', 'simupdates', 'fs2crew',
-    'hifi', 'active-sky', 'airbus', 'boeing', 'bombardier', 'cessna',
-    'embraer', 'piper', 'beechcraft', 'atr', 'concorde', 'helicopter',
-    'vessels', 'vessel', 'seafront', 'arex', 'landmarks', 'landmark',
+    'hpg-', 'got-friends', 'simupdates', 'fs2crew',
+    'active-sky', 'airbus', 'bombardier', 'beechcraft', 'concorde',
+    'vessels', 'vessel', 'seafront', 'landmarks', 'landmark',
     'sightseeing', 'citytimes', 'city-times', 'city_times', 'citywow', 'city-wow', 'city_wow',
     'moderncities', 'modern-cities', 'modern_cities', 'citypack', 'city-pack', 'city_pack',
     'cityupdate', 'city-update', 'city_update', 'city-landmarks', 'city_landmarks', 'skyline', 'skylines',
     'asobo-scenery-', 'microsoft-scenery-', 'asobo-mission', 'mission-templates', 'fs-freeflight',
     'helipad-worldwide', 'monument-valley', '-rbr1', '-rbr2', '-rbr3', '-rbr4', '-rbr5', '-rbr6',
-    'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport', 'ferries', 'ferry',
     'obstacles', 'obstacle', 'powerlines', 'powerline', 'windfarms', 'windfarm', 'windturbines', 'solarfarms',
     'cooling-towers', 'coolingtowers', 'we-love-vfr', 'welovevfr', 'mamudesign', 'puffinflight',
     'nightlighting', 'night-lighting', 'night_lighting', 'night-enhanced', 'nightenhanced', '3d-night',
-    'terrain-mesh', 'elevation-mesh', 'lidar', 'coastline', 'coastlines', 'waterfix', 'water-fix', 'bijan', 'rex-accu', 'zinertek'
+    'terrain-mesh', 'elevation-mesh', 'coastline', 'coastlines', 'waterfix', 'water-fix', 'bijan', 'rex-accu', 'zinertek'
 ]
+
+# Short or ambiguous tokens that must match on token boundaries and NEVER override an explicit '-airport-' package
+PROTECTED_TOKEN_REGEX = re.compile(
+    r'(?:^|[-_ ])(atr|fnx|fbw|crj|fsl|raas|asfs|hifi|salty|cowan|tfdi|wt21|pgg|arex|horizon|boeing|cessna|embraer|piper|helicopter|ships|ferry|ferries|mission|discovery|lidar)(?:$|[-_ \d])'
+)
 
 def is_core_or_library_package(pkg_path_or_name):
     """
     Bulletproof immunity detector:
     Guarantees that NO aircraft, livery, utility, tool, or core package
-    can ever be classified as an airport scenery or disabled under any circumstances.
+    can ever be classified as an airport scenery or disabled under any circumstances,
+    while ensuring explicit airport packages (-airport-, SCENERY + scenery/) are never falsely exempted.
     """
     if not pkg_path_or_name:
         return False
@@ -163,8 +181,7 @@ def is_core_or_library_package(pkg_path_or_name):
     # 1. Path-level checks for aircraft / livery dedicated directories
     if any(k in p_lower for k in [
         '/msfs_aircraft/', '/msfs_livery/', '/msfs_liveries/',
-        'simobjects/airplanes', 'simobjects/rotorcraft', 'simobjects/boats',
-        'airplanes', 'rotorcraft'
+        'simobjects/airplanes', 'simobjects/rotorcraft', 'simobjects/boats'
     ]):
         return True
 
@@ -177,9 +194,25 @@ def is_core_or_library_package(pkg_path_or_name):
     # Remove standard MSFS Content.xml prefixes
     norm_name = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', base_lower)
 
+    # Check if package is an explicit airport package (and not a generic/model library)
+    is_explicit_airport_pkg = (
+        any(w in base_lower for w in ['-airport-', '_airport_', 'airport-', '-airfield-', '-aerodrome-', '-heliport-'])
+        and not any(lib_w in base_lower for lib_w in ['modellib', 'model-lib', 'model_lib', 'commonlibrary', 'genericairports', 'generic-airports', 'projectairports', 'travelbook', 'landingchallenge', 'landing-challenge'])
+        and not base_lower.endswith(('-models', '_models', '-library', '_library'))
+    )
+
     # 3. String token checks against protected keywords
-    if any(k in base_lower or k in norm_name for k in PROTECTED_SYSTEM_KEYWORDS):
-        return True
+    if not is_explicit_airport_pkg:
+        if any(k in base_lower or k in norm_name for k in PROTECTED_SYSTEM_KEYWORDS):
+            return True
+        if PROTECTED_TOKEN_REGEX.search(base_lower) or PROTECTED_TOKEN_REGEX.search(norm_name):
+            return True
+        if any(k in base_lower or k in norm_name for k in ['sound', 'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport']):
+            return True
+    else:
+        # Even for explicit airport packages, always protect sceneryx/aircraft/livery if ever misnamed
+        if any(k in base_lower for k in ['sceneryx', 'wildbill75', '-aircraft-', '-livery-']):
+            return True
 
     # 4. Deep structural inspection if path is a directory
     target_dir = None
@@ -200,19 +233,28 @@ def is_core_or_library_package(pkg_path_or_name):
                 with open(mpath, 'r', encoding='utf-8', errors='ignore') as mf:
                     mdata = json.load(mf)
                     ctype = str(mdata.get('content_type', '')).upper()
+                    has_sc_dir = os.path.isdir(os.path.join(target_dir, 'scenery')) or os.path.isdir(os.path.join(target_dir, 'Scenery'))
                     if ctype and ctype != 'SCENERY':
-                        return True
+                        if not (ctype == 'MISC' and has_sc_dir):
+                            return True
             except Exception:
                 pass
 
-        # Check SimObjects presence
+        # Check SimObjects presence (immune unless it is a genuine SCENERY package with a scenery/ folder containing static aircraft)
         so_dir = os.path.join(target_dir, 'SimObjects')
         if not os.path.exists(so_dir):
             so_dir = os.path.join(target_dir, 'SimObjects.disabled')
         if os.path.isdir(so_dir):
-            for sub in ['Airplanes', 'Rotorcraft', 'Boats', 'Airplanes.disabled', 'Rotorcraft.disabled', 'Boats.disabled']:
-                if os.path.isdir(os.path.join(so_dir, sub)):
-                    return True
+            has_sc_dir_so = os.path.isdir(os.path.join(target_dir, 'scenery')) or os.path.isdir(os.path.join(target_dir, 'Scenery'))
+            is_scenery_with_static_simobjects = (
+                (ctype == 'SCENERY' or is_explicit_airport_pkg)
+                and has_sc_dir_so
+                and not any(k in base_lower for k in ['-aircraft-', '-livery-', 'fsltl', 'aig-', 'justflight-traffic', 'gaist', 'seafront'])
+            )
+            if not is_scenery_with_static_simobjects:
+                for sub in ['Airplanes', 'Rotorcraft', 'Boats', 'Airplanes.disabled', 'Rotorcraft.disabled', 'Boats.disabled']:
+                    if os.path.isdir(os.path.join(so_dir, sub)):
+                        return True
 
         # Check if package is streamed or contains .fsarchive containers
         is_streamed = 'streamed' in p_lower
@@ -291,6 +333,10 @@ def resolve_package_icaos(pkg_name):
         t_upper = t.upper()
         if len(t_upper) == 4 and t_upper in airports:
             found.add(t_upper)
+        else:
+            m_pref = re.match(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)', t_l)
+            if m_pref and m_pref.group(1).upper() in airports:
+                found.add(m_pref.group(1).upper())
 
     return found
 
@@ -725,8 +771,8 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
         if res:
             return set(res)
 
-        m = re.search(r'[-_]airport[-_]([a-z0-9]{3,4})([-_]|$)', clean_lower)
-        if m:
+        m = re.search(r'(?:^|[-_])airport[-_]([a-z0-9]{3,8})([-_]|$)', clean_lower)
+        if m and m.group(1).lower() not in ('generic', 'glider', 'common', 'base', 'services'):
             return {m.group(1).upper()}
 
         # Known Handcrafted / Payware Airport name patterns (Gatwick, Frankfurt, Vancouver, etc.)
@@ -812,8 +858,10 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                         changed = True
                         continue
 
-                    # STRICT SAFEGUARD: Never re-enable known secondary conflicting packages
+                    # STRICT SAFEGUARD: Never re-enable known secondary conflicting packages or pre-existing disabled packages
                     if name_clean_lower in all_conflict_sec_lower or name_norm in all_conflict_sec_lower:
+                        continue
+                    if not full_reset and (name_lower in pre_existing_xml_lower or name_clean_lower in pre_existing_xml_lower):
                         continue
 
                     # Re-enable all scenery packages to Activated
@@ -848,15 +896,42 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                     if pkg_icaos:
                         is_keep = any(k in target_icaos for k in pkg_icaos)
                         if not is_keep:
-                            if elem.get('active') == 'Activated':
+                            if elem.get('active') not in ('UserDisabled', 'SystemDisabled'):
                                 elem.set('active', 'UserDisabled')
                                 disabled_xml_packages.add(name)
                                 changed = True
+                        else:
+                            all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
+                            if elem.get('active') == 'UserDisabled' and clean_lower not in all_conflict_sec_lower and norm not in all_conflict_sec_lower:
+                                elem.set('active', 'Activated')
+                                changed = True
                     elif name.endswith('.disabled') and not is_core_or_library_package(name):
-                        if elem.get('active') == 'Activated':
+                        if elem.get('active') not in ('UserDisabled', 'SystemDisabled'):
                             elem.set('active', 'UserDisabled')
                             disabled_xml_packages.add(name)
                             changed = True
+
+                # Proactive injection: any real streamed/official airport package on disk not yet in Content.xml must be explicitly added as UserDisabled
+                if all_airports:
+                    for ap in all_airports:
+                        ap_ic = (ap.get('icao') or '').upper()
+                        if not ap_ic or ap_ic in target_icaos:
+                            continue
+                        for src in ap.get('all_sources', []):
+                            fn = src.get('folder_name', '')
+                            pkg_p = src.get('package_path', '')
+                            if not fn or fn.startswith('msfs-default-'):
+                                continue
+                            fn_c = (fn[:-9] if fn.endswith('.disabled') else fn).lower()
+                            fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c)
+                            if fn_c not in seen_xml_names and fn_n not in seen_xml_names:
+                                if fn_c.startswith(('fs20-', 'fs24-', 'asobo-', 'microsoft-')) and pkg_p and os.path.exists(pkg_p):
+                                    if not is_core_or_library_package(fn_c):
+                                        ET.SubElement(tree, 'Package', {'name': fn_c, 'active': 'UserDisabled'})
+                                        seen_xml_names.add(fn_c)
+                                        seen_xml_names.add(fn_n)
+                                        added_xml_packages.add(fn_c)
+                                        changed = True
 
                 # Final immunity sweep: Guarantee ALL aircraft and liveries remain Activated
                 for elem in tree.findall('Package'):
@@ -1205,6 +1280,7 @@ class Api:
     _main_window_instance = None
 
     def __init__(self):
+        self._scenery_mutation_lock = threading.RLock()
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
         self._startup_scanned = False
         if not IS_LITE:
@@ -1366,6 +1442,85 @@ class Api:
         except Exception:
             return json.dumps({"status": "error"})
 
+    def _prune_cached_ghost_sources(self, json_path):
+        try:
+            if not os.path.exists(json_path):
+                return None
+            with open(json_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            if not content or len(content) <= 10:
+                return None
+            data = json.loads(content)
+            if not isinstance(data, list):
+                return content
+            changed = False
+            for ap in data:
+                sources = ap.get('all_sources')
+                if not isinstance(sources, list) or len(sources) == 0:
+                    continue
+                valid_sources = []
+                for s in sources:
+                    if s.get('is_default') or s.get('pricing_type') == 'Default' or str(s.get('folder_name', '')).startswith('msfs-default-'):
+                        valid_sources.append(s)
+                        continue
+                    if s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo':
+                        valid_sources.append(s)
+                        continue
+                    pp = s.get('package_path', '')
+                    if pp and os.path.isdir(pp):
+                        valid_sources.append(s)
+                    else:
+                        changed = True
+                # Also deduplicate identical (realpath) or identical (clean_folder, vendor, version) sources
+                deduped_sources = []
+                seen_keys = {}
+                for s in valid_sources:
+                    if s.get('is_default') or s.get('pricing_type') == 'Default' or str(s.get('folder_name', '')).startswith('msfs-default-'):
+                        deduped_sources.append(s)
+                        continue
+                    pp = s.get('package_path', '')
+                    real_k = os.path.normcase(os.path.realpath(pp)) if pp else ''
+                    fn_raw = str(s.get('folder_name', '')).strip()
+                    if fn_raw.lower().endswith('.disabled'):
+                        fn_raw = fn_raw[:-9]
+                    fn_raw = re.sub(r'[-_\s.(]+(copy|copie|backup|bak)(\b|\d*|\))*$', '', fn_raw, flags=re.IGNORECASE).strip().lower()
+                    sig_k = ('ASOBO_OFFICIAL',) if (s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo') else (fn_raw, str(s.get('vendor', '')).strip().lower(), str(s.get('version', '')).strip().lower())
+                    match_idx = seen_keys.get(real_k) if real_k else None
+                    if match_idx is None:
+                        match_idx = seen_keys.get(sig_k)
+                    if match_idx is None:
+                        idx_new = len(deduped_sources)
+                        deduped_sources.append(s)
+                        if real_k:
+                            seen_keys[real_k] = idx_new
+                        seen_keys[sig_k] = idx_new
+                    else:
+                        changed = True
+                        prev_s = deduped_sources[match_idx]
+                        if prev_s.get('is_disabled') and not s.get('is_disabled'):
+                            deduped_sources[match_idx] = s
+                valid_sources = deduped_sources
+                if len(valid_sources) != len(sources) and len(valid_sources) > 0:
+                    ap['all_sources'] = valid_sources
+                    non_fix = [
+                        s for s in valid_sources
+                        if not s.get('is_default')
+                        and s.get('pricing_type') != 'Default'
+                        and not s.get('is_fix_patch')
+                        and not s.get('is_addon')
+                    ]
+                    ap['conflict_count'] = len(non_fix) if len(non_fix) > 0 else 1
+                    active_non_fix = [s for s in non_fix if not s.get('is_disabled')]
+                    ap['has_conflict'] = len(active_non_fix) > 1
+            if changed:
+                new_content = json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                return new_content
+            return content
+        except Exception:
+            return None
+
     def get_airports(self):
         settings = get_settings()
         disclaimer_accepted = settings.get("disclaimer_accepted", False)
@@ -1377,13 +1532,9 @@ class Api:
 
         # If already scanned during this startup session, return cached data without re-running delta
         if self._startup_scanned and self._startup_delta is not None and os.path.exists(OUTPUT_JSON_PATH):
-            try:
-                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if content and len(content) > 100:
-                        return content
-            except Exception:
-                pass
+            pruned = self._prune_cached_ghost_sources(OUTPUT_JSON_PATH)
+            if pruned and len(pruned) > 100:
+                return pruned
 
         global AIRPORTS_CACHE
         auto_scan = settings.get("auto_scan_on_startup", True)
@@ -1402,12 +1553,11 @@ class Api:
 
         if os.path.exists(OUTPUT_JSON_PATH):
             try:
-                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if content and len(content) > 10:
-                        self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
-                        self._startup_scanned = True
-                        return content
+                content = self._prune_cached_ghost_sources(OUTPUT_JSON_PATH)
+                if content and len(content) > 10:
+                    self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+                    self._startup_scanned = True
+                    return content
             except Exception as e:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
 
@@ -1491,6 +1641,145 @@ class Api:
             print("Error in get_airport_runways:", e)
             return json.dumps([])
 
+    def get_live_airport_wind(self, icao, lat=0.0, lon=0.0):
+        """Fetches live surface wind and active ATIS runway assignments using free public aviation APIs (NOAA METAR, VATSIM ATIS, Open-Meteo fallback)."""
+        try:
+            icao_clean = (icao or '').strip().upper()
+            if not icao_clean:
+                return json.dumps({"icao": "", "wdir": None, "wspd": 0, "source": "none"})
+
+            now = time.time()
+            if not hasattr(Api, '_LIVE_WIND_CACHE'):
+                Api._LIVE_WIND_CACHE = {}
+
+            cached = Api._LIVE_WIND_CACHE.get(icao_clean)
+            if cached and (now - cached.get('ts', 0)) < 600:
+                return json.dumps(cached['data'])
+
+            result = {
+                "icao": icao_clean,
+                "wdir": None,
+                "wspd": 0,
+                "source": "none",
+                "metar": "",
+                "atis_dep": [],
+                "atis_arr": []
+            }
+
+            # 1. Check live NOAA Aviation Weather METAR (100% free, official, fast)
+            try:
+                url = f"https://aviationweather.gov/api/data/metar?ids={icao_clean}&format=json"
+                req = urllib.request.Request(url, headers={"User-Agent": "SceneryX/1.2"})
+                with urllib.request.urlopen(req, timeout=2.5) as resp:
+                    if resp.status == 200:
+                        raw_data = resp.read().decode('utf-8', errors='ignore').strip()
+                        if raw_data:
+                            metars = json.loads(raw_data)
+                            if isinstance(metars, list) and len(metars) > 0:
+                                m = metars[0]
+                                wdir_val = m.get('wdir')
+                                wspd_val = m.get('wspd')
+                                raw_ob = str(m.get('rawOb') or '')
+                                if isinstance(wdir_val, (int, float)):
+                                    result['wdir'] = int(wdir_val)
+                                elif isinstance(wdir_val, str) and wdir_val.isdigit():
+                                    result['wdir'] = int(wdir_val)
+                                if isinstance(wspd_val, (int, float)):
+                                    result['wspd'] = int(wspd_val)
+                                elif isinstance(wspd_val, str) and wspd_val.isdigit():
+                                    result['wspd'] = int(wspd_val)
+                                result['metar'] = raw_ob
+                                result['source'] = 'METAR'
+            except Exception:
+                pass
+
+            # 2. Check cached VATSIM Digital ATIS if available (refreshed in background at most every 5 min)
+            try:
+                if not hasattr(Api, '_VATSIM_ATIS_CACHE'):
+                    Api._VATSIM_ATIS_CACHE = {"ts": 0, "by_icao": {}, "fetching": False}
+
+                def _refresh_vatsim_atis():
+                    try:
+                        Api._VATSIM_ATIS_CACHE["fetching"] = True
+                        v_req = urllib.request.Request(
+                            "https://data.vatsim.net/v3/vatsim-data.json",
+                            headers={"User-Agent": "SceneryX/1.2"}
+                        )
+                        with urllib.request.urlopen(v_req, timeout=3.0) as v_resp:
+                            if v_resp.status == 200:
+                                v_json = json.loads(v_resp.read().decode('utf-8', errors='ignore'))
+                                by_icao = {}
+                                for atis in (v_json.get('atis') or []):
+                                    cs = str(atis.get('callsign') or '').upper()
+                                    if len(cs) >= 4:
+                                        ap_code = cs[:4]
+                                        lines = " ".join(atis.get('text_lines') or [])
+                                        if lines:
+                                            by_icao.setdefault(ap_code, []).append((cs, lines))
+                                Api._VATSIM_ATIS_CACHE["by_icao"] = by_icao
+                                Api._VATSIM_ATIS_CACHE["ts"] = time.time()
+                    except Exception:
+                        pass
+                    finally:
+                        Api._VATSIM_ATIS_CACHE["fetching"] = False
+
+                if (now - Api._VATSIM_ATIS_CACHE.get("ts", 0)) > 300 and not Api._VATSIM_ATIS_CACHE.get("fetching"):
+                    threading.Thread(target=_refresh_vatsim_atis, daemon=True).start()
+
+                atis_entries = (Api._VATSIM_ATIS_CACHE.get("by_icao") or {}).get(icao_clean) or []
+                if atis_entries:
+                    dep_set = []
+                    arr_set = []
+                    for cs, text in atis_entries:
+                        up_txt = text.upper()
+                        for m_dep in re.finditer(r'(?:DEP(?:ARTURE|ARTING)?\s+(?:RWY|RUNWAYS?)|RWY\s+FOR\s+DEP(?:ARTURE)?)\s*[:\-]?\s*([0-3]\d[LRC]?(?:\s*(?:/|AND|&|,)\s*[0-3]\d[LRC]?)*)', up_txt):
+                            for tok in re.findall(r'[0-3]\d[LRC]?', m_dep.group(1)):
+                                if tok not in dep_set:
+                                    dep_set.append(tok)
+                        for m_arr in re.finditer(r'(?:(?:ARR(?:IVAL|IVING)?|LDG|LANDING)\s+(?:RWY|RUNWAYS?)|(?:ILS|INST|APCH|APPROACH)\s+(?:RWY|RUNWAYS?))\s*[:\-]?\s*([0-3]\d[LRC]?(?:\s*(?:/|AND|&|,)\s*[0-3]\d[LRC]?)*)', up_txt):
+                            for tok in re.findall(r'[0-3]\d[LRC]?', m_arr.group(1)):
+                                if tok not in arr_set:
+                                    arr_set.append(tok)
+                    if dep_set:
+                        result['atis_dep'] = dep_set
+                    if arr_set:
+                        result['atis_arr'] = arr_set
+            except Exception:
+                pass
+
+            # 3. Fallback to Open-Meteo Live 10m Surface Wind if no METAR wind direction is available
+            if result['wdir'] is None:
+                try:
+                    lat_f = float(lat or 0.0)
+                    lon_f = float(lon or 0.0)
+                    if abs(lat_f) > 0.0001 or abs(lon_f) > 0.0001:
+                        om_url = (
+                            f"https://api.open-meteo.com/v1/forecast?"
+                            f"latitude={lat_f:.4f}&longitude={lon_f:.4f}"
+                            f"&current=wind_direction_10m,wind_speed_10m&wind_speed_unit=kn"
+                        )
+                        om_req = urllib.request.Request(om_url, headers={"User-Agent": "SceneryX/1.2"})
+                        with urllib.request.urlopen(om_req, timeout=2.5) as om_resp:
+                            if om_resp.status == 200:
+                                om_data = json.loads(om_resp.read().decode('utf-8', errors='ignore'))
+                                cur = om_data.get('current') or {}
+                                wdir_om = cur.get('wind_direction_10m')
+                                wspd_om = cur.get('wind_speed_10m')
+                                if wdir_om is not None:
+                                    result['wdir'] = int(round(float(wdir_om)))
+                                if wspd_om is not None:
+                                    result['wspd'] = int(round(float(wspd_om)))
+                                if result['source'] == 'none':
+                                    result['source'] = 'Open-Meteo'
+                except Exception:
+                    pass
+
+            Api._LIVE_WIND_CACHE[icao_clean] = {'ts': now, 'data': result}
+            return json.dumps(result)
+        except Exception as e:
+            print(f"Error in get_live_airport_wind({icao}):", e)
+            return json.dumps({"icao": str(icao or ''), "wdir": None, "wspd": 0, "source": "error"})
+
     def get_world_airport(self, icao):
         """Returns on-demand synthesized metadata for any default MSFS procedural airport in the world."""
         try:
@@ -1505,12 +1794,16 @@ class Api:
             return json.dumps(None)
 
     def rescan(self):
-        global AIRPORTS_CACHE
-        airports = run_scan()
-        AIRPORTS_CACHE = airports
-        delta = compute_scan_delta(airports, update_snapshot=True)
-        self._startup_delta = delta
-        return json.dumps({"airports": airports, "delta": delta}, separators=(',', ':'), ensure_ascii=False)
+        with self._scenery_mutation_lock:
+            global AIRPORTS_CACHE
+            airports = run_scan()
+            AIRPORTS_CACHE = airports
+            delta = compute_scan_delta(airports, update_snapshot=True)
+            self._startup_delta = delta
+            return json.dumps({"airports": airports, "delta": delta}, separators=(',', ':'), ensure_ascii=False)
+
+    def rescan_packages(self):
+        return self.rescan()
 
     def fetch_simbrief(self, identifier):
         if IS_LITE:
@@ -1602,7 +1895,40 @@ class Api:
                 general = data.get('general', {})
                 flight_num = f"{general.get('icao_airline', '')}{general.get('flight_number', '')}".strip()
                 route = general.get('route', '')
-                aircraft = data.get('aircraft', {}).get('name', '')
+                aircraft_obj = data.get('aircraft', {}) if isinstance(data.get('aircraft'), dict) else {}
+                aircraft = aircraft_obj.get('name', '')
+                aircraft_icao = str(aircraft_obj.get('icaocode', '') or aircraft_obj.get('base_type', '') or aircraft).strip().upper()
+                cruise_alt_raw = str(general.get('initial_altitude', '') or '').strip()
+                if cruise_alt_raw.isdigit() and int(cruise_alt_raw) >= 1000:
+                    cruise_fl = f"FL{int(int(cruise_alt_raw) / 100):03d}"
+                else:
+                    cruise_fl = cruise_alt_raw or "--"
+                route_dist = str(general.get('route_distance', '') or general.get('gc_distance', '') or '').strip()
+                airac_code = str(params.get('airac', '') or general.get('airac', '') or '').strip()
+
+                waypoints = []
+                navlog = data.get('navlog', {})
+                fixes = navlog.get('fix', []) if isinstance(navlog, dict) else []
+                if isinstance(fixes, dict):
+                    fixes = [fixes]
+                if isinstance(fixes, list):
+                    for fx in fixes:
+                        if not isinstance(fx, dict):
+                            continue
+                        try:
+                            f_lat = float(fx.get('pos_lat'))
+                            f_lon = float(fx.get('pos_long'))
+                            f_ident = str(fx.get('ident', '') or '').strip().upper()
+                            f_type = str(fx.get('type', '') or '').strip().lower()
+                            if f_ident and f_type != 'apt':
+                                waypoints.append({
+                                    'ident': f_ident,
+                                    'lat': f_lat,
+                                    'lon': f_lon,
+                                    'type': f_type
+                                })
+                        except Exception:
+                            pass
 
                 all_flight_icaos = [origin_icao, dest_icao] + [a['icao'] for a in alternates]
                 all_flight_icaos = list(dict.fromkeys([icao.upper() for icao in all_flight_icaos if icao]))
@@ -1623,10 +1949,18 @@ class Api:
                     "alternates": alternates,
                     "flight_number": flight_num,
                     "aircraft": aircraft,
+                    "aircraft_icao": aircraft_icao,
+                    "cruise_fl": cruise_fl,
+                    "route_distance": route_dist,
+                    "airac": airac_code,
+                    "waypoints": waypoints,
                     "route": route,
                     "flight_icaos": all_flight_icaos,
                     "fetched_at": time.time()
                 }
+                cross_audit = self._build_simbrief_cross_audit(flight_data)
+                flight_data["cross_audit"] = cross_audit
+
                 st['latest_simbrief_flight'] = flight_data
                 save_settings(st)
 
@@ -1634,13 +1968,1006 @@ class Api:
                     "status": "success",
                     "username": username,
                     "userid": user_id,
-                    "flight": flight_data
+                    "flight": flight_data,
+                    "cross_audit": cross_audit
+                }, ensure_ascii=False)
+        except urllib.error.HTTPError as http_err:
+            err_msg = f"SimBrief HTTP {http_err.code}: Unknown Pilot ID or no active OFP generated."
+            try:
+                err_body = http_err.read().decode('utf-8', errors='ignore')
+                err_json = json.loads(err_body)
+                sb_stat = err_json.get('fetch', {}).get('status')
+                if sb_stat:
+                    err_msg = f"SimBrief API ({http_err.code}): {sb_stat}"
+            except Exception:
+                pass
+            return json.dumps({"status": "error", "code": http_err.code, "message": err_msg}, ensure_ascii=False)
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as net_err:
+            return json.dumps({
+                "status": "error",
+                "code": "NETWORK_TIMEOUT",
+                "message": f"SimBrief connection timeout or network unreachable: {getattr(net_err, 'reason', str(net_err))}"
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": f"Error fetching SimBrief data: {str(e)}"}, ensure_ascii=False)
+
+    def _build_simbrief_cross_audit(self, flight_data):
+        """Cross-checks DEP, ARR, and ALTN airports against local Scenery library and GSX profiles."""
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            installed_airports = []
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        installed_airports = json.load(f)
+                except Exception:
+                    installed_airports = []
+            if not installed_airports:
+                try:
+                    installed_airports = run_scan()
+                except Exception:
+                    installed_airports = []
+
+            ap_by_icao = {str(a.get('icao', '')).upper().strip(): a for a in installed_airports if isinstance(a, dict) and a.get('icao')}
+
+            targets = []
+            if isinstance(flight_data, dict):
+                orig = flight_data.get('origin') or {}
+                dest = flight_data.get('destination') or {}
+                if orig.get('icao'):
+                    targets.append({'role': 'DEP', 'icao': str(orig.get('icao')).upper().strip(), 'name': orig.get('name', '')})
+                if dest.get('icao'):
+                    targets.append({'role': 'ARR', 'icao': str(dest.get('icao')).upper().strip(), 'name': dest.get('name', '')})
+                alts = flight_data.get('alternates') or []
+                for idx, alt in enumerate(alts):
+                    if isinstance(alt, dict) and alt.get('icao'):
+                        role_lbl = 'ALTN' if len(alts) == 1 else f'ALTN {idx + 1}'
+                        targets.append({'role': role_lbl, 'icao': str(alt.get('icao')).upper().strip(), 'name': alt.get('name', '')})
+            elif isinstance(flight_data, list):
+                for item in flight_data:
+                    if isinstance(item, dict) and item.get('icao'):
+                        targets.append({
+                            'role': str(item.get('role', 'APT')).upper().strip(),
+                            'icao': str(item.get('icao')).upper().strip(),
+                            'name': str(item.get('name', ''))
+                        })
+
+            rows = []
+            error_count = 0
+            warning_count = 0
+
+            for tgt in targets:
+                icao = tgt['icao']
+                ap = ap_by_icao.get(icao)
+                ap_name = (ap.get('city') or ap.get('name') or tgt.get('name') or icao) if ap else (tgt.get('name') or icao)
+
+                if ap:
+                    raw_pt = str(ap.get('pricing_type') or 'Default').strip()
+                    if raw_pt.lower() == 'payware':
+                        category = 'PAYWARE'
+                    elif raw_pt.lower() == 'freeware':
+                        category = 'FREEWARE'
+                    elif raw_pt.lower() == 'asobo':
+                        category = 'ASOBO'
+                    else:
+                        category = 'DEFAULT'
+
+                    sources = ap.get('all_sources') or []
+                    active_custom_sources = [
+                        s for s in sources
+                        if isinstance(s, dict) and not s.get('is_disabled')
+                        and not s.get('is_fix_patch')
+                        and str(s.get('type', '')).lower() not in ('default', 'asobo', 'msfs default')
+                        and str(s.get('pricing_type', '')).lower() not in ('default', 'asobo', 'msfs default')
+                    ]
+                    has_conflict = bool(ap.get('has_conflict')) or len(active_custom_sources) > 1
+                    is_disabled = bool(ap.get('is_disabled', False))
+
+                    if has_conflict:
+                        scenery_status = 'CONFLICT'
+                        scenery_label = 'SCENERY CONFLICT'
+                        scenery_severity = 'error'
+                        error_count += 1
+                    elif is_disabled:
+                        scenery_status = 'DISABLED'
+                        scenery_label = 'SCENERY DISABLED'
+                        scenery_severity = 'warn'
+                        warning_count += 1
+                    elif category == 'DEFAULT':
+                        scenery_status = 'DEFAULT'
+                        scenery_label = 'DEFAULT ACTIVE'
+                        scenery_severity = 'ok'
+                    else:
+                        scenery_status = 'ACTIVE'
+                        scenery_label = 'SCENERY ACTIVE'
+                        scenery_severity = 'ok'
+                else:
+                    category = 'DEFAULT'
+                    scenery_status = 'DEFAULT'
+                    scenery_label = 'DEFAULT MSFS'
+                    scenery_severity = 'ok'
+
+                gsx_audit = audit_single_airport_gsx(icao, gsx_dir=gsx_dir, ap=ap)
+                gsx_raw = str(gsx_audit.get('status', 'NONE')).upper()
+                gsx_files = gsx_audit.get('files') or []
+                active_gsx = next((f for f in gsx_files if not f.get('is_disabled')), None)
+                gsx_studio = ''
+                if active_gsx:
+                    gsx_studio = str(active_gsx.get('studio') or active_gsx.get('author') or '').strip().upper()
+                has_bundled = bool(gsx_audit.get('bundled_gsx_profile') or (ap and ap.get('bundled_gsx_profile')))
+
+                if gsx_raw == 'MATCHED':
+                    gsx_status = 'VALID'
+                    gsx_label = f"GSX VALID ({gsx_studio})" if gsx_studio else "GSX VALID"
+                    gsx_severity = 'ok'
+                elif gsx_raw == 'DUPLICATE':
+                    gsx_status = 'DUPLICATE'
+                    act_cnt = len([f for f in gsx_files if not f.get('is_disabled')])
+                    gsx_label = f"GSX DUPLICATE ({act_cnt} INI)"
+                    gsx_severity = 'error'
+                    error_count += 1
+                elif gsx_raw in ('MISMATCH_STUDIO', 'MISMATCH_VERSION', 'MISMATCH_DEFAULT'):
+                    gsx_status = 'MISMATCH'
+                    gsx_label = 'GSX MISMATCH'
+                    gsx_severity = 'warn'
+                    warning_count += 1
+                elif gsx_raw == 'DISABLED':
+                    gsx_status = 'DISABLED'
+                    gsx_label = 'GSX DISABLED'
+                    gsx_severity = 'warn'
+                    warning_count += 1
+                elif gsx_raw == 'ORPHAN':
+                    gsx_status = 'ORPHAN'
+                    gsx_label = 'GSX ORPHAN'
+                    gsx_severity = 'warn'
+                    warning_count += 1
+                else:
+                    # NONE
+                    if category in ('PAYWARE', 'FREEWARE'):
+                        gsx_status = 'MISSING_CUSTOM'
+                        gsx_label = 'BUNDLED GSX UNLINKED' if has_bundled else 'NO GSX PROFILE'
+                        gsx_severity = 'warn'
+                        warning_count += 1
+                    else:
+                        gsx_status = 'NONE'
+                        gsx_label = 'NO GSX PROFILE'
+                        gsx_severity = 'neutral'
+
+                row_has_issue = (scenery_severity in ('warn', 'error')) or (gsx_severity in ('warn', 'error'))
+                rows.append({
+                    'role': tgt['role'],
+                    'icao': icao,
+                    'name': str(ap_name).upper(),
+                    'category': category,
+                    'scenery_status': scenery_status,
+                    'scenery_label': scenery_label,
+                    'scenery_severity': scenery_severity,
+                    'gsx_status': gsx_status,
+                    'gsx_label': gsx_label,
+                    'gsx_severity': gsx_severity,
+                    'has_bundled_gsx': has_bundled,
+                    'has_issue': row_has_issue
+                })
+
+            issue_count = error_count + warning_count
+            all_clear = (issue_count == 0)
+            return {
+                'all_clear': all_clear,
+                'issue_count': issue_count,
+                'error_count': error_count,
+                'warning_count': warning_count,
+                'rows': rows
+            }
+        except Exception as e:
+            print(f"[SimBrief Cross-Audit] Error: {e}")
+            return {
+                'all_clear': True,
+                'issue_count': 0,
+                'error_count': 0,
+                'warning_count': 0,
+                'rows': []
+            }
+
+    def audit_simbrief_route(self, payload_json=None):
+        """Re-runs the SimBrief / Route Pre-Flight Cross-Audit on demand and returns updated status."""
+        try:
+            st = get_settings()
+            target_data = None
+            if payload_json:
+                try:
+                    target_data = json.loads(payload_json) if isinstance(payload_json, str) else payload_json
+                except Exception:
+                    target_data = None
+            if not target_data:
+                target_data = st.get('latest_simbrief_flight') or {}
+            audit = self._build_simbrief_cross_audit(target_data)
+            if isinstance(st.get('latest_simbrief_flight'), dict) and not payload_json:
+                st['latest_simbrief_flight']['cross_audit'] = audit
+                save_settings(st)
+            return json.dumps({
+                "status": "ok",
+                "cross_audit": audit
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def resolve_simbrief_conflict(self, icao):
+        """
+        Resolves Scenery and/or GSX duplicate conflicts for a given airport ICAO from the SimBrief Cross-Audit matrix,
+        re-runs the audit, and triggers a frontend callback to refresh the UI and map.
+        """
+        try:
+            target_icao = str(icao or '').strip().upper()
+            if not target_icao:
+                return json.dumps({"status": "error", "message": "Missing ICAO code"}, ensure_ascii=False)
+
+            all_airports = run_scan()
+            ap = next((a for a in all_airports if isinstance(a, dict) and str(a.get('icao') or '').upper() == target_icao), None)
+            resolved_actions = []
+
+            if ap:
+                sources = ap.get('all_sources') or []
+                base_sources = [
+                    s for s in sources
+                    if isinstance(s, dict) and not s.get('is_disabled') and not s.get('is_fix_patch')
+                ]
+                if len(base_sources) > 1 or ap.get('has_conflict'):
+                    # Prioritize Payware > Freeware > Asobo
+                    def _src_rank(s):
+                        pt = str(s.get('pricing_type') or s.get('type') or '').lower()
+                        if 'payware' in pt or s.get('is_payware'):
+                            return 0
+                        if 'freeware' in pt:
+                            return 1
+                        if 'asobo' in pt or s.get('is_asobo_official'):
+                            return 2
+                        return 3
+
+                    sorted_srcs = sorted(base_sources, key=_src_rank)
+                    chosen = sorted_srcs[0] if sorted_srcs else None
+                    if chosen:
+                        chosen_pkg = (chosen.get('package_path') or '').strip() or (chosen.get('folder_name') or '').strip()
+                        if chosen_pkg and hasattr(self, 'select_scenery_option'):
+                            self.select_scenery_option(target_icao, chosen_pkg)
+                            resolved_actions.append(f"SCENERY:{chosen.get('folder_name') or chosen_pkg}")
+
+            # Also check if there is a duplicate GSX .ini conflict for this ICAO
+            try:
+                gsx_dir = get_gsx_profiles_dir()
+                if gsx_dir and os.path.isdir(gsx_dir):
+                    matching_inis = []
+                    for fname in os.listdir(gsx_dir):
+                        fl = fname.lower()
+                        if fl.endswith('.ini') and (fl.startswith(target_icao.lower() + '-') or fl.startswith(target_icao.lower() + '_') or fl == f"{target_icao.lower()}.ini"):
+                            full_p = os.path.join(gsx_dir, fname)
+                            try:
+                                mtime = os.path.getmtime(full_p)
+                            except Exception:
+                                mtime = 0
+                            matching_inis.append((mtime, fname, full_p))
+                    if len(matching_inis) > 1:
+                        matching_inis.sort(key=lambda x: x[0], reverse=True)
+                        for _, fname, full_p in matching_inis[1:]:
+                            try:
+                                os.replace(full_p, full_p + '.disabled')
+                                resolved_actions.append(f"GSX_DISABLED:{fname}")
+                            except Exception:
+                                pass
+            except Exception as gsx_err:
+                print(f"[SimBrief Resolve GSX] {gsx_err}")
+
+            updated_airports = run_scan()
+            st = get_settings()
+            latest_sb = st.get('latest_simbrief_flight') or {}
+            updated_audit = self._build_simbrief_cross_audit(latest_sb)
+            if isinstance(st.get('latest_simbrief_flight'), dict):
+                st['latest_simbrief_flight']['cross_audit'] = updated_audit
+                save_settings(st)
+
+            result_payload = {
+                "status": "ok",
+                "icao": target_icao,
+                "resolved_actions": resolved_actions,
+                "airports": updated_airports,
+                "cross_audit": updated_audit
+            }
+            try:
+                if getattr(self, '_window', None):
+                    js_arg = json.dumps({"icao": target_icao, "cross_audit": updated_audit}, ensure_ascii=False)
+                    self._window.evaluate_js(f"if (window.onBackendSimbriefConflictResolved) window.onBackendSimbriefConflictResolved({js_arg});")
+            except Exception:
+                pass
+            return json.dumps(result_payload, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    # =========================================================================
+    # LOADOUT PROFILES ENGINE (DYNAMIC SCENERY GROUP ACTIVATION)
+    # =========================================================================
+
+    def _normalize_icao_prefix(self, raw_val):
+        """Extracts the clean uppercase ICAO prefix from either 'LF' or 'LF - FRANCE'."""
+        if not raw_val:
+            return ""
+        s = str(raw_val).strip().upper()
+        if " - " in s:
+            s = s.split(" - ", 1)[0].strip()
+        elif "-" in s:
+            s = s.split("-", 1)[0].strip()
+        return s.replace("*", "").strip()
+
+    def _get_default_loadout_profiles(self):
+        eu_isos = [
+            "FR", "DE", "GB", "IT", "ES", "NL", "BE", "CH", "AT", "PT", "IE", "NO", "SE", "DK", "FI", "LU", "IS", "MT", "MC", "AD", "SM", "VA", "LI", "GI", "FO", "GL", "PM", "JE", "GG", "IM",
+            "PL", "GR", "TR", "RO", "CZ", "HU", "BG", "HR", "SK", "UA", "RS", "SI", "EE", "LV", "LT", "CY", "AL", "BA", "ME", "MK", "XK", "MD", "BY", "GE", "AM", "AZ", "RU"
+        ]
+        na_isos = ["US", "CA"]
+        return [
+            {
+                "id": "ALL",
+                "name": "ALL SCENERIES ACTIVE",
+                "is_builtin": True,
+                "categories": ["Payware", "Freeware", "Asobo"],
+                "prefixes": [],
+                "manual_icaos": [],
+                "keep_libraries": True
+            },
+            {
+                "id": "NONE_ROUTE_ONLY",
+                "name": "NONE (STRICT ROUTE ISOLATION ONLY)",
+                "is_builtin": True,
+                "categories": [],
+                "prefixes": [],
+                "manual_icaos": [],
+                "keep_libraries": True
+            },
+            {
+                "id": "EU_IFR",
+                "name": "EUROPE AIRLINERS",
+                "is_builtin": False,
+                "categories": ["Payware", "Freeware", "Asobo"],
+                "prefixes": eu_isos,
+                "manual_icaos": [],
+                "keep_libraries": True
+            },
+            {
+                "id": "US_BUSH",
+                "name": "NORTH AMERICA (USA & CANADA)",
+                "is_builtin": False,
+                "categories": ["Payware", "Freeware", "Asobo"],
+                "prefixes": na_isos,
+                "manual_icaos": [],
+                "keep_libraries": True
+            },
+            {
+                "id": "PAYWARE_ONLY",
+                "name": "PAYWARE ONLY (GLOBAL)",
+                "is_builtin": False,
+                "categories": ["Payware"],
+                "prefixes": [],
+                "manual_icaos": [],
+                "keep_libraries": True
+            }
+        ]
+
+    def _is_sim_running_guard(self):
+        """Rapid (~2ms) Win32 Toolhelp32 process check for FlightSimulator2024.exe or FlightSimulator.exe."""
+        try:
+            if hasattr(flight_rig_optimizer, '_is_msfs_running_now'):
+                return bool(flight_rig_optimizer._is_msfs_running_now())
+        except Exception:
+            pass
+        return False
+
+    def _create_ntfs_junction(self, source_dir: str, link_dir: str) -> bool:
+        """
+        Creates a zero-privilege Windows NTFS Directory Junction (IO_REPARSE_TAG_MOUNT_POINT)
+        pointing `link_dir` (inside MSFS Community) to `source_dir` (in the Add-on Library Vault).
+        """
+        if self._is_sim_running_guard():
+            return False
+        if not source_dir or not os.path.isdir(source_dir):
+            return False
+        if is_core_or_library_package(source_dir) or is_core_or_library_package(link_dir):
+            return False
+        try:
+            import _winapi
+            if os.path.lexists(link_dir):
+                if hasattr(os.path, 'isjunction') and os.path.isjunction(link_dir):
+                    os.rmdir(link_dir)
+                else:
+                    return False  # Never overwrite a real physical folder with a junction
+            _winapi.CreateJunction(os.path.abspath(source_dir), os.path.abspath(link_dir))
+            return True
+        except OSError as os_err:
+            print(f"[Loadout NTFS Junction] CreateJunction error ({link_dir} -> {source_dir}): {os_err}")
+            return False
+
+    def _remove_ntfs_junction(self, link_dir: str) -> bool:
+        """
+        Unlinks an NTFS Directory Junction from MSFS Community in O(1) via os.rmdir()
+        without deleting any files inside the target source directory.
+        """
+        if self._is_sim_running_guard():
+            return False
+        if not link_dir or not os.path.lexists(link_dir):
+            return False
+        if is_core_or_library_package(link_dir):
+            print(f"[IMMUNITY GUARD] Refusing to unlink protected core/aircraft package: {link_dir}")
+            return False
+        try:
+            if (hasattr(os.path, 'isjunction') and os.path.isjunction(link_dir)) or os.path.islink(link_dir):
+                os.rmdir(link_dir)
+                return True
+            return False
+        except OSError as os_err:
+            print(f"[Loadout NTFS Junction] RemoveJunction error ({link_dir}): {os_err}")
+            return False
+
+    def get_loadout_profiles(self):
+        try:
+            st = get_settings()
+            profiles = st.get('loadout_profiles')
+            if not isinstance(profiles, list) or len(profiles) == 0:
+                profiles = self._get_default_loadout_profiles()
+                st['loadout_profiles'] = profiles
+                if not st.get('active_loadout_id'):
+                    st['active_loadout_id'] = 'ALL'
+                save_settings(st)
+            else:
+                defaults = self._get_default_loadout_profiles()
+                defaults_by_id = {d['id']: d for d in defaults}
+                changed = False
+                if not any(isinstance(p, dict) and p.get('id') == 'ALL' for p in profiles):
+                    profiles.insert(0, defaults[0])
+                    changed = True
+                if not any(isinstance(p, dict) and p.get('id') == 'NONE_ROUTE_ONLY' for p in profiles):
+                    profiles.insert(1, defaults[1])
+                    changed = True
+                # Synchronize built-in and default regional presets with REGION_COUNTRY_MAP ISO codes & all 3 categories
+                legacy_eu_px = {"LF", "EG", "ED", "LE", "LI", "LS", "EH", "EB", "LO", "LP", "EK", "EN", "ES", "EF", "EI", "EP", "LG", "LT"}
+                legacy_na_px = {"K", "C", "PA", "PH"}
+                for p in profiles:
+                    if not isinstance(p, dict):
+                        continue
+                    pid = p.get('id')
+                    if pid == 'ALL':
+                        p['name'] = 'ALL SCENERIES ACTIVE'
+                        p['categories'] = ['Payware', 'Freeware', 'Asobo']
+                    elif pid in ('EU_IFR', 'US_BUSH'):
+                        if p.get('is_builtin'):
+                            p['is_builtin'] = False
+                            changed = True
+                        cur_px_set = set(p.get('prefixes') or [])
+                        if (
+                            not cur_px_set
+                            or cur_px_set.issubset(legacy_eu_px)
+                            or cur_px_set.issubset(legacy_na_px)
+                            or (pid == 'EU_IFR' and ('GL' not in cur_px_set or 'PM' not in cur_px_set or 'AX' in cur_px_set or 'ZA' in cur_px_set or 'KM' in cur_px_set))
+                            or (pid == 'US_BUSH' and ('GL' in cur_px_set or 'PM' in cur_px_set))
+                        ):
+                            p['prefixes'] = list(defaults_by_id[pid]['prefixes'])
+                            p['categories'] = ['Payware', 'Freeware', 'Asobo']
+                            if pid == 'US_BUSH' and p.get('manual_icaos') == ['LFPG', 'EBBR', 'LFRN']:
+                                p['manual_icaos'] = []
+                            changed = True
+                    elif isinstance(p.get('prefixes'), list):
+                        norm_px = [self._normalize_icao_prefix(x) for x in p['prefixes'] if self._normalize_icao_prefix(x)]
+                        if norm_px != p['prefixes']:
+                            p['prefixes'] = norm_px
+                            changed = True
+                if changed:
+                    st['loadout_profiles'] = profiles
+                    save_settings(st)
+
+            active_id = st.get('active_loadout_id') or 'ALL'
+            sim_running = self._is_sim_running_guard()
+            return json.dumps({
+                "status": "ok",
+                "profiles": profiles,
+                "active_loadout_id": active_id,
+                "is_sim_running": sim_running
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def save_loadout_profile(self, profile_json):
+        try:
+            if IS_LITE:
+                return json.dumps({"status": "locked", "is_lite": True, "message": "Loadout Profiles are only available in SceneryX Pro."})
+            prof = json.loads(profile_json) if isinstance(profile_json, str) else profile_json
+            if not isinstance(prof, dict):
+                return json.dumps({"status": "error", "message": "Invalid profile payload"})
+
+            prof_id = str(prof.get('id') or '').strip()
+            prof_name = str(prof.get('name') or 'CUSTOM LOADOUT').strip().upper()
+            if not prof_id or prof_id in ('ALL', 'NONE_ROUTE_ONLY'):
+                prof_id = 'LOADOUT_' + str(int(time.time() * 1000))
+
+            categories = [str(c).strip() for c in (prof.get('categories') or ['Payware', 'Freeware', 'Asobo']) if str(c).strip()]
+            prefixes = []
+            for raw_px in (prof.get('prefixes') or []):
+                clean_px = self._normalize_icao_prefix(raw_px)
+                if clean_px and clean_px not in prefixes:
+                    prefixes.append(clean_px)
+            manual_icaos = [str(ic).strip().upper() for ic in (prof.get('manual_icaos') or []) if str(ic).strip()]
+            keep_libraries = bool(prof.get('keep_libraries', True))
+
+            clean_prof = {
+                "id": prof_id,
+                "name": prof_name,
+                "is_builtin": False,
+                "categories": categories,
+                "prefixes": prefixes,
+                "manual_icaos": manual_icaos,
+                "keep_libraries": keep_libraries
+            }
+
+            st = get_settings()
+            profiles = st.get('loadout_profiles')
+            if not isinstance(profiles, list) or len(profiles) == 0:
+                profiles = self._get_default_loadout_profiles()
+
+            updated = False
+            for idx, existing in enumerate(profiles):
+                if isinstance(existing, dict) and existing.get('id') == prof_id:
+                    profiles[idx] = clean_prof
+                    updated = True
+                    break
+            if not updated:
+                profiles.append(clean_prof)
+
+            st['loadout_profiles'] = profiles
+            save_settings(st)
+
+            return json.dumps({
+                "status": "ok",
+                "profile": clean_prof,
+                "profiles": profiles,
+                "active_loadout_id": st.get('active_loadout_id') or 'ALL'
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def delete_loadout_profile(self, profile_id):
+        try:
+            target_id = str(profile_id or '').strip()
+            if not target_id or target_id in ('ALL', 'NONE_ROUTE_ONLY'):
+                return json.dumps({"status": "error", "message": "Cannot delete built-in profile."})
+
+            st = get_settings()
+            profiles = st.get('loadout_profiles') or self._get_default_loadout_profiles()
+            profiles = [p for p in profiles if isinstance(p, dict) and p.get('id') != target_id]
+            st['loadout_profiles'] = profiles
+            if st.get('active_loadout_id') == target_id:
+                st['active_loadout_id'] = 'ALL'
+            save_settings(st)
+
+            return json.dumps({
+                "status": "ok",
+                "profiles": profiles,
+                "active_loadout_id": st.get('active_loadout_id') or 'ALL'
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def _load_cached_airports_fast(self):
+        if os.path.exists(OUTPUT_JSON_PATH):
+            try:
+                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    return data
+            except Exception:
+                pass
+        return run_scan()
+
+    def apply_loadout_profile(self, profile_id):
+        try:
+            if IS_LITE:
+                return json.dumps({"status": "locked", "is_lite": True, "message": "Loadout Profiles are only available in SceneryX Pro."})
+
+            if self._is_sim_running_guard():
+                return json.dumps({
+                    "status": "locked_sim_running",
+                    "is_sim_running": True,
+                    "message": "MSFS RUNNING - LOADOUT SWITCHING LOCKED FOR SAFETY."
+                }, ensure_ascii=False)
+
+            with self._scenery_mutation_lock:
+                if self._is_sim_running_guard():
+                    return json.dumps({
+                        "status": "locked_sim_running",
+                        "is_sim_running": True,
+                        "message": "MSFS RUNNING - LOADOUT SWITCHING LOCKED FOR SAFETY."
+                    }, ensure_ascii=False)
+
+                global AIRPORTS_CACHE
+                target_id = str(profile_id or 'ALL').strip()
+                st = get_settings()
+                profiles = st.get('loadout_profiles') or self._get_default_loadout_profiles()
+                scan_paths_cfg = st.get("scan_paths", [])
+                all_airports = self._load_cached_airports_fast()
+                folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
+                all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
+
+                # Merge previously dissociated bundle BGLs from both settings.json and isolation_snapshot.json
+                snapshot = load_isolation_snapshot()
+                prev_bundle_bgls = []
+                if isinstance(snapshot, dict):
+                    for pair in snapshot.get('disabled_bundle_bgls', []):
+                        if isinstance(pair, (list, tuple)) and len(pair) > 1 and list(pair) not in prev_bundle_bgls:
+                            prev_bundle_bgls.append(list(pair))
+                for pair in st.get('flight_mode', {}).get('disabled_bundle_bgls', []):
+                    if isinstance(pair, (list, tuple)) and len(pair) > 1 and list(pair) not in prev_bundle_bgls:
+                        prev_bundle_bgls.append(list(pair))
+
+                for item in prev_bundle_bgls:
+                    try:
+                        pkg_p = item[0] if isinstance(item, (list, tuple)) else ''
+                        b_icao = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ''
+                        if pkg_p and b_icao:
+                            set_package_state_for_icao(pkg_p, b_icao, should_enable=True)
+                    except Exception:
+                        pass
+
+                # Preserve pre-existing manual exclusions across profile switches
+                pre_existing_disabled = []
+                pre_existing_disabled_xml = []
+                if isinstance(snapshot, dict):
+                    pre_existing_disabled = list(snapshot.get('pre_existing_disabled_folders', []))
+                    pre_existing_disabled_xml = list(snapshot.get('pre_existing_disabled_xml', []))
+
+                if target_id == 'ALL':
+                    for cfg in scan_paths_cfg:
+                        dp = cfg.get('path', '')
+                        if not dp or not os.path.exists(dp):
+                            continue
+                        onestore = os.path.join(dp, 'OneStore')
+                        target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+                        for td in target_dirs:
+                            if not os.path.exists(td):
+                                continue
+                            try:
+                                for item in os.listdir(td):
+                                    if item.endswith('.disabled'):
+                                        item_clean = item[:-9]
+                                        item_clean_lower = item_clean.lower()
+                                        item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+                                        if item_clean_lower in all_conflict_sec_lower or item_norm in all_conflict_sec_lower:
+                                            continue
+                                        dis_p = os.path.join(td, item)
+                                        if is_core_or_library_package(dis_p) or is_core_or_library_package(item_clean):
+                                            continue
+                                        try:
+                                            enable_physical_package(dis_p)
+                                        except Exception:
+                                            pass
+                            except Exception:
+                                pass
+
+                    update_msfs_content_xml(
+                        restore_flight_mode=True,
+                        full_reset=True,
+                        folder_to_icaos=folder_to_icaos,
+                        third_party_airport_pkgs=third_party_airport_pkgs,
+                        all_airports=all_airports
+                    )
+                    clear_isolation_snapshot()
+
+                    total_custom_airports = 0
+                    for ap in all_airports:
+                        if not isinstance(ap, dict):
+                            continue
+                        sources = ap.get('all_sources') or []
+                        custom_sources = [
+                            s for s in sources
+                            if isinstance(s, dict)
+                            and not s.get('is_fix_patch')
+                            and not (s.get('is_default') or s.get('pricing_type') == 'Default' or str(s.get('folder_name', '')).startswith('msfs-default-'))
+                        ]
+                        raw_pt = str(ap.get('pricing_type') or 'Default').strip().lower()
+                        is_custom_ap = bool(custom_sources) or (raw_pt != 'default' and not ap.get('is_default'))
+                        if is_custom_ap:
+                            total_custom_airports += 1
+                            ap['is_disabled'] = False
+                            for s in custom_sources:
+                                fn_clean = str(s.get('folder_name') or '').lower()
+                                if fn_clean.endswith('.disabled'):
+                                    fn_clean = fn_clean[:-9]
+                                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean)
+                                if fn_clean not in all_conflict_sec_lower and fn_norm not in all_conflict_sec_lower:
+                                    s['is_disabled'] = False
+
+                    try:
+                        tmp_path = OUTPUT_JSON_PATH + '.tmp'
+                        with open(tmp_path, 'w', encoding='utf-8') as f:
+                            json.dump(all_airports, f, ensure_ascii=False)
+                        try:
+                            os.replace(tmp_path, OUTPUT_JSON_PATH)
+                        except Exception:
+                            if os.path.exists(OUTPUT_JSON_PATH):
+                                os.remove(OUTPUT_JSON_PATH)
+                            os.rename(tmp_path, OUTPUT_JSON_PATH)
+                    except Exception as cache_err:
+                        print(f"[Loadout Cache Sync] Error saving OUTPUT_JSON_PATH: {cache_err}")
+                    AIRPORTS_CACHE = all_airports
+
+                    st['active_loadout_id'] = 'ALL'
+                    st['flight_mode'] = {
+                        'active': False,
+                        'icaos': [],
+                        'dep_icao': '',
+                        'arr_icao': '',
+                        'profile': 'CORRIDOR',
+                        'alternates': [],
+                        'simbrief_flight': None,
+                        'disabled_count': 0,
+                        'disabled_folders': [],
+                        'disabled_xml_packages': [],
+                        'added_xml_packages': [],
+                        'disabled_bundle_bgls': []
+                    }
+                    save_settings(st)
+                    return json.dumps({
+                        "status": "ok",
+                        "active_loadout_id": "ALL",
+                        "keep_icaos": [],
+                        "active_count": total_custom_airports,
+                        "parked_count": 0,
+                        "airports": all_airports
+                    }, ensure_ascii=False)
+
+                prof = next((p for p in profiles if isinstance(p, dict) and p.get('id') == target_id), None)
+                if not prof:
+                    return json.dumps({"status": "error", "message": f"Loadout profile '{target_id}' not found."})
+
+                allowed_cats = {str(c).strip().lower() for c in (prof.get('categories') or ['Payware', 'Freeware', 'Asobo'])}
+                prefixes_set = {self._normalize_icao_prefix(px) for px in (prof.get('prefixes') or []) if self._normalize_icao_prefix(px)}
+                manual_set = {str(ic).strip().upper() for ic in (prof.get('manual_icaos') or []) if str(ic).strip()}
+
+                keep_icaos = set()
+                total_custom_airports = 0
+                for ap in all_airports:
+                    if not isinstance(ap, dict):
+                        continue
+                    icao = str(ap.get('icao') or '').strip().upper()
+                    if not icao:
+                        continue
+
+                    sources = ap.get('all_sources') or []
+                    custom_sources = [
+                        s for s in sources
+                        if isinstance(s, dict)
+                        and not s.get('is_fix_patch')
+                        and not (s.get('is_default') or s.get('pricing_type') == 'Default' or str(s.get('folder_name', '')).startswith('msfs-default-'))
+                    ]
+                    if custom_sources:
+                        total_custom_airports += 1
+                        primary_src = next((s for s in custom_sources if not s.get('is_disabled')), custom_sources[0])
+                        if primary_src.get('is_payware') or primary_src.get('pricing_type') == 'Payware' or ap.get('is_payware') or ap.get('pricing_type') == 'Payware':
+                            norm_cat = 'payware'
+                        elif primary_src.get('is_asobo_official') or primary_src.get('pricing_type') == 'Asobo' or ap.get('is_asobo_official') or ap.get('pricing_type') == 'Asobo':
+                            norm_cat = 'asobo'
+                        else:
+                            norm_cat = 'freeware'
+                    else:
+                        raw_pt = str(ap.get('pricing_type') or 'Default').strip().lower()
+                        if raw_pt == 'default' or ap.get('is_default'):
+                            if icao in manual_set:
+                                keep_icaos.add(icao)
+                            continue
+                        total_custom_airports += 1
+                        if 'payware' in raw_pt or ap.get('is_payware'):
+                            norm_cat = 'payware'
+                        elif 'asobo' in raw_pt or ap.get('is_asobo_official'):
+                            norm_cat = 'asobo'
+                        else:
+                            norm_cat = 'freeware'
+
+                    if icao in manual_set:
+                        keep_icaos.add(icao)
+                        continue
+                    if norm_cat not in allowed_cats:
+                        continue
+                    if prefixes_set:
+                        ap_country = str(ap.get('country') or ap.get('iso_country') or '').strip().upper()
+                        if ap_country not in prefixes_set:
+                            continue
+                    elif manual_set:
+                        # Strictly keep ONLY the pinned airports when no region/country is selected
+                        continue
+                    keep_icaos.add(icao)
+
+                keep_icaos_list = list(keep_icaos)
+                disabled_by_flight_mode = []
+                disabled_bundle_bgls = []
+
+                # Single-pass differential folder update in Community (only renames folders whose state actually changes!)
+                for cfg in scan_paths_cfg:
+                    dp = cfg.get('path', '')
+                    if not dp or not os.path.exists(dp):
+                        continue
+                    is_community = 'community' in dp.lower()
+                    if not is_community:
+                        continue
+                    onestore = os.path.join(dp, 'OneStore')
+                    target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+                    for td in target_dirs:
+                        if not os.path.exists(td):
+                            continue
+                        try:
+                            for item in os.listdir(td):
+                                item_p = os.path.join(td, item)
+                                if not os.path.isdir(item_p) or item == 'OneStore':
+                                    continue
+                                item_lower = item.lower()
+                                if any(k in item_lower for k in ['asobo-', 'microsoft-', 'official', 'streamed', 'worldupdate', 'cityupdate']):
+                                    continue
+                                item_clean = item[:-9] if item.endswith('.disabled') else item
+                                item_clean_lower = item_clean.lower()
+                                item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+
+                                if is_core_or_library_package(item_p) or is_core_or_library_package(item_clean):
+                                    continue
+
+                                pkg_icaos = folder_to_icaos.get(item_clean_lower) or folder_to_icaos.get(item_norm)
+                                if not pkg_icaos:
+                                    bundle_icaos = SPECIAL_BUNDLE_MAP.get(item_clean_lower) or SPECIAL_BUNDLE_MAP.get(item_norm)
+                                    if not bundle_icaos:
+                                        for bk, bv in SPECIAL_BUNDLE_MAP.items():
+                                            if bk in item_clean_lower or bk in item_norm:
+                                                bundle_icaos = bv
+                                                break
+                                    if bundle_icaos:
+                                        pkg_icaos = set(bundle_icaos)
+                                if not pkg_icaos:
+                                    pkg_icaos = resolve_package_icaos(item_clean) or resolve_package_icaos(item_norm)
+
+                                is_airport_pkg = (
+                                    bool(pkg_icaos)
+                                    or (item_clean_lower in third_party_airport_pkgs)
+                                    or (item_norm in third_party_airport_pkgs)
+                                    or (item_clean_lower in SPECIAL_BUNDLE_MAP)
+                                    or (item_norm in SPECIAL_BUNDLE_MAP)
+                                    or any(k in item_clean_lower for k in ['francevfr', 'fvfr', '-airport-', '_airport_', '-airfield-', '-aerodrome-'])
+                                )
+                                if not is_airport_pkg:
+                                    continue
+
+                                is_keep = any(k in keep_icaos for k in (pkg_icaos or []))
+                                try:
+                                    if is_keep:
+                                        if item.endswith('.disabled') and item_clean_lower not in all_conflict_sec_lower and item_norm not in all_conflict_sec_lower:
+                                            enable_physical_package(item_p)
+                                            item_p = os.path.join(td, item_clean)
+                                        if pkg_icaos and len(pkg_icaos) > 1 and os.path.exists(item_p):
+                                            for b_icao in pkg_icaos:
+                                                try:
+                                                    if b_icao in keep_icaos:
+                                                        set_package_state_for_icao(item_p, b_icao, should_enable=True)
+                                                    else:
+                                                        set_package_state_for_icao(item_p, b_icao, should_enable=False)
+                                                        disabled_bundle_bgls.append([item_p, b_icao])
+                                                except Exception:
+                                                    pass
+                                    else:
+                                        if not item.endswith('.disabled'):
+                                            dis_p = disable_physical_package(item_p)
+                                            if dis_p and dis_p.endswith('.disabled'):
+                                                disabled_by_flight_mode.append(item_clean)
+                                        else:
+                                            disabled_by_flight_mode.append(item_clean)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                disabled_xml_pkgs, added_xml_pkgs = update_msfs_content_xml(
+                    keep_icaos=keep_icaos,
+                    restore_flight_mode=False,
+                    folder_to_icaos=folder_to_icaos,
+                    third_party_airport_pkgs=third_party_airport_pkgs,
+                    all_airports=all_airports
+                )
+
+                # Synchronize is_disabled flags in all_airports and persist to OUTPUT_JSON_PATH (scenery_indexes.json)
+                for ap in all_airports:
+                    if not isinstance(ap, dict):
+                        continue
+                    icao = str(ap.get('icao') or '').strip().upper()
+                    sources = ap.get('all_sources') or []
+                    custom_sources = [
+                        s for s in sources
+                        if isinstance(s, dict)
+                        and not s.get('is_fix_patch')
+                        and not (s.get('is_default') or s.get('pricing_type') == 'Default' or str(s.get('folder_name', '')).startswith('msfs-default-'))
+                    ]
+                    raw_pt = str(ap.get('pricing_type') or 'Default').strip().lower()
+                    is_custom_ap = bool(custom_sources) or (raw_pt != 'default' and not ap.get('is_default'))
+                    if is_custom_ap:
+                        should_disable = (icao not in keep_icaos)
+                        ap['is_disabled'] = should_disable
+                        for s in custom_sources:
+                            fn_clean = str(s.get('folder_name') or '').lower()
+                            if fn_clean.endswith('.disabled'):
+                                fn_clean = fn_clean[:-9]
+                            fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean)
+                            if fn_clean not in all_conflict_sec_lower and fn_norm not in all_conflict_sec_lower:
+                                s['is_disabled'] = should_disable
+
+                try:
+                    tmp_path = OUTPUT_JSON_PATH + '.tmp'
+                    with open(tmp_path, 'w', encoding='utf-8') as f:
+                        json.dump(all_airports, f, ensure_ascii=False)
+                    try:
+                        os.replace(tmp_path, OUTPUT_JSON_PATH)
+                    except Exception:
+                        if os.path.exists(OUTPUT_JSON_PATH):
+                            os.remove(OUTPUT_JSON_PATH)
+                        os.rename(tmp_path, OUTPUT_JSON_PATH)
+                except Exception as cache_err:
+                    print(f"[Loadout Cache Sync] Error saving OUTPUT_JSON_PATH: {cache_err}")
+                AIRPORTS_CACHE = all_airports
+
+                parked_cnt = max(0, total_custom_airports - len(keep_icaos_list))
+                snapshot_data = {
+                    "created_at": datetime.now().isoformat(),
+                    "route": {
+                        "dep_icao": "",
+                        "arr_icao": "",
+                        "profile": f"LOADOUT:{prof.get('name', target_id)}",
+                        "alternates": [],
+                        "keep_icaos": keep_icaos_list
+                    },
+                    "disabled_folders": disabled_by_flight_mode,
+                    "disabled_xml_packages": list(disabled_xml_pkgs),
+                    "added_xml_packages": list(added_xml_pkgs),
+                    "disabled_bundle_bgls": disabled_bundle_bgls,
+                    "pre_existing_disabled_folders": pre_existing_disabled,
+                    "pre_existing_disabled_xml": pre_existing_disabled_xml
+                }
+                save_isolation_snapshot(snapshot_data)
+
+                st['active_loadout_id'] = target_id
+                st['flight_mode'] = {
+                    'active': True,
+                    'disabled_count': parked_cnt,
+                    'icaos': keep_icaos_list,
+                    'dep_icao': '',
+                    'arr_icao': '',
+                    'profile': f"LOADOUT:{prof.get('name', target_id)}",
+                    'base_loadout_id': target_id,
+                    'alternates': [],
+                    'simbrief_flight': None,
+                    'disabled_folders': disabled_by_flight_mode,
+                    'disabled_xml_packages': list(disabled_xml_pkgs),
+                    'added_xml_packages': list(added_xml_pkgs),
+                    'disabled_bundle_bgls': disabled_bundle_bgls
+                }
+                save_settings(st)
+
+                return json.dumps({
+                    "status": "ok",
+                    "active_loadout_id": target_id,
+                    "profile_name": prof.get('name', target_id),
+                    "keep_icaos": keep_icaos_list,
+                    "active_count": len(keep_icaos_list),
+                    "parked_count": parked_cnt,
+                    "airports": all_airports
                 }, ensure_ascii=False)
         except Exception as e:
-            return json.dumps({"status": "error", "message": f"Error fetching SimBrief data: {str(e)}"})
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     def toggle_airport_disabled(self, icao):
         try:
+            if self._is_sim_running_guard():
+                return json.dumps({
+                    "status": "locked_sim_running",
+                    "is_sim_running": True,
+                    "message": "MSFS RUNNING - SCENERY MODIFICATION LOCKED FOR SAFETY."
+                }, ensure_ascii=False)
             icao_target = str(icao).strip().upper()
             if is_core_or_library_package(icao_target):
                 return json.dumps({"status": "error", "message": "Protected package cannot be disabled."})
@@ -1694,6 +3021,12 @@ class Api:
 
     def reset_full_database(self):
         try:
+            if self._is_sim_running_guard():
+                return json.dumps({
+                    "status": "locked_sim_running",
+                    "is_sim_running": True,
+                    "message": "MSFS RUNNING - DATABASE RESET LOCKED FOR SAFETY."
+                }, ensure_ascii=False)
             self.restore_all_sceneries(full_reset=True)
 
             st = get_settings()
@@ -2494,229 +3827,257 @@ class Api:
         if IS_LITE:
             return json.dumps({"status": "locked", "is_lite": True, "message": "Flight Plan Optimizer is only available in SceneryX Pro."})
         try:
-            raw_param = json.loads(keep_icaos_json)
-            dep_icao = ''
-            arr_icao = ''
-            profile = 'CORRIDOR'
-            alternates = []
-            simbrief_flight = None
+            if self._is_sim_running_guard():
+                return json.dumps({
+                    "status": "locked_sim_running",
+                    "is_sim_running": True,
+                    "message": "MSFS RUNNING - SCENERY OPTIMIZATION LOCKED FOR SAFETY."
+                }, ensure_ascii=False)
+            with self._scenery_mutation_lock:
+                if self._is_sim_running_guard():
+                    return json.dumps({
+                        "status": "locked_sim_running",
+                        "is_sim_running": True,
+                        "message": "MSFS RUNNING - SCENERY OPTIMIZATION LOCKED FOR SAFETY."
+                    }, ensure_ascii=False)
 
-            if isinstance(raw_param, dict):
-                keep_icaos = set(raw_param.get('keep_icaos', []))
-                dep_icao = raw_param.get('dep_icao', '')
-                arr_icao = raw_param.get('arr_icao', '')
-                profile = raw_param.get('profile', 'CORRIDOR')
-                alternates = raw_param.get('alternates', [])
-                simbrief_flight = raw_param.get('simbrief_flight', None)
-            else:
-                keep_icaos = set(raw_param)
+                raw_param = json.loads(keep_icaos_json)
+                dep_icao = ''
+                arr_icao = ''
+                profile = 'CORRIDOR'
+                alternates = []
+                simbrief_flight = None
+                base_loadout_id = None
 
-            settings = get_settings()
-            scan_paths_cfg = settings.get("scan_paths", [])
+                if isinstance(raw_param, dict):
+                    keep_icaos = set(raw_param.get('keep_icaos', []))
+                    dep_icao = raw_param.get('dep_icao', '')
+                    arr_icao = raw_param.get('arr_icao', '')
+                    profile = raw_param.get('profile', 'CORRIDOR')
+                    alternates = raw_param.get('alternates', [])
+                    simbrief_flight = raw_param.get('simbrief_flight', None)
+                    base_loadout_id = raw_param.get('base_loadout_id', None)
+                else:
+                    keep_icaos = set(raw_param)
 
-            all_airports = run_scan()
-            folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
+                settings = get_settings()
+                if load_isolation_snapshot() or settings.get('flight_mode', {}).get('active'):
+                    self.restore_all_sceneries(full_reset=False)
+                    settings = get_settings()
+                scan_paths_cfg = settings.get("scan_paths", [])
 
-            # Record all pre-existing disabled packages across all scan folders and Content.xml to guarantee lossless rollback
-            pre_existing_disabled = []
-            for cfg in scan_paths_cfg:
-                dp = cfg.get('path', '')
-                if not os.path.exists(dp):
-                    continue
-                onestore = os.path.join(dp, 'OneStore')
-                target_dirs = [onestore] if os.path.exists(onestore) else [dp]
-                for td in target_dirs:
-                    if not os.path.exists(td):
+                all_airports = run_scan()
+                folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
+
+                # Record all pre-existing disabled packages across all scan folders and Content.xml to guarantee lossless rollback
+                pre_existing_disabled = []
+                for cfg in scan_paths_cfg:
+                    dp = cfg.get('path', '')
+                    if not os.path.exists(dp):
                         continue
-                    try:
-                        for item in os.listdir(td):
-                            if item.endswith('.disabled'):
-                                pre_existing_disabled.append(item)
-                    except Exception:
-                        pass
+                    onestore = os.path.join(dp, 'OneStore')
+                    target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+                    for td in target_dirs:
+                        if not os.path.exists(td):
+                            continue
+                        try:
+                            for item in os.listdir(td):
+                                if item.endswith('.disabled'):
+                                    pre_existing_disabled.append(item)
+                        except Exception:
+                            pass
 
-            pre_existing_disabled_xml = []
-            for xml_path in get_content_xml_paths():
-                if os.path.exists(xml_path):
-                    try:
-                        import xml.etree.ElementTree as ET
-                        tree = ET.parse(xml_path)
-                        for elem in tree.getroot().findall('Package'):
-                            if elem.get('active') == 'UserDisabled':
-                                pre_existing_disabled_xml.append(elem.get('name', ''))
-                    except Exception:
-                        pass
+                pre_existing_disabled_xml = []
+                for xml_path in get_content_xml_paths():
+                    if os.path.exists(xml_path):
+                        try:
+                            import xml.etree.ElementTree as ET
+                            tree = ET.parse(xml_path)
+                            for elem in tree.getroot().findall('Package'):
+                                if elem.get('active') == 'UserDisabled':
+                                    pre_existing_disabled_xml.append(elem.get('name', ''))
+                        except Exception:
+                            pass
 
-            enabled_count = 0
-            disabled_count = 0
-            disabled_by_flight_mode = []
-            disabled_bundle_bgls = []
+                enabled_count = 0
+                disabled_count = 0
+                disabled_by_flight_mode = []
+                disabled_bundle_bgls = []
 
-            for cfg in scan_paths_cfg:
-                dp = cfg.get('path', '')
-                if not os.path.exists(dp):
-                    continue
-
-                dp_lower = dp.lower()
-                is_community = 'community' in dp_lower
-
-                onestore = os.path.join(dp, 'OneStore')
-                target_dirs = [onestore] if os.path.exists(onestore) else [dp]
-
-                for td in target_dirs:
-                    if not os.path.exists(td):
+                for cfg in scan_paths_cfg:
+                    dp = cfg.get('path', '')
+                    if not os.path.exists(dp):
                         continue
-                    try:
-                        for item in os.listdir(td):
-                            item_p = os.path.join(td, item)
-                            if not os.path.isdir(item_p) or item == 'OneStore':
-                                continue
 
-                            item_lower = item.lower()
-                            # Never rename official Asobo/Microsoft packages physically
-                            if any(k in item_lower for k in ['asobo-', 'microsoft-', 'official', 'streamed', 'worldupdate', 'cityupdate']):
-                                continue
+                    dp_lower = dp.lower()
+                    is_community = 'community' in dp_lower
 
-                            item_clean = item[:-9] if item.endswith('.disabled') else item
-                            item_clean_lower = item_clean.lower()
-                            item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+                    onestore = os.path.join(dp, 'OneStore')
+                    target_dirs = [onestore] if os.path.exists(onestore) else [dp]
 
-                            # STRICT IMMUNITY GUARD: Never touch aircraft, liveries, tools or core utilities
-                            if is_core_or_library_package(item_p) or is_core_or_library_package(item_clean):
-                                continue
+                    for td in target_dirs:
+                        if not os.path.exists(td):
+                            continue
+                        try:
+                            for item in os.listdir(td):
+                                item_p = os.path.join(td, item)
+                                if not os.path.isdir(item_p) or item == 'OneStore':
+                                    continue
 
-                            pkg_icaos = folder_to_icaos.get(item_clean_lower) or folder_to_icaos.get(item_norm)
-                            if not pkg_icaos:
-                                bundle_icaos = SPECIAL_BUNDLE_MAP.get(item_clean_lower) or SPECIAL_BUNDLE_MAP.get(item_norm)
-                                if not bundle_icaos:
-                                    for bk, bv in SPECIAL_BUNDLE_MAP.items():
-                                        if bk in item_clean_lower or bk in item_norm:
-                                            bundle_icaos = bv
+                                item_lower = item.lower()
+                                # Never rename official Asobo/Microsoft packages physically
+                                if any(k in item_lower for k in ['asobo-', 'microsoft-', 'official', 'streamed', 'worldupdate', 'cityupdate']):
+                                    continue
+
+                                item_clean = item[:-9] if item.endswith('.disabled') else item
+                                item_clean_lower = item_clean.lower()
+                                item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+
+                                # STRICT IMMUNITY GUARD: Never touch aircraft, liveries, tools or core utilities
+                                if is_core_or_library_package(item_p) or is_core_or_library_package(item_clean):
+                                    continue
+
+                                pkg_icaos = folder_to_icaos.get(item_clean_lower) or folder_to_icaos.get(item_norm)
+                                if not pkg_icaos:
+                                    bundle_icaos = SPECIAL_BUNDLE_MAP.get(item_clean_lower) or SPECIAL_BUNDLE_MAP.get(item_norm)
+                                    if not bundle_icaos:
+                                        for bk, bv in SPECIAL_BUNDLE_MAP.items():
+                                            if bk in item_clean_lower or bk in item_norm:
+                                                bundle_icaos = bv
+                                                break
+                                    if bundle_icaos:
+                                        pkg_icaos = set(bundle_icaos)
+
+                                if not pkg_icaos:
+                                    pkg_icaos = resolve_package_icaos(item_clean) or resolve_package_icaos(item_norm)
+
+                                # Known Handcrafted / Payware Airport name patterns (Gatwick, Frankfurt, Vancouver, etc.)
+                                if not pkg_icaos:
+                                    for t_icao, t_words in [
+                                        ('EGKK', ['gatwick', 'egkk']),
+                                        ('EDDF', ['frankfurt', 'eddf']),
+                                        ('CYVR', ['vancouver', 'cyvr']),
+                                        ('LFBD', ['bordeaux', 'merignac', 'lfbd']),
+                                        ('LFML', ['marseille', 'lfml']),
+                                        ('LFKB', ['bastia', 'lfkb'])
+                                    ]:
+                                        if any(w in item_clean_lower for w in t_words):
+                                            pkg_icaos = {t_icao}
                                             break
-                                if bundle_icaos:
-                                    pkg_icaos = set(bundle_icaos)
 
-                            # Known Handcrafted / Payware Airport name patterns (Gatwick, Frankfurt, Vancouver, etc.)
-                            if not pkg_icaos:
-                                for t_icao, t_words in [
-                                    ('EGKK', ['gatwick', 'egkk']),
-                                    ('EDDF', ['frankfurt', 'eddf']),
-                                    ('CYVR', ['vancouver', 'cyvr']),
-                                    ('LFBD', ['bordeaux', 'merignac', 'lfbd']),
-                                    ('LFML', ['marseille', 'lfml']),
-                                    ('LFKB', ['bastia', 'lfkb'])
-                                ]:
-                                    if any(w in item_clean_lower for w in t_words):
-                                        pkg_icaos = {t_icao}
-                                        break
+                                # ONLY process packages that actually represent airport sceneries!
+                                # NEVER rename liveries, aircraft, tools, GSX, or utilities!
+                                is_airport_pkg = (
+                                    bool(pkg_icaos)
+                                    or (item_clean_lower in third_party_airport_pkgs)
+                                    or (item_norm in third_party_airport_pkgs)
+                                    or (item_clean_lower in SPECIAL_BUNDLE_MAP)
+                                    or (item_norm in SPECIAL_BUNDLE_MAP)
+                                    or any(k in item_clean_lower for k in ['francevfr', 'fvfr', '-airport-', '_airport_', '-airfield-', '-aerodrome-'])
+                                )
+                                if not is_airport_pkg:
+                                    continue
 
-                            # ONLY process packages that actually represent airport sceneries!
-                            # NEVER rename liveries, aircraft, tools, GSX, or utilities!
-                            is_airport_pkg = (
-                                bool(pkg_icaos)
-                                or (item_clean_lower in third_party_airport_pkgs)
-                                or (item_norm in third_party_airport_pkgs)
-                                or (item_clean_lower in SPECIAL_BUNDLE_MAP)
-                                or (item_norm in SPECIAL_BUNDLE_MAP)
-                                or any(k in item_clean_lower for k in ['francevfr', 'fvfr', '-airport-', '_airport_', '-airfield-', '-aerodrome-'])
-                            )
-                            if not is_airport_pkg:
-                                continue
+                                is_keep = any(k in keep_icaos for k in (pkg_icaos or []))
 
-                            is_keep = any(k in keep_icaos for k in (pkg_icaos or []))
+                                if is_community:
+                                    try:
+                                        # Never re-enable packages that were already disabled prior to flight mode
+                                        if not is_keep and not item.endswith('.disabled'):
+                                            dis_p = disable_physical_package(item_p)
+                                            if dis_p and dis_p.endswith('.disabled'):
+                                                disabled_count += 1
+                                                disabled_by_flight_mode.append(item)
+                                        elif not is_keep and item.endswith('.disabled'):
+                                            disable_physical_package(item_p)
+                                        elif is_keep and pkg_icaos and len(pkg_icaos) > 1 and not item.endswith('.disabled'):
+                                            # Multi-airport bundle (e.g. France VFR sevfrairports)
+                                            # Dissociate non-kept ICAOs inside this bundle by disabling their specific BGLs!
+                                            for b_icao in pkg_icaos:
+                                                if b_icao not in keep_icaos:
+                                                    try:
+                                                        set_package_state_for_icao(item_p, b_icao, should_enable=False)
+                                                        disabled_bundle_bgls.append((item_p, b_icao))
+                                                        disabled_count += 1
+                                                    except Exception as bgl_err:
+                                                        print(f"Error dissociating bundle airport {b_icao} in {item}: {bgl_err}")
+                                    except Exception as rename_err:
+                                        print(f"Skipping package state change for {item}: {rename_err}")
+                        except Exception as e:
+                            print(f"Error processing {td} during flight optimizer:", e)
 
-                            if is_community:
-                                try:
-                                    # Never re-enable packages that were already disabled prior to flight mode
-                                    if not is_keep and not item.endswith('.disabled'):
-                                        dis_p = disable_physical_package(item_p)
-                                        if dis_p and dis_p.endswith('.disabled'):
-                                            disabled_count += 1
-                                            disabled_by_flight_mode.append(item)
-                                    elif is_keep and pkg_icaos and len(pkg_icaos) > 1 and not item.endswith('.disabled'):
-                                        # Multi-airport bundle (e.g. France VFR sevfrairports)
-                                        # Dissociate non-kept ICAOs inside this bundle by disabling their specific BGLs!
-                                        for b_icao in pkg_icaos:
-                                            if b_icao not in keep_icaos:
-                                                try:
-                                                    set_package_state_for_icao(item_p, b_icao, should_enable=False)
-                                                    disabled_bundle_bgls.append((item_p, b_icao))
-                                                    disabled_count += 1
-                                                except Exception as bgl_err:
-                                                    print(f"Error dissociating bundle airport {b_icao} in {item}: {bgl_err}")
-                                except Exception as rename_err:
-                                    print(f"Skipping package state change for {item}: {rename_err}")
-                    except Exception as e:
-                        print(f"Error processing {td} during flight optimizer:", e)
+                # Update MSFS Native Content.xml (UserDisabled / Activated)
+                disabled_xml_pkgs, added_xml_pkgs = update_msfs_content_xml(
+                    keep_icaos=keep_icaos,
+                    restore_flight_mode=False,
+                    folder_to_icaos=folder_to_icaos,
+                    third_party_airport_pkgs=third_party_airport_pkgs,
+                    all_airports=all_airports
+                )
 
-            # Update MSFS Native Content.xml (UserDisabled / Activated)
-            disabled_xml_pkgs, added_xml_pkgs = update_msfs_content_xml(
-                keep_icaos=keep_icaos,
-                restore_flight_mode=False,
-                folder_to_icaos=folder_to_icaos,
-                third_party_airport_pkgs=third_party_airport_pkgs,
-                all_airports=all_airports
-            )
+                # Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
+                sanitize_msfs_content_xml()
 
-            # Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
-            sanitize_msfs_content_xml()
+                # Merge with existing state if flight mode was already partially active
+                existing_flight_cfg = settings.get('flight_mode', {})
+                existing_folders = set(existing_flight_cfg.get('disabled_folders', []))
+                existing_xml = set(existing_flight_cfg.get('disabled_xml_packages', []))
+                existing_added = set(existing_flight_cfg.get('added_xml_packages', []))
+                existing_bundle_bgls = existing_flight_cfg.get('disabled_bundle_bgls', [])
 
-            # Merge with existing state if flight mode was already partially active
-            existing_flight_cfg = settings.get('flight_mode', {})
-            existing_folders = set(existing_flight_cfg.get('disabled_folders', []))
-            existing_xml = set(existing_flight_cfg.get('disabled_xml_packages', []))
-            existing_added = set(existing_flight_cfg.get('added_xml_packages', []))
-            existing_bundle_bgls = existing_flight_cfg.get('disabled_bundle_bgls', [])
+                all_disabled_folders = list(existing_folders.union(disabled_by_flight_mode))
+                all_disabled_xml = list(existing_xml.union(disabled_xml_pkgs))
+                all_added_xml = list(existing_added.union(added_xml_pkgs))
+                all_bundle_bgls = existing_bundle_bgls + [list(pair) for pair in disabled_bundle_bgls if list(pair) not in existing_bundle_bgls]
 
-            all_disabled_folders = list(existing_folders.union(disabled_by_flight_mode))
-            all_disabled_xml = list(existing_xml.union(disabled_xml_pkgs))
-            all_added_xml = list(existing_added.union(added_xml_pkgs))
-            all_bundle_bgls = existing_bundle_bgls + [list(pair) for pair in disabled_bundle_bgls if list(pair) not in existing_bundle_bgls]
+                total_disabled_count = len(all_disabled_folders) + len(all_disabled_xml) + len(all_added_xml) + len(all_bundle_bgls)
 
-            total_disabled_count = len(all_disabled_folders) + len(all_disabled_xml) + len(all_added_xml) + len(all_bundle_bgls)
+                # Persist atomic isolation snapshot to disk
+                snapshot_data = {
+                    "created_at": datetime.now().isoformat(),
+                    "route": {
+                        "dep_icao": dep_icao,
+                        "arr_icao": arr_icao,
+                        "profile": profile,
+                        "alternates": alternates,
+                        "keep_icaos": list(keep_icaos)
+                    },
+                    "disabled_folders": all_disabled_folders,
+                    "disabled_xml_packages": all_disabled_xml,
+                    "added_xml_packages": all_added_xml,
+                    "disabled_bundle_bgls": all_bundle_bgls,
+                    "pre_existing_disabled_folders": pre_existing_disabled,
+                    "pre_existing_disabled_xml": pre_existing_disabled_xml
+                }
+                save_isolation_snapshot(snapshot_data)
 
-            # Persist atomic isolation snapshot to disk
-            snapshot_data = {
-                "created_at": datetime.now().isoformat(),
-                "route": {
-                    "dep_icao": dep_icao,
-                    "arr_icao": arr_icao,
-                    "profile": profile,
-                    "alternates": alternates,
-                    "keep_icaos": list(keep_icaos)
-                },
-                "disabled_folders": all_disabled_folders,
-                "disabled_xml_packages": all_disabled_xml,
-                "added_xml_packages": all_added_xml,
-                "disabled_bundle_bgls": all_bundle_bgls,
-                "pre_existing_disabled_folders": pre_existing_disabled,
-                "pre_existing_disabled_xml": pre_existing_disabled_xml
-            }
-            save_isolation_snapshot(snapshot_data)
+                if base_loadout_id:
+                    settings['active_loadout_id'] = base_loadout_id
 
-            settings['flight_mode'] = {
-                'active': True,
-                'disabled_count': total_disabled_count,
-                'icaos': list(keep_icaos),
-                'dep_icao': dep_icao,
-                'arr_icao': arr_icao,
-                'profile': profile,
-                'alternates': alternates,
-                'simbrief_flight': simbrief_flight,
-                'disabled_folders': all_disabled_folders,
-                'disabled_xml_packages': all_disabled_xml,
-                'added_xml_packages': all_added_xml,
-                'disabled_bundle_bgls': all_bundle_bgls
-            }
-            save_settings(settings)
+                settings['flight_mode'] = {
+                    'active': True,
+                    'disabled_count': total_disabled_count,
+                    'icaos': list(keep_icaos),
+                    'dep_icao': dep_icao,
+                    'arr_icao': arr_icao,
+                    'profile': profile,
+                    'base_loadout_id': base_loadout_id or settings.get('active_loadout_id') or 'ALL',
+                    'alternates': alternates,
+                    'simbrief_flight': simbrief_flight,
+                    'disabled_folders': all_disabled_folders,
+                    'disabled_xml_packages': all_disabled_xml,
+                    'added_xml_packages': all_added_xml,
+                    'disabled_bundle_bgls': all_bundle_bgls
+                }
+                save_settings(settings)
 
-            airports = run_scan()
-            return json.dumps({
-                "status": "ok",
-                "enabled_count": enabled_count,
-                "disabled_count": total_disabled_count,
-                "airports": airports
-            }, ensure_ascii=False)
+                airports = run_scan()
+                return json.dumps({
+                    "status": "ok",
+                    "enabled_count": enabled_count,
+                    "disabled_count": total_disabled_count,
+                    "airports": airports
+                }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
@@ -2731,125 +4092,144 @@ class Api:
         - 100% aircraft, livery, and utility immunity is enforced in Content.xml, snapshot is cleared, and settings updated.
         """
         try:
-            settings = get_settings()
-            scan_paths_cfg = settings.get("scan_paths", [])
-            re_enabled_count = 0
+            if self._is_sim_running_guard():
+                return json.dumps({
+                    "status": "locked_sim_running",
+                    "is_sim_running": True,
+                    "message": "MSFS RUNNING - SCENERY RESTORATION LOCKED FOR SAFETY."
+                }, ensure_ascii=False)
 
-            snapshot = load_isolation_snapshot()
-            flight_mode_cfg = settings.get('flight_mode', {})
+            with self._scenery_mutation_lock:
+                if self._is_sim_running_guard():
+                    return json.dumps({
+                        "status": "locked_sim_running",
+                        "is_sim_running": True,
+                        "message": "MSFS RUNNING - SCENERY RESTORATION LOCKED FOR SAFETY."
+                    }, ensure_ascii=False)
 
-            flight_disabled_folders = set()
-            flight_disabled_xml = set()
-            flight_added_xml = set()
-            pre_existing_folders = set()
-            pre_existing_xml = set()
-            disabled_bundle_bgls = []
+                settings = get_settings()
+                scan_paths_cfg = settings.get("scan_paths", [])
+                re_enabled_count = 0
 
-            if snapshot and isinstance(snapshot, dict):
-                flight_disabled_folders.update(snapshot.get('disabled_folders', []))
-                flight_disabled_xml.update(snapshot.get('disabled_xml_packages', []))
-                flight_added_xml.update(snapshot.get('added_xml_packages', []))
-                pre_existing_folders.update(snapshot.get('pre_existing_disabled_folders', []))
-                pre_existing_xml.update(snapshot.get('pre_existing_disabled_xml', []))
-                disabled_bundle_bgls.extend(snapshot.get('disabled_bundle_bgls', []))
+                snapshot = load_isolation_snapshot()
+                flight_mode_cfg = settings.get('flight_mode', {})
 
-            if isinstance(flight_mode_cfg, dict):
-                flight_disabled_folders.update(flight_mode_cfg.get('disabled_folders', []))
-                flight_disabled_xml.update(flight_mode_cfg.get('disabled_xml_packages', []))
-                flight_added_xml.update(flight_mode_cfg.get('added_xml_packages', []))
-                for pair in flight_mode_cfg.get('disabled_bundle_bgls', []):
-                    if pair not in disabled_bundle_bgls:
-                        disabled_bundle_bgls.append(pair)
+                flight_disabled_folders = set()
+                flight_disabled_xml = set()
+                flight_added_xml = set()
+                pre_existing_folders = set()
+                pre_existing_xml = set()
+                disabled_bundle_bgls = []
 
-            flight_disabled_folders_lower = {f.lower() for f in flight_disabled_folders}
-            pre_existing_folders_lower = {f.lower() for f in pre_existing_folders}
-            all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
+                if snapshot and isinstance(snapshot, dict):
+                    flight_disabled_folders.update(snapshot.get('disabled_folders', []))
+                    flight_disabled_xml.update(snapshot.get('disabled_xml_packages', []))
+                    flight_added_xml.update(snapshot.get('added_xml_packages', []))
+                    pre_existing_folders.update(snapshot.get('pre_existing_disabled_folders', []))
+                    pre_existing_xml.update(snapshot.get('pre_existing_disabled_xml', []))
+                    disabled_bundle_bgls.extend(snapshot.get('disabled_bundle_bgls', []))
 
-            # 1. Restore physical packages in Community
-            for cfg in scan_paths_cfg:
-                dp = cfg.get('path', '')
-                if not os.path.exists(dp):
-                    continue
+                if isinstance(flight_mode_cfg, dict):
+                    flight_disabled_folders.update(flight_mode_cfg.get('disabled_folders', []))
+                    flight_disabled_xml.update(flight_mode_cfg.get('disabled_xml_packages', []))
+                    flight_added_xml.update(flight_mode_cfg.get('added_xml_packages', []))
+                    for pair in flight_mode_cfg.get('disabled_bundle_bgls', []):
+                        if pair not in disabled_bundle_bgls:
+                            disabled_bundle_bgls.append(pair)
 
-                onestore = os.path.join(dp, 'OneStore')
-                target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+                flight_disabled_folders_lower = {f.lower() for f in flight_disabled_folders}
+                pre_existing_folders_lower = {f.lower() for f in pre_existing_folders}
+                all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
 
-                for td in target_dirs:
-                    if not os.path.exists(td):
+                # 1. Restore physical packages in Community
+                for cfg in scan_paths_cfg:
+                    dp = cfg.get('path', '')
+                    if not os.path.exists(dp):
                         continue
+
+                    onestore = os.path.join(dp, 'OneStore')
+                    target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+
+                    for td in target_dirs:
+                        if not os.path.exists(td):
+                            continue
+                        try:
+                            for item in os.listdir(td):
+                                if item.endswith('.disabled'):
+                                    item_clean = item[:-9]
+                                    item_clean_lower = item_clean.lower()
+                                    item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+
+                                    # NEVER restore known secondary conflict packages!
+                                    if item_clean_lower in all_conflict_sec_lower or item_norm in all_conflict_sec_lower:
+                                        continue
+
+                                    # Preserve packages manually disabled by the user prior to isolation when full_reset=False
+                                    if not full_reset and (item.lower() in pre_existing_folders_lower or item_clean_lower in pre_existing_folders_lower):
+                                        continue
+
+                                    dis_p = os.path.join(td, item)
+                                    # Never touch protected packages
+                                    if is_core_or_library_package(dis_p) or is_core_or_library_package(item_clean):
+                                        continue
+
+                                    try:
+                                        enable_physical_package(dis_p)
+                                        re_enabled_count += 1
+                                    except Exception as e:
+                                        print(f"Error restoring {dis_p}:", e)
+                        except Exception as e:
+                            print(f"Error scanning {td} for restore:", e)
+
+                # 2. Re-enable dissociated bundle BGLs
+                for item in disabled_bundle_bgls:
                     try:
-                        for item in os.listdir(td):
-                            if item.endswith('.disabled'):
-                                item_clean = item[:-9]
-                                item_clean_lower = item_clean.lower()
-                                item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+                        pkg_p = item[0] if isinstance(item, (list, tuple)) else ''
+                        b_icao = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ''
+                        if pkg_p and b_icao:
+                            set_package_state_for_icao(pkg_p, b_icao, should_enable=True)
+                    except Exception as bgl_e:
+                        print(f"Error restoring bundle BGL: {bgl_e}")
 
-                                # NEVER restore known secondary conflict packages!
-                                if item_clean_lower in all_conflict_sec_lower or item_norm in all_conflict_sec_lower:
-                                    continue
+                # 3. Restore MSFS Content.xml safely (restoring flight mode modifications)
+                update_msfs_content_xml(
+                    restore_flight_mode=True,
+                    flight_disabled_xml=flight_disabled_xml,
+                    flight_added_xml=flight_added_xml,
+                    pre_existing_disabled_xml=pre_existing_xml,
+                    full_reset=full_reset
+                )
 
-                                dis_p = os.path.join(td, item)
-                                # Never touch protected packages
-                                if is_core_or_library_package(dis_p) or is_core_or_library_package(item_clean):
-                                    continue
+                # 4. Conflict Prevention Safeguard: Ensure secondary conflicting packages remain disabled
+                auto_resolve_known_conflicts()
 
-                                try:
-                                    enable_physical_package(dis_p)
-                                    re_enabled_count += 1
-                                except Exception as e:
-                                    print(f"Error restoring {dis_p}:", e)
-                    except Exception as e:
-                        print(f"Error scanning {td} for restore:", e)
+                # 5. Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
+                sanitize_msfs_content_xml()
 
-            # 2. Re-enable dissociated bundle BGLs
-            for item in disabled_bundle_bgls:
-                try:
-                    pkg_p = item[0] if isinstance(item, (list, tuple)) else ''
-                    b_icao = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ''
-                    if pkg_p and b_icao:
-                        set_package_state_for_icao(pkg_p, b_icao, should_enable=True)
-                except Exception as bgl_e:
-                    print(f"Error restoring bundle BGL: {bgl_e}")
+                # 6. Clear snapshot and flight mode state
+                clear_isolation_snapshot()
+                settings['flight_mode'] = {
+                    'active': False,
+                    'icaos': [],
+                    'dep_icao': '',
+                    'arr_icao': '',
+                    'profile': 'CORRIDOR',
+                    'alternates': [],
+                    'simbrief_flight': None,
+                    'disabled_count': 0,
+                    'disabled_folders': [],
+                    'disabled_xml_packages': [],
+                    'added_xml_packages': [],
+                    'disabled_bundle_bgls': []
+                }
+                save_settings(settings)
 
-            # 3. Restore MSFS Content.xml safely (restoring flight mode modifications)
-            update_msfs_content_xml(
-                restore_flight_mode=True,
-                flight_disabled_xml=flight_disabled_xml,
-                flight_added_xml=flight_added_xml,
-                pre_existing_disabled_xml=pre_existing_xml,
-                full_reset=full_reset
-            )
-
-            # 4. Conflict Prevention Safeguard: Ensure secondary conflicting packages remain disabled
-            auto_resolve_known_conflicts()
-
-            # 5. Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
-            sanitize_msfs_content_xml()
-
-            # 6. Clear snapshot and flight mode state
-            clear_isolation_snapshot()
-            settings['flight_mode'] = {
-                'active': False,
-                'icaos': [],
-                'dep_icao': '',
-                'arr_icao': '',
-                'profile': 'CORRIDOR',
-                'alternates': [],
-                'simbrief_flight': None,
-                'disabled_count': 0,
-                'disabled_folders': [],
-                'disabled_xml_packages': [],
-                'added_xml_packages': [],
-                'disabled_bundle_bgls': []
-            }
-            save_settings(settings)
-
-            airports = run_scan()
-            return json.dumps({
-                "status": "ok",
-                "re_enabled_count": re_enabled_count,
-                "airports": airports
-            }, ensure_ascii=False)
+                airports = run_scan()
+                return json.dumps({
+                    "status": "ok",
+                    "re_enabled_count": re_enabled_count,
+                    "airports": airports
+                }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
@@ -4651,9 +6031,9 @@ class Api:
         except Exception as e:
             return json.dumps([], ensure_ascii=False)
 
-    def save_custom_profile(self, profile_name, overwrite_id=None):
+    def save_custom_profile(self, profile_name, overwrite_id=None, mode=None):
         try:
-            res = flight_rig_optimizer.save_custom_profile(profile_name, overwrite_id=overwrite_id)
+            res = flight_rig_optimizer.save_custom_profile(profile_name, overwrite_id=overwrite_id, mode=mode)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
@@ -5113,6 +6493,60 @@ class Api:
         "- **Fluidité de la carte :** Suppression des carrés clairs lors du zoom et du déplacement sur la carte."
     )
 
+    _PATCH_1_2_0_CHANGELOG_BODY = (
+        "**Release Date:** October 30, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## NEW FEATURES\n\n"
+        "### 1. Interactive 3D Terrestrial Globe & Cartographic Engine\n"
+        "- **2D Planisphere & 3D Terrestrial Globe (`2D Map` / `3D Globe`):** Seamlessly switch between the 2D Mercator planisphere and the new 3D Terrestrial Globe with full spherical projection, fine mouse-wheel zoom increments, 3D great-circle flight arcs, and world-space airport clustering.\n"
+        "- **8 Unified Cartographic Styles & VFR / IFR Aeronautical Charts:** Choose between 4 dark cockpit themes (`Avionics Blue`, `Deep Navy`, `Carbon Dark`, `Radar Emerald`), official OpenAIP **VFR Chart** & **IFR Enroute** aeronautical overlays (controlled airspaces, VOR/NDB navaids, frequencies), **Satellite** imagery, and **Street Map** in both 2D and 3D.\n"
+        "- **Real-Time Day / Night Solar Terminator & UTC / Local Timeline:** Visualize real-time daylight, twilight, and night across the world in 2D and 3D. Scrub through the 24-hour timeline (`-1H` / `+1H` or slider), toggle between **UTC (Zulu)** and **Local Time (`UTC\u00b1`)**, or sync with the **LIVE** clock.\n\n"
+        "### 2. Unified Scenery & Route Optimizer + Loadout Rules Builder\n"
+        "- **Custom Base Loadout Profiles (`Edit Loadout Rules`):** Create, save, and activate reusable base scenery environments (e.g., *Europe Airliners*, *North America*). Filter active sceneries by category (`Payware`, `Freeware`, `Asobo`), world regions, or individual countries.\n"
+        "- **Interactive Map Airport Pinning (`Pin Airports on Map`):** Lock favorite hubs directly on the 2D map or 3D globe so they always stay enabled regardless of regional rules.\n"
+        "- **Route Overlay & SimBrief Alternates Integration:** Combine any Base Loadout Profile with a **Direct A-to-B**, **En-Route Corridor**, or **SimBrief OFP** flight plan (automatically protecting departure, destination, corridor, and SimBrief alternate airports).\n\n"
+        "### 3. Live Telemetry (`DEP / ARR / ACTUAL POSITION`) & Hardware-Tailored Profiles\n"
+        "- **Enhanced Live Flight Telemetry Header:** Displays your planned **DEP** and **ARR** from SimBrief (or live auto-detected origin in Free Flight) alongside your aircraft's real-time **ACTUAL POSITION**.\n"
+        "- **Continuous Hardware Sync & Tailored Presets:** Automatically adapts `LOW`, `OPTIMUM`, and `ULTRA` MSFS graphics profiles and Smart LOD targets to your detected CPU, GPU VRAM, RAM, and display refresh rate, and refreshes recommendations whenever a hardware upgrade is detected.\n"
+        "- **Updated Interactive Onboarding Tour:** Added `NEW` feature tags and a dedicated walkthrough step for **Edit Loadout Rules & Custom Profiles**.\n\n"
+        "## BUG FIXES & STABILITY\n\n"
+        "### 1. 3D Globe, UI & Graphics Settings Fixes\n"
+        "- **3D Globe Startup Optical Centering:** Fixed the 3D Globe horizontal offset when opening SceneryX with the Classic left sidebar active, and added `ResizeObserver` viewport tracking.\n"
+        "- **MSFS Graphic Settings 2D / VR Mode Badge Sync:** Fixed the sidebar and top banner `2D` / `VR` indicator so it updates immediately when switching between `2D DISPLAY` and `VR HEADSET` tabs, and aligned all 4 quick-preset keys (`TerrainLoDFactor`, `ObjectsLoDFactor`, `OffscreenTerrainPreCaching`, `TextureResolution`).\n"
+        "- **Loadout Builder Map Click & Modal Close Cleanup:** Fixed map click interception when opening another drawer over the Loadout Builder, and ensured closing the window while in Pin Mode properly restores the active loadout map preview.\n\n"
+        "### 2. Backend NTFS Concurrency, Sim Guards & State Persistence\n"
+        "- **Multi-Airport Bundle BGL Restoration:** Fixed orphaned `.bgl.sceneryx_off` files when switching directly between Loadout Profiles and preserved manual scenery exclusions during partial restores.\n"
+        "- **Strict Simulator Locks & Mutation Mutex:** Added thread-safe re-entrant locking (`_scenery_mutation_lock`), strict simulator-running checks (`_is_sim_running_guard`) on all NTFS junction/folder operations, and frontend button debouncing.\n"
+        "- **Atomic Settings & Hardware Cache Writes:** Prevented concurrent `settings.json` overwrites when saving `hardware_profile_cache.json` and eliminated false-positive RAM change loops on boot."
+    )
+
+    _PATCH_1_2_0_CHANGELOG_BODY_FR = (
+        "**Date de publication :** 30 Octobre 2026\n"
+        "**Canal :** `Updates/patches`\n\n"
+        "## NOUVELLES FONCTIONNALITÉS\n\n"
+        "### 1. Globe Terrestre 3D Interactif & Moteur Cartographique\n"
+        "- **Planisphère 2D & Globe Terrestre 3D (`2D Map` / `3D Globe`) :** Basculez instantanément entre le planisphère 2D Mercator et le nouveau Globe Terrestre 3D avec projection sphérique complète, zoom progressif à la molette, trajectoires orthodromiques 3D et regroupement dynamique des aéroports.\n"
+        "- **8 Styles Cartographiques Unifiés & Cartes Aéronautiques VFR / IFR :** Choisissez parmi 4 thèmes cockpit sombres (`Avionics Blue`, `Deep Navy`, `Carbon Dark`, `Radar Emerald`), les cartes aéronautiques officielles OpenAIP **VFR Chart** et **IFR Enroute** (espaces aériens contrôlés, balises VOR/NDB, fréquences), l'imagerie **Satellite** et **Street Map** en 2D comme en 3D.\n"
+        "- **Terminateur Solaire Jour / Nuit & Timeline UTC / Heure Locale :** Visualisez en temps réel le jour, le crépuscule et la nuit sur la carte 2D et le globe 3D. Parcourez le cycle de 24h via le curseur ou les boutons `-1H` / `+1H`, basculez entre **UTC (Zulu)** et **Heure Locale (`UTC\u00b1`)**, ou synchronisez sur l'horloge **LIVE**.\n\n"
+        "### 2. Optimiseur Unifié Scènes & Route + Éditeur de Règles (`Edit Loadout Rules`)\n"
+        "- **Profils de Scènes de Base Réutilisables (`Edit Loadout Rules`) :** Créez, sauvegardez et activez vos propres profils d'environnement de base (ex. *Europe Airliners*, *North America*) en filtrant par catégorie (`Payware`, `Freeware`, `Asobo`), par région du monde ou par pays.\n"
+        "- **Épinglage d'Aéroports sur la Carte (`Pin Airports on Map`) :** Épinglez vos hubs favoris d'un clic sur la carte 2D ou le globe 3D afin qu'ils restent toujours actifs quelles que soient les règles régionales.\n"
+        "- **Superposition de Route & Dégagements SimBrief :** Combinez votre profil de base avec un trajet **Direct A-to-B**, un **Corridor En-Route** ou une importation **SimBrief OFP** (incluant automatiquement le départ, l'arrivée, le corridor et les aéroports de dégagement SimBrief).\n\n"
+        "### 3. Télémétrie Live (`DEP / ARR / ACTUAL POSITION`) & Profils Matériels Adaptatifs\n"
+        "- **Nouvel Affichage de Télémétrie de Vol :** Affiche clairement le départ (**DEP**) et l'arrivée (**ARR**) issus de l'OFP SimBrief (ou le point de départ détecté en direct en vol libre) ainsi que la position actuelle de l'avion (**ACTUAL POSITION**).\n"
+        "- **Synchronisation Matérielle Continue :** Adapte dynamiquement les profils de performances (`LOW`, `OPTIMUM`, `ULTRA`) et les cibles Smart LOD selon le CPU, la VRAM GPU, la RAM et la fréquence d'écran détectés, avec mise à jour automatique en cas d'évolution matérielle.\n"
+        "- **Onboarding Interactif Enrichi :** Ajout des badges `NEW` et d'une nouvelle étape dédiée à l'éditeur **Edit Loadout Rules & Profils Personnalisés**.\n\n"
+        "## BUGS CORRIGÉS & STABILITÉ\n\n"
+        "### 1. Corrections Globe 3D, Interface & Réglages Graphiques\n"
+        "- **Centrage Optique du Globe 3D à l'Ouverture :** Correction du décalage horizontal du globe 3D au lancement lorsque le panneau latéral Classique est affiché, et ajout d'un `ResizeObserver` automatique.\n"
+        "- **Mise à Jour du Badge `2D` / `VR` & Alignement des Presets Rapides :** Correction de l'indicateur `2D` / `VR` dans le menu latéral et la bannière lors du changement d'onglet (`2D DISPLAY` / `VR HEADSET`), et alignement des 4 clés des boutons rapides 2D et VR (`TerrainLoDFactor`, `ObjectsLoDFactor`, `OffscreenTerrainPreCaching`, `TextureResolution`).\n"
+        "- **Nettoyage du Mode Pin & des Écouteurs de Clic Carte :** Correction de l'interception des clics carte lors de l'ouverture d'un autre tiroir par-dessus le Loadout Builder et restauration propre de l'aperçu carte à la fermeture de la fenêtres.\n\n"
+        "### 2. Verrous NTFS, Protection Simulateur & Persistance des Données\n"
+        "- **Restauration des BGL Multi-Aéroports :** Correction des fichiers `.bgl.sceneryx_off` orphelins lors du passage direct d'un profil Loadout à un autre et préservation des exclusions manuelles lors d'une restauration partielle.\n"
+        "- **Verrous de Concurrence & Protection MSFS Actif :** Ajout d'un verrou mutex backend (`_scenery_mutation_lock`), vérification stricte de l'état de MSFS (`_is_sim_running_guard`) sur toutes les opérations NTFS et protection anti-double clic côté interface.\n"
+        "- **Sauvegarde Atomique du Cache Matériel :** Remplacement des écritures brutes de `settings.json` par des lectures/écritures sécurisées et suppression de la boucle de redétection RAM au démarrage."
+    )
+
     DEFAULT_PATCH_CHANGELOGS = {
         "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
         "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
@@ -5122,6 +6556,7 @@ class Api:
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY,
         "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY,
         "PRO_1.1.8": "# SceneryX — Patch PRO_1.1.8\n\n" + _PATCH_1_1_8_CHANGELOG_BODY,
+        "PRO_1.2.0": "# SceneryX — Release PRO_1.2.0\n\n" + _PATCH_1_2_0_CHANGELOG_BODY,
         "LITE_1.1.5": "# SceneryX — Patch LITE_1.1.5\n\n" + _PATCH_1_1_8_CHANGELOG_BODY,
     }
 
@@ -5134,6 +6569,7 @@ class Api:
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY_FR,
         "PRO_1.1.8": "# SceneryX — Patch PRO_1.1.8\n\n" + _PATCH_1_1_8_CHANGELOG_BODY_FR,
+        "PRO_1.2.0": "# SceneryX — Version PRO_1.2.0\n\n" + _PATCH_1_2_0_CHANGELOG_BODY_FR,
         "LITE_1.1.5": "# SceneryX — Patch LITE_1.1.5\n\n" + _PATCH_1_1_8_CHANGELOG_BODY_FR,
     }
 
@@ -5482,7 +6918,7 @@ class Api:
             else:
                 p = filename_or_path
             if os.path.exists(p):
-                webbrowser.open(f"file:///{os.path.abspath(p)}")
+                flight_perf_tracker.repair_existing_html_report(p); webbrowser.open(f"file:///{os.path.abspath(p)}")
                 return json.dumps({"status": "ok"})
             return json.dumps({"status": "error", "message": "File not found"})
         except Exception as e:
@@ -6141,6 +7577,7 @@ def main():
             appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'SceneryX')
             has_existing = os.path.exists(os.path.join(appdata_dir, 'settings.json'))
             flight_rig_optimizer.generate_default_rig_profiles(preserve_active=has_existing, missing_only=has_existing)
+            flight_rig_optimizer.sync_hardware_profile_on_boot()
             print("[SceneryX CLI] Standard profiles successfully generated.", flush=True)
         except Exception as e:
             print(f"[SceneryX CLI] Profile generation error: {e}", flush=True)
@@ -6201,11 +7638,12 @@ def main():
     except Exception as e:
         print(f"[Sanitize] Startup check warning: {e}")
 
-    # Strictly synchronize saved active graphics profile to UserCfg.opt on startup
+    # Continuous hardware refresh & active graphics profile synchronization on every boot
     try:
+        flight_rig_optimizer.sync_hardware_profile_on_boot()
         flight_rig_optimizer.ensure_active_profile_applied()
     except Exception as e:
-        print(f"[Optimizer] Startup active profile sync warning: {e}")
+        print(f"[Optimizer] Startup hardware/profile sync warning: {e}")
 
     # Automatically recover orphan benchmarks from abrupt exits or MSFS CTD
     try:

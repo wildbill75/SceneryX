@@ -22,6 +22,7 @@ const MAIN_SCENERY_EXCEPTIONS = new Set([
 
 function isFixOrOverlay(s) {
     if (!s) return false;
+    if (s._isFixOrOverlay !== undefined) return s._isFixOrOverlay;
     const fn = (s.folder_name || '').toLowerCase();
     if (MAIN_SCENERY_EXCEPTIONS.has(fn)) return false;
     // Official Microsoft / Asobo handcrafted base sceneries are full base airports, never fixes or overlays
@@ -40,9 +41,11 @@ function isFixOrOverlay(s) {
         'lights', 'lighting', 'trees', 'vegetation', 'texture', 'extension',
         'zparking', 'exclusion', 'jetway', 'marking'
     ];
-    return fixKeywords.some(k => {
+    const res = fixKeywords.some(k => {
         return fn.includes(`-${k}`) || fn.includes(`_${k}`) || fn.includes(`${k}-`) || fn.includes(`${k}_`);
     });
+    s._isFixOrOverlay = res;
+    return res;
 }
 let map;
 let markerClusterGroup;
@@ -90,15 +93,8 @@ function showUnlockProModal() {
                 </div>
                 <div class="p-4 space-y-3.5 text-left">
                     <p class="text-xs text-[#94A3B8] leading-relaxed">
-                        This feature requires <strong class="text-[#F1F5F9]">SceneryX Pro</strong> (Flight Optimizer, Smart LOD, SimBrief &amp; In-Game Toolbar Panel).
+                        This feature requires <strong class="text-[#F1F5F9]">SceneryX Pro</strong> (3D Globe, VFR/IFR Charts, Day/Night Solar View, Flight Optimizer, Smart LOD, SimBrief &amp; In-Game Panel).
                     </p>
-                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
-                        <div class="space-y-0.5">
-                            <span class="text-xs font-bold text-[#F1F5F9] block">Launch Offer — 4.90€ <span class="text-[#64748B] line-through font-normal ml-1">9.90€</span></span>
-                            <span class="text-[10px] text-[#64748B] block">Promo code at checkout</span>
-                        </div>
-                        <span class="px-2.5 py-1 rounded bg-[#181E2B] border border-[#2D3A54] text-xs font-mono font-bold text-[#00A8FF] tracking-wider select-all shrink-0">FSTO-LAUNCH</span>
-                    </div>
                 </div>
                 <div class="px-4 py-3 bg-[#0E121A] border-t border-[#253046] flex items-center justify-end gap-2">
                     <button type="button" onclick="closeUnlockProModal()" class="px-3.5 py-1.5 rounded-md bg-[#181E2B] hover:bg-[#253046] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046] font-sans font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer">
@@ -220,7 +216,7 @@ function applyLiteEditionLocks() {
 
     // 5. Pro Floating Windows Headers (shown during Onboarding Tour preview in Lite)
     const proWinIds = [
-        'float-win-route-opt',
+        'float-win-unified-optimizer',
         'float-win-smart-lod',
         'float-win-graphics',
         'float-win-my-rig',
@@ -246,6 +242,103 @@ function applyLiteEditionLocks() {
             existingBadge.remove();
         }
     });
+
+    // 6. Top-Right 3D Globe, Map Style Themes (VFR/IFR/Satellite), and Day/Night Solar Controls
+    const topLockIds = ['lite-lock-globe', 'lite-lock-map-theme', 'lite-lock-day-night'];
+    topLockIds.forEach(lockId => {
+        const lockEl = document.getElementById(lockId);
+        if (!lockEl) return;
+        if (isLite) {
+            lockEl.innerHTML = LITE_PRO_LOCK_SVG;
+            lockEl.classList.remove('hidden');
+        } else {
+            lockEl.innerHTML = '';
+            lockEl.classList.add('hidden');
+        }
+    });
+
+    const themeWrap = document.getElementById('map-theme-select-wrap');
+    const themeSelect = document.getElementById('map-theme-select');
+    if (themeWrap && themeSelect && isLite) {
+        if (!themeWrap.dataset.liteLockedBound) {
+            themeWrap.dataset.liteLockedBound = 'true';
+            const interceptTheme = (e) => {
+                if (window.IS_LITE && !isTourDemoAllowingProPreview()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    themeSelect.value = 'avionics_blue';
+                    themeSelect.blur();
+                    showUnlockProModal();
+                    return false;
+                }
+            };
+            themeWrap.addEventListener('mousedown', interceptTheme, true);
+            themeWrap.addEventListener('click', interceptTheme, true);
+            themeSelect.addEventListener('focus', (e) => {
+                if (window.IS_LITE && !isTourDemoAllowingProPreview()) {
+                    e.target.blur();
+                    showUnlockProModal();
+                }
+            });
+        }
+    }
+
+    // 7. Settings: Map Display Mode (2D vs 3D Globe) & Local Time / Day-Night
+    const mapProjBadge = document.getElementById('cfg-map-projection-pro-badge');
+    const mapProjSelect = document.getElementById('cfg-map-projection');
+    if (mapProjBadge) {
+        if (isLite) {
+            mapProjBadge.innerHTML = LITE_PRO_BADGE_INNER;
+            mapProjBadge.className = LITE_PRO_BADGE_CLASS;
+        } else {
+            mapProjBadge.className = 'hidden';
+        }
+    }
+    if (mapProjSelect && isLite && !mapProjSelect.dataset.liteLockedBound) {
+        mapProjSelect.dataset.liteLockedBound = 'true';
+        mapProjSelect.value = '2d';
+        const interceptProj = (e) => {
+            if (window.IS_LITE && !isTourDemoAllowingProPreview()) {
+                e.preventDefault();
+                e.stopPropagation();
+                mapProjSelect.value = '2d';
+                mapProjSelect.blur();
+                showUnlockProModal();
+                return false;
+            }
+        };
+        mapProjSelect.addEventListener('mousedown', interceptProj, true);
+        mapProjSelect.addEventListener('click', interceptProj, true);
+    }
+
+    const localTimeBadge = document.getElementById('cfg-local-time-pro-badge');
+    const localTzSelect = document.getElementById('cfg-local-tz-offset');
+    if (localTimeBadge) {
+        if (isLite) {
+            localTimeBadge.innerHTML = LITE_PRO_BADGE_INNER;
+            localTimeBadge.className = LITE_PRO_BADGE_CLASS;
+        } else {
+            localTimeBadge.className = 'hidden';
+        }
+    }
+    if (localTzSelect && isLite && !localTzSelect.dataset.liteLockedBound) {
+        localTzSelect.dataset.liteLockedBound = 'true';
+        const interceptTz = (e) => {
+            if (window.IS_LITE && !isTourDemoAllowingProPreview()) {
+                e.preventDefault();
+                e.stopPropagation();
+                localTzSelect.blur();
+                showUnlockProModal();
+                return false;
+            }
+        };
+        localTzSelect.addEventListener('mousedown', interceptTz, true);
+        localTzSelect.addEventListener('click', interceptTz, true);
+    }
+}
+
+function isTourDemoAllowingProPreview() {
+    return !!(window._tourBypassLiteLock || (window.onboardingTour && window.onboardingTour.isOpen));
 }
 window.applyLiteEditionLocks = applyLiteEditionLocks;
 document.addEventListener('DOMContentLoaded', () => {
@@ -264,16 +357,29 @@ let airportsByIcao = new Map();
 let isAirportsIndexDirty = true;
 let lastIndexedAirportsRef = null;
 
+const cleanCityNameCache = new Map();
+const cleanAirportNameCache = new Map();
+const clusterDivIconCache = new Map();
+
 function rebuildAirportsByIcaoIndex() {
     airportsByIcao.clear();
     for (let i = 0; i < allAirportsData.length; i++) {
         const ap = allAirportsData[i];
         if (ap && ap.icao) {
+            ap._cachedActiveSrc = undefined;
+            ap._cachedPricingType = undefined;
+            ap._cachedCategory = undefined;
+            ap._cachedLabelTier = undefined;
+            ap._cachedIsDisabled = undefined;
+            ap._cachedHasActiveFix = undefined;
             airportsByIcao.set(String(ap.icao).toUpperCase().trim(), ap);
         }
     }
     isAirportsIndexDirty = false;
     lastIndexedAirportsRef = allAirportsData;
+    if (window.globeEngine) {
+        window.globeEngine._cachedWorldClusterKey = '';
+    }
 }
 
 const HISTORIC_AIRPORTS = {
@@ -392,6 +498,8 @@ function getAirportByIcao(icao) {
 
 function getCleanCityName(rawCity) {
     if (!rawCity) return '';
+    const cached = cleanCityNameCache.get(rawCity);
+    if (cached !== undefined) return cached;
     let city = String(rawCity).trim();
     // 1. Remove text within parentheses: e.g. "Hartford (Fort Rucker)" -> "Hartford", "Saint-Étienne (Loire)" -> "Saint-Étienne"
     city = city.replace(/\s*\([^)]*\)/g, '').trim();
@@ -404,11 +512,17 @@ function getCleanCityName(rawCity) {
     }
     // 3. Remove trailing punctuation like commas, dashes, slashes
     city = city.replace(/[\/,\-]+$/, '').trim();
-    return city || String(rawCity).trim();
+    const out = city || String(rawCity).trim();
+    if (cleanCityNameCache.size > 25000) cleanCityNameCache.clear();
+    cleanCityNameCache.set(rawCity, out);
+    return out;
 }
 
 function getCleanAirportName(rawName, rawCity = '') {
     if (!rawName) return '';
+    const cacheKey = `${rawName}|${rawCity || ''}`;
+    const cached = cleanAirportNameCache.get(cacheKey);
+    if (cached !== undefined) return cached;
     let name = String(rawName).trim();
     
     // 0. Remove duplicate/closed prefixes e.g. '[Duplicate] Wolf\'s Fang Runway' -> 'Wolf\'s Fang Runway'
@@ -453,7 +567,10 @@ function getCleanAirportName(rawName, rawCity = '') {
         }
     }
 
-    return name || String(rawName).trim();
+    const out = name || String(rawName).trim();
+    if (cleanAirportNameCache.size > 25000) cleanAirportNameCache.clear();
+    cleanAirportNameCache.set(cacheKey, out);
+    return out;
 }
 
 // Currency & Investment Engine
@@ -584,7 +701,18 @@ const ISO_TO_COUNTRY_NAME = {
     'TV': 'Tuvalu', 'UG': 'Uganda', 'UA': 'Ukraine', 'AE': 'United Arab Emirates',
     'GB': 'United Kingdom', 'US': 'United States', 'UY': 'Uruguay', 'UZ': 'Uzbekistan',
     'VU': 'Vanuatu', 'VA': 'Vatican City', 'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen',
-    'ZM': 'Zambia', 'ZW': 'Zimbabwe'
+    'ZM': 'Zambia', 'ZW': 'Zimbabwe',
+    'PM': 'Saint Pierre & Miquelon', 'GI': 'Gibraltar', 'AX': 'Aland Islands', 'SJ': 'Svalbard',
+    'CW': 'Curacao', 'AW': 'Aruba', 'GP': 'Guadeloupe', 'MQ': 'Martinique', 'KY': 'Cayman Islands',
+    'VG': 'British Virgin Islands', 'VI': 'U.S. Virgin Islands', 'AG': 'Antigua & Barbuda',
+    'TC': 'Turks & Caicos', 'SX': 'Sint Maarten', 'BL': 'Saint Barthelemy', 'BQ': 'Bonaire',
+    'MF': 'Saint Martin', 'AI': 'Anguilla', 'MS': 'Montserrat', 'EH': 'Western Sahara',
+    'RE': 'Reunion', 'YT': 'Mayotte', 'SH': 'Saint Helena', 'NF': 'Norfolk Island',
+    'CC': 'Cocos Islands', 'CX': 'Christmas Island', 'NC': 'New Caledonia', 'GU': 'Guam',
+    'MP': 'Northern Mariana Islands', 'CK': 'Cook Islands', 'NU': 'Niue', 'WF': 'Wallis & Futuna',
+    'AS': 'American Samoa', 'UM': 'U.S. Outlying Islands', 'TK': 'Tokelau',
+    'XK': 'Kosovo', 'JE': 'Jersey', 'GG': 'Guernsey', 'IM': 'Isle of Man',
+    'BM': 'Bermuda', 'FK': 'Falkland Islands', 'TF': 'French Southern Territories', 'IO': 'Diego Garcia'
 };
 
 const REGION_VIEWPORTS = {
@@ -602,17 +730,17 @@ const REGION_VIEWPORTS = {
 };
 
 const REGION_COUNTRY_MAP = {
-    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'AX', 'SJ'],
-    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ', 'RU'],
-    'namerica': ['US', 'CA', 'GL', 'PM'],
-    'camerica_caribbean': ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'BL', 'BQ', 'MF', 'AI', 'MS'],
-    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'],
-    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'TL', 'BN'],
-    'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE'],
+    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MT', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'GL', 'PM', 'JE', 'GG', 'IM'],
+    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'XK', 'MD', 'BY', 'GE', 'AM', 'AZ', 'RU'],
+    'namerica': ['US', 'CA'],
+    'camerica_caribbean': ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'DM', 'GD', 'TC', 'SX', 'BL', 'BQ', 'MF', 'AI', 'MS', 'BM'],
+    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'FK', 'AQ'],
+    'asia': ['JP', 'CN', 'IN', 'KR', 'KP', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'IO', 'TL', 'BN'],
+    'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'SY', 'IQ', 'IR', 'IL', 'PS', 'YE'],
     'nafrica': ['EG', 'MA', 'DZ', 'TN', 'LY', 'SD', 'MR', 'EH'],
-    'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
+    'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'MU', 'RE', 'YT', 'TF', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
     'oceania': ['AU', 'NZ', 'PG', 'NF', 'CC', 'CX'],
-    'pacific': ['PF', 'NC', 'FJ', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'TK']
+    'pacific': ['PF', 'NC', 'FJ', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM']
 };
 
 function getCountryFlagEmoji(iso) {
@@ -961,6 +1089,9 @@ function drawFlightOptimizerRoute() {
 }
 
 async function executeFlightOptimizer() {
+    if (typeof applyUnifiedOptimization === 'function' && optimizerOrigin && optimizerDest) {
+        return await applyUnifiedOptimization();
+    }
     const keepIcaos = [];
     if (flightOriginAirport) keepIcaos.push(flightOriginAirport.icao);
     if (flightDestAirport) keepIcaos.push(flightDestAirport.icao);
@@ -982,7 +1113,14 @@ async function executeFlightOptimizer() {
 
     try {
         if (window.pywebview) {
-            const resRaw = await window.pywebview.api.optimize_flight_mode(JSON.stringify(keepIcaos));
+            const legacyPayload = {
+                keep_icaos: keepIcaos,
+                dep_icao: flightOriginAirport ? flightOriginAirport.icao : '',
+                arr_icao: flightDestAirport ? flightDestAirport.icao : '',
+                profile: 'DIRECT',
+                base_loadout_id: (typeof selectedBaseLoadoutId !== 'undefined' && selectedBaseLoadoutId) ? selectedBaseLoadoutId : 'ALL'
+            };
+            const resRaw = await window.pywebview.api.optimize_flight_mode(JSON.stringify(legacyPayload));
             const res = JSON.parse(resRaw);
             if (res.status === 'ok') {
                 isFlightOptimizerActive = true;
@@ -1177,12 +1315,14 @@ function initMap() {
         center: [20.0, 0.0], // Global world view (Screenshot 3)
         zoom: 2.5,
         minZoom: 2,
+        zoomSnap: 0.25,           // Fine 0.25 fractional zoom increments in 2D Map
+        zoomDelta: 0.25,          // Fine 0.25 step on +/- zoom buttons
         zoomControl: false,
         worldCopyJump: true,
         preferCanvas: true,
         doubleClickZoom: false,
-        wheelPxPerZoomLevel: 120, // Smooth mouse wheel zooming
-        wheelDebounceTime: 60,    // Debounce rapid wheel events to prevent animation queue lag
+        wheelPxPerZoomLevel: 160, // Fine, progressive mouse wheel zooming
+        wheelDebounceTime: 45,    // Snappy fractional wheel response
         zoomAnimation: true,
         fadeAnimation: true,
         markerZoomAnimation: true,
@@ -1193,13 +1333,14 @@ function initMap() {
     window.leafletMap = map;
     window.map = map;
 
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    window.mainBaseTileLayer = L.tileLayer('https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        subdomains: ['server', 'services'],
         attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
         maxZoom: 16,
         updateWhenIdle: false,    // Stream visible tiles progressively during pan gestures
         updateWhenZooming: false, // Avoid fetching intermediate zoom levels during wheel/flyTo animations
-        updateInterval: 100,      // Throttle pan tile requests to 100ms for 60fps smoothness
-        keepBuffer: 3,            // Keep 3 tiles outside viewport (avoids 500-tile HTTP queue bottleneck)
+        updateInterval: 65,       // Snappy pan tile requests
+        keepBuffer: 2,            // Optimal 2-tile buffer to keep GPU filter surface compact
         crossOrigin: true
     }).addTo(map);
 
@@ -1212,8 +1353,9 @@ function initMap() {
 
     markerClusterGroup = L.markerClusterGroup({
         chunkedLoading: true,
-        chunkInterval: 120,
-        chunkDelay: 15,
+        chunkInterval: 90,
+        chunkDelay: 12,
+        removeOutsideVisibleBounds: true,
         maxClusterRadius: function (zoom) {
             if (zoom <= 3) return 50;
             if (zoom <= 5) return 40;
@@ -1224,7 +1366,57 @@ function initMap() {
         showCoverageOnHover: false,
         zoomToBoundsOnClick: true,
         animate: true,
-        animateAddingMarkers: false
+        animateAddingMarkers: false,
+        iconCreateFunction: function (cluster) {
+            const count = cluster.getChildCount();
+            const children = cluster.getAllChildMarkers ? cluster.getAllChildMarkers() : [];
+            const isPinVis = (typeof isLoadoutPinVisualMode === 'function' && isLoadoutPinVisualMode());
+            let hasPayware = false, hasAsobo = false, hasFreeware = false;
+            let hasAnyPinnedChild = false;
+
+            for (let i = 0; i < children.length; i++) {
+                const ap = children[i]._airportData;
+                if (!ap) continue;
+                if (isPinVis) {
+                    const isPinned = (typeof isAirportPinnedInCurrentEditLoadout === 'function' && isAirportPinnedInCurrentEditLoadout(ap));
+                    if (!isPinned) continue;
+                    hasAnyPinnedChild = true;
+                    const addonCat = String((typeof getAirportInstalledAddonCategory === 'function') ? getAirportInstalledAddonCategory(ap) : getAirportCategory(ap)).toUpperCase();
+                    if (addonCat === 'PAYWARE') { hasPayware = true; break; }
+                    else if (addonCat === 'ASOBO') hasAsobo = true;
+                    else if (addonCat === 'FREEWARE') hasFreeware = true;
+                } else {
+                    const cat = ap._cachedCategory || getAirportCategory(ap);
+                    if (cat === 'PAYWARE') { hasPayware = true; break; }
+                    else if (cat === 'ASOBO') hasAsobo = true;
+                    else if (cat === 'FREEWARE') hasFreeware = true;
+                }
+            }
+            let tierKey = 'D';
+            let ringColor = '#60a5fa';
+            let haloRgba = 'rgba(96, 165, 250, 0.28)';
+            if (isPinVis && !hasAnyPinnedChild) {
+                tierKey = 'PIN_GREY';
+                ringColor = '#64748B';
+                haloRgba = 'rgba(100, 116, 139, 0.28)';
+            } else if (hasPayware) { tierKey = 'P'; ringColor = '#c084fc'; haloRgba = 'rgba(192, 132, 252, 0.28)'; }
+            else if (hasAsobo) { tierKey = 'A'; ringColor = '#fbbf24'; haloRgba = 'rgba(251, 191, 36, 0.28)'; }
+            else if (hasFreeware) { tierKey = 'F'; ringColor = '#22d3ee'; haloRgba = 'rgba(34, 211, 238, 0.28)'; }
+
+            const cacheKey = `${count}_${tierKey}`;
+            let cachedIcon = clusterDivIconCache.get(cacheKey);
+            if (cachedIcon) return cachedIcon;
+
+            const size = count >= 50 ? 36 : (count >= 10 ? 30 : 26);
+            const outerSize = size + 6;
+            cachedIcon = L.divIcon({
+                html: `<div style="width:${outerSize}px;height:${outerSize}px;border-radius:9999px;background:${haloRgba};display:flex;align-items:center;justify-content:center;"><div style="width:${size}px;height:${size}px;border-radius:9999px;background:#0F172A;border:2px solid ${ringColor};display:flex;align-items:center;justify-content:center;color:#F8FAFC;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;line-height:1;">${count}</div></div>`,
+                className: 'sceneryx-cluster-icon',
+                iconSize: L.point(outerSize, outerSize)
+            });
+            clusterDivIconCache.set(cacheKey, cachedIcon);
+            return cachedIcon;
+        }
     });
 
     map.addLayer(markerClusterGroup);
@@ -1384,14 +1576,26 @@ function initMap() {
     });
 
     loadCountryOverlays();
+    initGlobe3DEngine();
 }
 
 let countryGeoJsonLayer = null;
+let countryHoverHighlightLayer = null;
+let hoveredCountry2DIso = null;
 let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
 let countryClickTimeout = null;
 const MAX_COUNTRY_INTERACTION_ZOOM = 6.5;
 let lastCountriesInactiveState = null;
+
+function clearCountryHover2D() {
+    if (hoveredCountry2DIso !== null) {
+        hoveredCountry2DIso = null;
+        if (countryHoverHighlightLayer) {
+            countryHoverHighlightLayer.clearLayers();
+        }
+    }
+}
 
 function updateCountryInteractivityState() {
     const mapEl = document.getElementById('map');
@@ -1402,15 +1606,7 @@ function updateCountryInteractivityState() {
 
     if (isZoomedIn) {
         mapEl.classList.add('countries-inactive');
-        if (countryGeoJsonLayer) {
-            countryGeoJsonLayer.eachLayer(layer => {
-                const iso = getFeatureIso(layer.feature);
-                const isSelected = (selectedCountryCode && iso && selectedCountryCode === iso);
-                if (!isSelected) {
-                    countryGeoJsonLayer.resetStyle(layer);
-                }
-            });
-        }
+        clearCountryHover2D();
     } else {
         mapEl.classList.remove('countries-inactive');
     }
@@ -1438,32 +1634,84 @@ function setDrawerSlidePosition(mode) {
     }
 }
 
-function resetCameraToStartupRegion() {
-    if (!map) return;
-    map.stop();
-    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+function isCameraAutoZoomEnabled() {
+    if (!currentSettings) return true;
+    if (currentSettings.camera_zoom_enabled === false) return false;
+    const z = parseFloat(currentSettings.camera_airport_zoom);
+    if (!isNaN(z) && z <= 3.5) return false;
+    return true;
+}
+
+function isCameraAutoPanEnabled() {
+    if (!currentSettings) return true;
+    if (currentSettings.camera_pan_enabled === false) return false;
+    const d = parseFloat(currentSettings.camera_pan_duration);
+    if (!isNaN(d) && d <= 0.05) return false;
+    return true;
+}
+
+function getCameraPanDuration(defaultVal = 1.1) {
+    if (!isCameraAutoPanEnabled()) return 0;
+    const d = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
-        : 1.1;
-    const regKey = currentSettings && currentSettings.camera_startup_region;
-    if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
-        const vp = REGION_VIEWPORTS[regKey];
-        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
+        : defaultVal;
+    return (!isNaN(d) && d > 0.05) ? d : defaultVal;
+}
+
+function fitMapBoundsRespectingCameraSettings(bounds, options = {}) {
+    if (!map || !bounds) return;
+    const panEnabled = isCameraAutoPanEnabled();
+    const zoomEnabled = isCameraAutoZoomEnabled();
+    if (!panEnabled) {
         return;
     }
-    // Default global World view
-    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: PAN_DURATION });
+    if (!zoomEnabled) {
+        try {
+            const latLngBounds = (typeof bounds.getCenter === 'function') ? bounds : L.latLngBounds(bounds);
+            map.panTo(latLngBounds.getCenter(), { animate: true, duration: getCameraPanDuration(options.duration || 0.5) });
+        } catch (e) {}
+        return;
+    }
+    map.fitBounds(bounds, options);
+}
+
+function resetCameraToStartupRegion() {
+    if (!map) return;
+    const panEnabled = isCameraAutoPanEnabled();
+    const zoomEnabled = isCameraAutoZoomEnabled();
+    if (!panEnabled && !zoomEnabled) return;
+    map.stop();
+    const PAN_DURATION = getCameraPanDuration(1.1);
+    const regKey = currentSettings && currentSettings.camera_startup_region;
+    const targetVp = (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey])
+        ? REGION_VIEWPORTS[regKey]
+        : { center: [25.0, 10.0], zoom: 3.0 };
+    if (panEnabled && zoomEnabled) {
+        map.flyTo(targetVp.center, targetVp.zoom, { animate: true, duration: PAN_DURATION });
+    } else if (panEnabled && !zoomEnabled) {
+        map.panTo(targetVp.center, { animate: true, duration: PAN_DURATION });
+    } else if (!panEnabled && zoomEnabled) {
+        map.setZoom(targetVp.zoom);
+    }
 }
 
 function resetCameraToDefaultView() {
     if (!map) return;
+    const panEnabled = isCameraAutoPanEnabled();
+    const zoomEnabled = isCameraAutoZoomEnabled();
+    if (!panEnabled && !zoomEnabled) return;
     map.stop();
-    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
-        ? parseFloat(currentSettings.camera_pan_duration)
-        : 1.1;
+    const PAN_DURATION = getCameraPanDuration(1.1);
     // Priority 1: Active filter region in sidebar (user's immediate working focus)
     if (selectedRegion && REGION_VIEWPORTS[selectedRegion]) {
         const vp = REGION_VIEWPORTS[selectedRegion];
-        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
+        if (panEnabled && zoomEnabled) {
+            map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
+        } else if (panEnabled && !zoomEnabled) {
+            map.panTo(vp.center, { animate: true, duration: PAN_DURATION });
+        } else if (!panEnabled && zoomEnabled) {
+            map.setZoom(vp.zoom);
+        }
         return;
     }
     // Priority 2 & 3: Startup camera region configured in user Settings or World view
@@ -1498,17 +1746,62 @@ async function loadCountryOverlays() {
         const resp = await fetch('countries.geojson');
         if (!resp.ok) return;
         const geoData = await resp.json();
+        window.sceneryxGeoJsonData = geoData;
+        if (window.globeEngine && typeof window.globeEngine.setCountriesGeoJson === 'function') {
+            window.globeEngine.setCountriesGeoJson(geoData);
+        }
+
+        if (map && !map.getPane('countryBasePane')) {
+            const cbPane = map.createPane('countryBasePane');
+            cbPane.style.zIndex = '320';
+        }
+        if (map && !map.getPane('countryHoverPane')) {
+            const chPane = map.createPane('countryHoverPane');
+            chPane.style.zIndex = '330';
+            chPane.style.pointerEvents = 'none';
+        }
+        const countryBaseRenderer = L.canvas({ padding: 0.25, pane: 'countryBasePane' });
+        const countryHoverRenderer = L.canvas({ padding: 0.1, pane: 'countryHoverPane' });
+
+        if (!countryHoverHighlightLayer && map) {
+            countryHoverHighlightLayer = L.geoJSON(null, {
+                pane: 'countryHoverPane',
+                renderer: countryHoverRenderer,
+                interactive: false,
+                smoothFactor: 1.5,
+                style: {
+                    fillColor: '#06b6d4',
+                    fillOpacity: 0.16,
+                    color: '#06b6d4',
+                    weight: 1.5,
+                    opacity: 0.8
+                }
+            }).addTo(map);
+        }
 
         countryGeoJsonLayer = L.geoJSON(geoData, {
+            pane: 'countryBasePane',
+            renderer: countryBaseRenderer,
+            smoothFactor: 2.2,
             style: feature => {
                 const iso = getFeatureIso(feature);
                 const isSelected = (selectedCountryCode && iso && selectedCountryCode === iso);
+                const th = (typeof getActiveMapStyleTheme === 'function') ? getActiveMapStyleTheme() : null;
+                if (isSelected) {
+                    return {
+                        fillColor: '#a855f7',
+                        fillOpacity: 0.24,
+                        color: '#a855f7',
+                        weight: 2,
+                        opacity: 0.92
+                    };
+                }
                 return {
-                    fillColor: isSelected ? '#a855f7' : '#06b6d4',
-                    fillOpacity: isSelected ? 0.22 : 0.0,
-                    color: isSelected ? '#a855f7' : '#475569',
-                    weight: isSelected ? 2 : 0.5,
-                    opacity: isSelected ? 0.9 : 0.3
+                    fillColor: th ? th.landFill : '#1B2333',
+                    fillOpacity: th ? th.map2dLandFillOpacity : 0.0,
+                    color: th ? th.landStroke : '#2C3A52',
+                    weight: th ? th.map2dBorderWeight : 0.65,
+                    opacity: th ? th.map2dBorderOpacity : 0.45
                 };
             },
             onEachFeature: (feature, layer) => {
@@ -1517,26 +1810,23 @@ async function loadCountryOverlays() {
                 const iso = getFeatureIso(feature);
 
                 layer.on({
-                    mouseover: (e) => {
+                    mouseover: () => {
                         if (isMapDragging) return;
-                        // Only active at country/regional zoom level
                         if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) return;
-                        // Do not show hover highlight on countries if radial menu is open or an airport is active
                         if (currentRadialAirport || selectedAirport) return;
-                        const l = e.target;
                         if (!selectedCountryCode || selectedCountryCode !== iso) {
-                            l.setStyle({
-                                fillColor: '#06b6d4',
-                                fillOpacity: 0.16,
-                                color: '#06b6d4',
-                                weight: 1.5,
-                                opacity: 0.8
-                            });
+                            if (hoveredCountry2DIso !== iso) {
+                                hoveredCountry2DIso = iso;
+                                if (countryHoverHighlightLayer) {
+                                    countryHoverHighlightLayer.clearLayers();
+                                    countryHoverHighlightLayer.addData(feature);
+                                }
+                            }
                         }
                     },
-                    mouseout: (e) => {
-                        if (countryGeoJsonLayer) {
-                            countryGeoJsonLayer.resetStyle(e.target);
+                    mouseout: () => {
+                        if (hoveredCountry2DIso === iso) {
+                            clearCountryHover2D();
                         }
                     },
                     click: (e) => {
@@ -2113,14 +2403,12 @@ function focusAirportInCountryMode(ap) {
     }
 
     // 4. Smoothly pan map to this airport without changing zoom or closing drawer
-    if (map && ap.lat && ap.lon) {
+    if (map && ap.lat && ap.lon && isCameraAutoPanEnabled()) {
         let displayLon = ap.lon;
         if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && displayLon < -100) {
             displayLon = displayLon + 360;
         }
-        const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
-            ? parseFloat(currentSettings.camera_pan_duration)
-            : 1.1;
+        const PAN_DURATION = getCameraPanDuration(1.1);
         map.panTo([ap.lat, displayLon], { animate: true, duration: PAN_DURATION });
     }
 }
@@ -2172,7 +2460,7 @@ function returnToCountryMode() {
             if (mainFrance) targetLayer = mainFrance;
         }
         if (targetLayer && targetLayer.getBounds) {
-            map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.4 });
+            fitMapBoundsRespectingCameraSettings(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.4 });
         }
     }
 
@@ -2335,6 +2623,7 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false, ke
     updateFilterUI();
     renderFilterStarWidget(0);
 
+    clearCountryHover2D();
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
     lastFocusedCountryCode = isoUpper;
@@ -2370,16 +2659,16 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false, ke
 
             if (isoUpper === 'FO') {
                 const foBounds = L.latLngBounds([[61.35, -7.75], [62.45, -6.20]]);
-                map.fitBounds(foBounds, { padding: [40, 40], maxZoom: 9, animate: true, duration: 0.5 });
+                fitMapBoundsRespectingCameraSettings(foBounds, { padding: [40, 40], maxZoom: 9, animate: true, duration: 0.5 });
             } else if (isoUpper === 'RU') {
                 // Optimal framing across the entire Russian Federation on a single continuous map
                 const ruBounds = L.latLngBounds([[41.15, 20.0], [77.5, 188.0]]);
-                map.fitBounds(ruBounds, { padding: [40, 40], maxZoom: 4, animate: true, duration: 0.5 });
+                fitMapBoundsRespectingCameraSettings(ruBounds, { padding: [40, 40], maxZoom: 4, animate: true, duration: 0.5 });
             } else if (targetLayer && targetLayer.getBounds) {
-                map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
+                fitMapBoundsRespectingCameraSettings(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
             }
         } else if (layer && layer.getBounds) {
-            map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
+            fitMapBoundsRespectingCameraSettings(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
         }
     }
 
@@ -2401,6 +2690,12 @@ async function loadInitialAppData() {
                 if (cfgStr) {
                     currentSettings = JSON.parse(cfgStr);
                     loadSimBriefSettingsUI();
+                    if (typeof setMapStyleTheme === 'function') {
+                        setMapStyleTheme(currentSettings.map_theme || 'avionics_blue', false);
+                    }
+                    if (typeof setMapProjectionMode === 'function' && currentSettings.map_projection) {
+                        setMapProjectionMode(currentSettings.map_projection, false);
+                    }
                 }
             } catch(e) {
                 console.warn("Settings loading warning:", e);
@@ -2422,7 +2717,7 @@ async function loadInitialAppData() {
                     await window.pywebview.api.ensure_active_profile_applied();
                 }
                 if (typeof fetchAndRenderCustomProfiles === 'function') {
-                    await fetchAndRenderCustomProfiles(false);
+                    await fetchAndRenderCustomProfiles(true);
                 }
             } catch (e) {
                 console.warn("Active profile startup loading warning:", e);
@@ -2476,6 +2771,10 @@ function hideSplashScreen() {
                 console.warn("finish_splash_and_show_main warning:", e);
             }
         }
+        if (window.globeEngine && typeof window.globeEngine.resize === 'function') {
+            setTimeout(() => window.globeEngine.resize(), 60);
+            setTimeout(() => window.globeEngine.resize(), 220);
+        }
         setTimeout(resolve, 200);
     });
 }
@@ -2508,6 +2807,12 @@ async function loadAirportsData() {
                     }
                     if (typeof applyNavigationStyle === 'function') {
                         applyNavigationStyle(currentSettings.navigation_style || 'classic');
+                    }
+                    if (typeof applyHeaderStatsVisibility === 'function') {
+                        applyHeaderStatsVisibility(currentSettings.show_header_fun_stats !== false);
+                    }
+                    if (typeof setMapProjectionMode === 'function') {
+                        setMapProjectionMode(currentSettings.map_projection || '2d', false);
                     }
                 }
             } catch(e) {
@@ -3129,9 +3434,15 @@ function renderConflictModalStep(index) {
     if (apLocEl) apLocEl.innerText = `${getCleanCityName(ap.city) || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
 
     // Center map smoothly on the airport in background
-    if (map && ap.lat && ap.lon) {
+    if (map && ap.lat && ap.lon && (isCameraAutoPanEnabled() || isCameraAutoZoomEnabled())) {
         try {
-            map.flyTo([ap.lat, ap.lon], Math.max(map.getZoom(), 11), { animate: true, duration: 1.0 });
+            if (isCameraAutoPanEnabled() && isCameraAutoZoomEnabled()) {
+                map.flyTo([ap.lat, ap.lon], Math.max(map.getZoom(), 11), { animate: true, duration: getCameraPanDuration(1.0) });
+            } else if (isCameraAutoPanEnabled()) {
+                map.panTo([ap.lat, ap.lon], { animate: true, duration: getCameraPanDuration(1.0) });
+            } else if (isCameraAutoZoomEnabled()) {
+                map.setZoom(Math.max(map.getZoom(), 11));
+            }
         } catch (e) {}
     }
 
@@ -3265,41 +3576,265 @@ async function applyConflictSelection() {
 }
 
 // -----------------------------------------------------------------------------
-// PILOT INSIGHTS & FUN STATS TICKER ENGINE
+// PILOT INSIGHTS & FUN STATS TICKER ENGINE + DORMANT SCENERIES MODAL
 // -----------------------------------------------------------------------------
 let currentFunStatsList = [];
 let currentFunStatsIndex = 0;
 let funStatsTimer = null;
 let funStatsIsPaused = false;
+let dormantSceneriesCache = [];
+let dormantSceneriesSearchQuery = '';
+
+function applyHeaderStatsVisibility(show) {
+    const isVisible = (show !== false);
+    const banner = document.getElementById('fun-stats-banner');
+    if (banner) {
+        if (isVisible) {
+            banner.classList.remove('hidden');
+            banner.style.display = '';
+        } else {
+            banner.classList.add('hidden');
+            banner.style.display = 'none';
+        }
+    }
+}
+
+function previewHeaderStatsSetting(checked) {
+    applyHeaderStatsVisibility(!!checked);
+}
+window.applyHeaderStatsVisibility = applyHeaderStatsVisibility;
+window.previewHeaderStatsSetting = previewHeaderStatsSetting;
+
+function getDormantAirportsRows(airports) {
+    const sourceAirports = airports || allAirportsData || [];
+    const rows = [];
+    sourceAirports.forEach(ap => {
+        if (!ap || !ap.icao) return;
+        const activeSigs = new Set(
+            (ap.all_sources || [])
+                .filter(s => s && !s.is_disabled && !s.is_default && s.pricing_type !== 'Default')
+                .map(s => `${String(s.folder_name || '').replace(/\.disabled$/i, '').toLowerCase()}|${String(s.vendor || '').toLowerCase()}|${String(s.version || '').toLowerCase()}`)
+        );
+        const disabledSources = (ap.all_sources || []).filter(src => {
+            if (!src || !src.is_disabled) return false;
+            if (src.is_default || src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-'))) return false;
+            if (src.is_asobo_official || src.pricing_type === 'Asobo') return false;
+            if (!src.package_path || !String(src.package_path).trim()) return false;
+            const sig = `${String(src.folder_name || '').replace(/\.disabled$/i, '').toLowerCase()}|${String(src.vendor || '').toLowerCase()}|${String(src.version || '').toLowerCase()}`;
+            if (activeSigs.has(sig)) return false;
+            return true;
+        });
+        if (disabledSources.length === 0) return;
+
+        // Pick primary disabled scenery source (prefer non-fix/overlay if available)
+        const primarySrc = disabledSources.find(s => typeof isFixOrOverlay !== 'function' || !isFixOrOverlay(s)) || disabledSources[0];
+        let totalDisabledBytes = 0;
+        disabledSources.forEach(s => {
+            totalDisabledBytes += _parseSourceBytes(s);
+        });
+
+        const isPayware = !!(primarySrc.is_payware || String(primarySrc.pricing_type || '').toLowerCase() === 'payware' || (!primarySrc.pricing_type && getAirportPricingType(ap) === 'Payware'));
+        const creator = (primarySrc.vendor && primarySrc.vendor !== 'Unknown')
+            ? primarySrc.vendor
+            : ((ap.vendor && ap.vendor !== 'Unknown' && !ap.vendor.includes('Default')) ? ap.vendor : 'Community');
+        const diskPath = primarySrc.package_path || primarySrc.folder_name || ap.package_name || '';
+        const sizeLabel = totalDisabledBytes >= 1024 * 1024 * 1024
+            ? `${(totalDisabledBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+            : (totalDisabledBytes > 0 ? `${Math.max(1, Math.round(totalDisabledBytes / (1024 * 1024)))} MB` : (primarySrc.size_str || ''));
+
+        rows.push({
+            icao: ap.icao,
+            name: getCleanAirportName(ap.name, ap.city) || ap.name || ap.icao,
+            city: ap.city || '',
+            country: (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(ap.country, ap.country) : (ap.country || ''),
+            creator: creator,
+            pricingType: isPayware ? 'Payware' : 'Freeware',
+            diskPath: diskPath,
+            sizeStr: sizeLabel,
+            bytes: totalDisabledBytes,
+            extraCount: disabledSources.length > 1 ? (disabledSources.length - 1) : 0
+        });
+    });
+
+    rows.sort((a, b) => a.icao.localeCompare(b.icao));
+    return rows;
+}
+
+function openDormantSceneriesModal() {
+    dormantSceneriesCache = getDormantAirportsRows(allAirportsData);
+    dormantSceneriesSearchQuery = '';
+    const searchInput = document.getElementById('dormant-sceneries-search');
+    if (searchInput) searchInput.value = '';
+
+    renderDormantSceneriesRows();
+
+    const backdrop = document.getElementById('dormant-sceneries-backdrop');
+    const modal = document.getElementById('dormant-sceneries-modal');
+    if (backdrop) backdrop.classList.remove('hidden');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closeDormantSceneriesModal() {
+    const backdrop = document.getElementById('dormant-sceneries-backdrop');
+    const modal = document.getElementById('dormant-sceneries-modal');
+    if (backdrop) backdrop.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function filterDormantSceneriesList(query) {
+    dormantSceneriesSearchQuery = String(query || '').trim().toLowerCase();
+    renderDormantSceneriesRows();
+}
+
+function renderDormantSceneriesRows() {
+    const listEl = document.getElementById('dormant-sceneries-list');
+    const countBadge = document.getElementById('dormant-sceneries-count-badge');
+    const sizeBadge = document.getElementById('dormant-sceneries-size-badge');
+    if (!listEl) return;
+
+    const filtered = dormantSceneriesCache.filter(item => {
+        if (!dormantSceneriesSearchQuery) return true;
+        const hay = `${item.icao} ${item.name} ${item.city} ${item.country} ${item.creator} ${item.pricingType} ${item.diskPath}`.toLowerCase();
+        return hay.includes(dormantSceneriesSearchQuery);
+    });
+
+    if (countBadge) countBadge.textContent = String(filtered.length);
+    const totalBytes = filtered.reduce((acc, r) => acc + (r.bytes || 0), 0);
+    if (sizeBadge) {
+        sizeBadge.textContent = totalBytes >= 1024 * 1024 * 1024
+            ? `${(totalBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+            : `${Math.round(totalBytes / (1024 * 1024))} MB`;
+    }
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="py-10 text-center text-xs text-slate-400">${escapeHtml(t('dormant.empty', 'No disabled addon sceneries found.'))}</div>`;
+        return;
+    }
+
+    const openFolderTooltip = escapeHtml(t('dormant.open_folder_tooltip', 'Open package folder in Windows Explorer'));
+    listEl.innerHTML = filtered.map(item => {
+        const isPayware = item.pricingType === 'Payware';
+        const isAsobo = item.pricingType === 'Asobo';
+        const typeBadge = isPayware
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-600 text-white border-0">PAYWARE</span>`
+            : (isAsobo
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-600 text-white border-0">ASOBO</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-cyan-600 text-white border-0">FREEWARE</span>`);
+        const icaoColorClass = isPayware
+            ? 'text-purple-400 hover:border-purple-400/60'
+            : (isAsobo
+                ? 'text-amber-400 hover:border-amber-400/60'
+                : 'text-cyan-400 hover:border-cyan-400/60');
+        const locSub = [item.city, item.country].filter(Boolean).join(', ');
+        const safeJsPath = escapeJsStr(item.diskPath);
+        const safeJsIcao = escapeJsStr(item.icao);
+        return `
+            <div class="grid grid-cols-12 gap-3 items-center px-3 py-2.5 rounded-lg hover:bg-[#181E2B]/80 transition-colors">
+                <div class="col-span-3 flex items-center gap-2.5 min-w-0">
+                    <button type="button" onclick="closeDormantSceneriesModal(); flyToAirport('${safeJsIcao}')" class="px-2 py-1 rounded bg-[#0B0E14] hover:bg-slate-800 border border-[#253046] ${icaoColorClass} font-mono font-bold text-xs shrink-0 cursor-pointer transition-colors" title="Fly to ${escapeHtml(item.icao)}">
+                        ${escapeHtml(item.icao)}
+                    </button>
+                    <div class="min-w-0">
+                        <div class="text-xs font-bold text-slate-100 truncate" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                        <div class="text-[11px] text-slate-400 truncate">${escapeHtml(locSub)}</div>
+                    </div>
+                </div>
+                <div class="col-span-2 min-w-0">
+                    <span class="text-xs font-semibold text-slate-200 truncate block" title="${escapeHtml(item.creator)}">${escapeHtml(item.creator)}</span>
+                </div>
+                <div class="col-span-1 flex items-center justify-center">
+                    ${typeBadge}
+                </div>
+                <div class="col-span-5 min-w-0 flex items-center gap-2">
+                    <div class="flex-1 min-w-0 bg-[#0B0E14] border border-[#1E2638] rounded px-2.5 py-1 font-mono text-[11px] text-slate-300 truncate select-all" title="${escapeHtml(item.diskPath)}">
+                        ${escapeHtml(item.diskPath || '—')}
+                    </div>
+                    ${item.sizeStr ? `<span class="text-[10px] font-mono text-slate-400 shrink-0">${escapeHtml(item.sizeStr)}</span>` : ''}
+                </div>
+                <div class="col-span-1 flex items-center justify-end">
+                    <button type="button" onclick="openSpecificPackageFolder('${safeJsPath}')" title="${openFolderTooltip}" class="w-8 h-8 rounded-lg bg-[#181E2B] hover:bg-cyan-500/20 border border-[#253046] hover:border-cyan-500/50 text-slate-300 hover:text-cyan-300 flex items-center justify-center transition-all cursor-pointer shrink-0">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.openDormantSceneriesModal = openDormantSceneriesModal;
+window.closeDormantSceneriesModal = closeDormantSceneriesModal;
+window.filterDormantSceneriesList = filterDormantSceneriesList;
 
 function flyToAirport(icao) {
     if (!icao) return;
-    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+    const cleanIcao = String(icao).toUpperCase().trim();
+    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(cleanIcao) : null;
     if (!ap || ap.lat === undefined || ap.lon === undefined) return;
-    if (typeof map !== 'undefined' && map) {
-        map.flyTo([ap.lat, ap.lon], 9, {
-            animate: true,
-            duration: 1.2
-        });
-        setTimeout(() => {
-            if (typeof showAirportDetails === 'function') {
-                showAirportDetails(ap);
+    if (typeof currentlyFilteredAirports !== 'undefined' && Array.isArray(currentlyFilteredAirports)) {
+        if (!currentlyFilteredAirports.some(a => a && a.icao === ap.icao)) {
+            currentlyFilteredAirports.push(ap);
+            if (typeof renderAirportsOnMap === 'function') {
+                renderAirportsOnMap(currentlyFilteredAirports);
             }
-        }, 600);
+        }
+    }
+    if (typeof focusAirportWithAnimation === 'function') {
+        focusAirportWithAnimation(ap);
+        return;
+    }
+    if (typeof panMapToAirport === 'function') {
+        panMapToAirport(ap, 9.5, 0.9);
+    }
+    if (typeof isClassicNavMode === 'function' && isClassicNavMode() && typeof showClassicAirportView === 'function') {
+        showClassicAirportView(ap);
+    } else if (typeof showAirportDetails === 'function') {
+        showAirportDetails(ap);
     }
 }
 
 function filterByWorldCapitals() {
     if (!window.WORLD_CAPITALS || !allAirportsData) return;
     const capitalIcaos = new Set(Object.keys(window.WORLD_CAPITALS));
-    const capitalAirports = allAirportsData.filter(ap => capitalIcaos.has(ap.icao.toUpperCase()));
-    if (capitalAirports.length > 0) {
-        currentlyFilteredAirports = capitalAirports;
-        renderAirportMarkers(capitalAirports);
-        if (typeof showToast === 'function') {
-            showToast(`🏛️ ${capitalAirports.length} world capital airports displayed on map`, 'info');
+    const capitalAirports = allAirportsData.filter(ap => ap && ap.icao && capitalIcaos.has(ap.icao.toUpperCase()) && getAirportPricingType(ap) !== 'Default');
+    const listToShow = capitalAirports.length > 0
+        ? capitalAirports
+        : allAirportsData.filter(ap => ap && ap.icao && capitalIcaos.has(ap.icao.toUpperCase()));
+    if (listToShow.length > 0) {
+        currentlyFilteredAirports = listToShow;
+        if (typeof renderAirportsOnMap === 'function') {
+            renderAirportsOnMap(listToShow);
         }
     }
+}
+
+function _parseSourceBytes(src) {
+    if (!src) return 0;
+    if (typeof src.size_bytes === 'number' && src.size_bytes > 0) return src.size_bytes;
+    if (src.size_str && typeof src.size_str === 'string') {
+        const mGb = src.size_str.match(/([\d\.]+)\s*GB/i);
+        if (mGb) return parseFloat(mGb[1]) * 1024 * 1024 * 1024;
+        const mMb = src.size_str.match(/([\d\.]+)\s*MB/i);
+        if (mMb) return parseFloat(mMb[1]) * 1024 * 1024;
+        const mKb = src.size_str.match(/([\d\.]+)\s*KB/i);
+        if (mKb) return parseFloat(mKb[1]) * 1024;
+    }
+    return 0;
+}
+
+function _haversineNm(lat1, lon1, lat2, lon2) {
+    const toRad = Math.PI / 180;
+    const dLat = (lat2 - lat1) * toRad;
+    const dLon = (lon2 - lon1) * toRad;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+    return 3440.065 * c;
 }
 
 function computeFunStats(airports) {
@@ -3310,6 +3845,8 @@ function computeFunStats(airports) {
     // 1. SPENT PAYWARE
     let totalSpentEur = 0;
     let paywareCount = 0;
+    let freewareCount = 0;
+    let asoboCount = 0;
     let distinctPackageCount = 0;
     const processedBundles = new Set();
     const customAirports = [];
@@ -3319,7 +3856,7 @@ function computeFunStats(airports) {
         const isCustom = (pt !== 'Default');
         if (isCustom) customAirports.push(ap);
 
-        if (pt === "Payware") {
+        if (pt === 'Payware') {
             paywareCount++;
             if (ap.is_bundle || ap.bundle_id) {
                 const bKey = ap.bundle_id || ap.package_name;
@@ -3332,8 +3869,14 @@ function computeFunStats(airports) {
                 distinctPackageCount++;
                 totalSpentEur += (ap.price_eur || 0);
             }
+        } else if (pt === 'Asobo') {
+            asoboCount++;
+        } else if (isCustom) {
+            freewareCount++;
         }
     });
+
+    const pool = customAirports.length > 0 ? customAirports : airports;
 
     const formattedSpent = formatCurrency(totalSpentEur);
     const avgPriceEur = distinctPackageCount > 0 ? (totalSpentEur / distinctPackageCount) : 0;
@@ -3341,7 +3884,7 @@ function computeFunStats(airports) {
 
     stats.push({
         id: 'spent',
-        html: t('funstats.spent', 'YOU HAVE SPENT <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{amount}</span> ON PAYWARE SCENERIES SO FAR !', { amount: formattedSpent }),
+        html: t('funstats.spent', 'YOU HAVE SPENT <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{amount}</span> ON PAYWARE SCENERIES <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(SO FAR)</span>', { amount: formattedSpent }),
         tooltip: t('funstats.spent_tooltip', 'Total based on {count} purchased payware packages ({airports} airports covered). Average: {avg} / product. Click to filter.', {
             count: distinctPackageCount,
             airports: paywareCount,
@@ -3352,7 +3895,23 @@ function computeFunStats(airports) {
         }
     });
 
-    // 2. CAPITALS COVERED
+    // 2. FREEWARE COMMUNITY VALUE
+    if (freewareCount > 0) {
+        const estSavedEur = freewareCount * 14.90;
+        stats.push({
+            id: 'freeware_value',
+            html: t('funstats.freeware_value', 'COMMUNITY TREASURE: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} FREEWARE ADDONS</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(~{estValue} IN EQUIVALENT PAYWARE)</span>', {
+                count: freewareCount.toLocaleString(),
+                estValue: formatCurrency(estSavedEur)
+            }),
+            tooltip: t('funstats.freeware_value_tooltip', 'Estimated commercial value saved thanks to community freeware creators. Click to filter Freeware.'),
+            action: () => {
+                if (typeof filterByPricingPill === 'function') filterByPricingPill('Freeware');
+            }
+        });
+    }
+
+    // 3. CAPITALS COVERED
     if (window.WORLD_CAPITALS) {
         const totalCapitals = window.WORLD_CAPITALS_TOTAL_COUNTRIES || 195;
         const ownedCapitalsSet = new Set();
@@ -3369,7 +3928,7 @@ function computeFunStats(airports) {
 
         stats.push({
             id: 'capitals',
-            html: t('funstats.capitals', 'YOU OWN <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} / {total}</span> WORLD CAPITALS ({pct}%)', {
+            html: t('funstats.capitals', 'YOU OWN <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} / {total}</span> WORLD CAPITALS <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({pct}%)</span>', {
                 count: count,
                 total: totalCapitals,
                 pct: pct
@@ -3381,7 +3940,7 @@ function computeFunStats(airports) {
         });
     }
 
-    // 3. TOP COUNTRY
+    // 4. TOP COUNTRY
     const countryCounts = {};
     customAirports.forEach(ap => {
         const c = ap.country || ap.iso_country;
@@ -3401,14 +3960,14 @@ function computeFunStats(airports) {
         const displayName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(null, topCountry) : topCountry;
         stats.push({
             id: 'top_country',
-            html: t('funstats.top_country', 'TOP DESTINATION: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{country}</span> ({count} ADDON SCENERIES)', {
+            html: t('funstats.top_country', 'TOP DESTINATION: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{country}</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({count} ADDON SCENERIES)</span>', {
                 country: displayName,
                 count: topCountryCount
             }),
             tooltip: t('funstats.top_country_tooltip', 'Click to center map on {country} and explore its addons.', { country: displayName }),
             action: () => {
-                let cCode = null;
-                if (typeof ISO_TO_COUNTRY_NAME !== 'undefined') {
+                let cCode = (topCountry && topCountry.length === 2) ? topCountry.toUpperCase() : null;
+                if (!cCode && typeof ISO_TO_COUNTRY_NAME !== 'undefined') {
                     for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
                         if (name.toLowerCase() === topCountry.toLowerCase()) {
                             cCode = code;
@@ -3422,46 +3981,103 @@ function computeFunStats(airports) {
                     const searchInput = document.getElementById('search-input');
                     if (searchInput) {
                         searchInput.value = displayName;
-                        handleSearch();
+                        filterAirports();
+                        if (typeof triggerSearchFocus === 'function') triggerSearchFocus();
                     }
                 }
             }
         });
     }
 
-    // 4. TOTAL DISK FOOTPRINT
+    // 5. TOTAL DISK FOOTPRINT & 6. HEAVIEST INDIVIDUAL SCENERY & 7. DORMANT/DISABLED ADDONS
     let totalBytes = 0;
+    let heaviestAp = null;
+    let heaviestBytes = 0;
+    let heaviestPkgName = '';
+    let heaviestSizeStr = '';
+    let activeFixesCount = 0;
+    let airportsWithFixesCount = 0;
+    let fs2024Count = 0;
+    let fs2020Count = 0;
+    const worldUpdatesSet = new Set();
+
+    const seenSourcePaths = new Set();
     customAirports.forEach(ap => {
+        let apHasFix = false;
         (ap.all_sources || []).forEach(src => {
-            if (src.size_bytes && typeof src.size_bytes === 'number') {
-                totalBytes += src.size_bytes;
-            } else if (src.size_str) {
-                const mGb = src.size_str.match(/([\d\.]+)\s*GB/i);
-                const mMb = src.size_str.match(/([\d\.]+)\s*MB/i);
-                if (mGb) totalBytes += parseFloat(mGb[1]) * 1024 * 1024 * 1024;
-                else if (mMb) totalBytes += parseFloat(mMb[1]) * 1024 * 1024;
+            if (src.is_default || src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-'))) return;
+            const pkgKey = (src.package_path || src.folder_name || '').toLowerCase();
+            const b = _parseSourceBytes(src);
+            if (pkgKey && !seenSourcePaths.has(pkgKey)) {
+                seenSourcePaths.add(pkgKey);
+                totalBytes += b;
+                const sf = (src.source_folder || '').toLowerCase();
+                if (sf.includes('2024')) fs2024Count++;
+                else if (sf.includes('2020')) fs2020Count++;
+            }
+            if (b > heaviestBytes && !isFixOrOverlay(src)) {
+                heaviestBytes = b;
+                heaviestAp = ap;
+                heaviestPkgName = src.folder_name || ap.package_name || ap.icao;
+                heaviestSizeStr = src.size_str || `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+            }
+            if (typeof isFixOrOverlay === 'function' && isFixOrOverlay(src) && !src.is_disabled) {
+                activeFixesCount++;
+                apHasFix = true;
+            }
+            if (src.world_update_name) {
+                worldUpdatesSet.add(src.world_update_name);
             }
         });
+        if (ap.world_update_name) {
+            worldUpdatesSet.add(ap.world_update_name);
+        }
+        if (apHasFix) airportsWithFixesCount++;
     });
+
+    const dormantRows = getDormantAirportsRows(airports);
+    const disabledAddonCount = dormantRows.length;
+    const disabledBytes = dormantRows.reduce((acc, r) => acc + (r.bytes || 0), 0);
+
     if (totalBytes > 0) {
         const sizeGb = (totalBytes / (1024 * 1024 * 1024)).toFixed(1);
         stats.push({
             id: 'disk_space',
-            html: t('funstats.disk_space', 'YOUR SCENERIES OCCUPY <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{size}</span> ON YOUR SSD', {
+            html: t('funstats.disk_space', 'YOUR SCENERIES OCCUPY <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{size}</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ON YOUR SSD)</span>', {
                 size: `${sizeGb} GB`
             }),
             tooltip: t('funstats.disk_space_tooltip', 'Cumulative disk footprint across all scanned MSFS airport packages.'),
+            action: () => {}
+        });
+    }
+
+    if (heaviestAp && heaviestBytes > 50 * 1024 * 1024) {
+        const cleanName = getCleanAirportName(heaviestAp.name, heaviestAp.city) || heaviestAp.icao;
+        const dispSize = heaviestBytes >= 1024 * 1024 * 1024
+            ? `${(heaviestBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+            : (heaviestSizeStr || `${Math.round(heaviestBytes / (1024 * 1024))} MB`);
+        stats.push({
+            id: 'heaviest_addon',
+            html: t('funstats.heaviest_addon', 'HEAVIEST SCENERY: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({size} ON DISK)</span>', {
+                name: cleanName,
+                icao: heaviestAp.icao,
+                size: dispSize
+            }),
+            tooltip: t('funstats.heaviest_addon_tooltip', 'Largest individual airport package on your SSD ({pkg}). Click to fly to {icao}.', {
+                pkg: heaviestPkgName,
+                icao: heaviestAp.icao
+            }),
             action: () => {
-                showToast(`💾 Total SSD footprint: ${sizeGb} GB across ${customAirports.length} custom addons`, 'info');
+                flyToAirport(heaviestAp.icao);
             }
         });
     }
 
-    // 5. TOP STUDIO / DEVELOPER
+    // 8. TOP STUDIO & 9. STUDIO DIVERSITY
     const studioCounts = {};
     customAirports.forEach(ap => {
         const v = (ap.vendor || '').trim();
-        if (v && v !== 'Unknown' && v !== 'Microsoft / Asobo' && v !== 'Asobo' && v !== 'Community' && v !== 'Default') {
+        if (v && v !== 'Unknown' && v !== 'Microsoft / Asobo' && v !== 'Asobo' && v !== 'Community' && v !== 'Default' && !v.includes('Default')) {
             studioCounts[v] = (studioCounts[v] || 0) + 1;
         }
     });
@@ -3476,7 +4092,7 @@ function computeFunStats(airports) {
     if (topStudio && topStudioCount >= 2) {
         stats.push({
             id: 'top_studio',
-            html: t('funstats.top_studio', 'TOP STUDIO: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{studio}</span> ({count} AIRPORTS)', {
+            html: t('funstats.top_studio', 'TOP STUDIO: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{studio}</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({count} AIRPORTS)</span>', {
                 studio: topStudio,
                 count: topStudioCount
             }),
@@ -3485,19 +4101,32 @@ function computeFunStats(airports) {
                 const searchInput = document.getElementById('search-input');
                 if (searchInput) {
                     searchInput.value = topStudio;
-                    handleSearch();
+                    filterAirports();
+                    if (typeof triggerSearchFocus === 'function') triggerSearchFocus();
                 }
             }
         });
     }
 
-    // 6. GSX EQUIPMENT RATE
+    const totalStudiosCount = Object.keys(studioCounts).length;
+    if (totalStudiosCount >= 3) {
+        stats.push({
+            id: 'studio_diversity',
+            html: t('funstats.studio_diversity', 'CREATOR ECOSYSTEM: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{studios} STUDIOS & CREATORS</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(IN YOUR LIBRARY)</span>', {
+                studios: totalStudiosCount
+            }),
+            tooltip: t('funstats.studio_diversity_tooltip', 'Total number of distinct scenery studios and independent creators represented in your collection.'),
+            action: () => {}
+        });
+    }
+
+    // 10. GSX EQUIPMENT RATE
     if (customAirports.length > 0) {
         const gsxCount = customAirports.filter(ap => ap.has_gsx_profile).length;
         const gsxPct = Math.round((gsxCount / customAirports.length) * 100);
         stats.push({
             id: 'gsx_rate',
-            html: t('funstats.gsx_rate', '<span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{pct}%</span> OF YOUR SCENERIES HAVE AN ACTIVE GSX PROFILE ({active}/{total})', {
+            html: t('funstats.gsx_rate', '<span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{pct}%</span> OF YOUR SCENERIES HAVE AN ACTIVE GSX PROFILE <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({active}/{total})</span>', {
                 pct: gsxPct,
                 active: gsxCount,
                 total: customAirports.length
@@ -3509,21 +4138,229 @@ function computeFunStats(airports) {
         });
     }
 
-    // 7. HIGHEST ELEVATION AIRPORT
-    let highestAp = null;
-    let maxElevation = -9999;
-    (customAirports.length > 0 ? customAirports : airports).forEach(ap => {
-        const elev = typeof ap.elevation === 'number' ? ap.elevation : (ap.alt || ap.altitude || -9999);
-        if (elev > maxElevation && elev < 20000) {
-            maxElevation = elev;
-            highestAp = ap;
+    // 11. RUNWAY ANALYTICS: LONGEST RUNWAY, SHORTEST STOL RUNWAY, MOST RUNWAYS, CUMULATIVE RUNWAY KM
+    let longestRwyAp = null;
+    let longestRwyObj = null;
+    let maxRwyFt = 0;
+    let shortestRwyAp = null;
+    let shortestRwyObj = null;
+    let minRwyFt = 999999;
+    let mostRwysAp = null;
+    let maxRwyCount = 0;
+    let totalRwyMeters = 0;
+    let totalRwyCount = 0;
+
+    pool.forEach(ap => {
+        const rwys = Array.isArray(ap.runways) ? ap.runways.filter(r => !r.closed) : [];
+        if (rwys.length === 0) return;
+        if (rwys.length > maxRwyCount) {
+            maxRwyCount = rwys.length;
+            mostRwysAp = ap;
+        }
+        let apMaxFt = 0;
+        let apMaxRwy = null;
+        rwys.forEach(r => {
+            const ft = typeof r.length_ft === 'number' ? r.length_ft : (typeof r.length_m === 'number' ? Math.round(r.length_m * 3.28084) : 0);
+            const m = typeof r.length_m === 'number' ? r.length_m : Math.round(ft / 3.28084);
+            if (m > 0) {
+                totalRwyMeters += m;
+                totalRwyCount++;
+            }
+            if (ft > maxRwyFt && ft < 22000) {
+                maxRwyFt = ft;
+                longestRwyAp = ap;
+                longestRwyObj = r;
+            }
+            if (ft > apMaxFt) {
+                apMaxFt = ft;
+                apMaxRwy = r;
+            }
+        });
+        const typeLow = (ap.english_type || ap.type || '').toLowerCase();
+        if (!typeLow.includes('heli') && !typeLow.includes('water') && !typeLow.includes('seaplane') && apMaxFt >= 800 && apMaxFt < minRwyFt) {
+            minRwyFt = apMaxFt;
+            shortestRwyAp = ap;
+            shortestRwyObj = apMaxRwy;
         }
     });
-    if (highestAp && maxElevation > 3000) {
+
+    if (longestRwyAp && longestRwyObj && maxRwyFt >= 8000) {
+        const cleanName = getCleanAirportName(longestRwyAp.name, longestRwyAp.city) || longestRwyAp.icao;
+        const lenM = longestRwyObj.length_m || Math.round(maxRwyFt / 3.28084);
+        stats.push({
+            id: 'longest_runway',
+            html: t('funstats.longest_runway', 'LONGEST RUNWAY: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({length_m} M / {length_ft} FT)</span>', {
+                name: cleanName,
+                icao: longestRwyAp.icao,
+                length_m: lenM.toLocaleString(),
+                length_ft: maxRwyFt.toLocaleString()
+            }),
+            tooltip: t('funstats.longest_runway_tooltip', 'Longest paved runway in your collection (RWY {rwy}). Click to inspect.', {
+                rwy: longestRwyObj.id || 'MAIN'
+            }),
+            action: () => {
+                flyToAirport(longestRwyAp.icao);
+            }
+        });
+    }
+
+    if (shortestRwyAp && shortestRwyObj && minRwyFt < 4500 && (!longestRwyAp || shortestRwyAp.icao !== longestRwyAp.icao)) {
+        const cleanName = getCleanAirportName(shortestRwyAp.name, shortestRwyAp.city) || shortestRwyAp.icao;
+        const lenM = shortestRwyObj.length_m || Math.round(minRwyFt / 3.28084);
+        stats.push({
+            id: 'shortest_runway',
+            html: t('funstats.shortest_runway', 'STOL CHALLENGE: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({length_m} M / {length_ft} FT)</span>', {
+                name: cleanName,
+                icao: shortestRwyAp.icao,
+                length_m: lenM.toLocaleString(),
+                length_ft: minRwyFt.toLocaleString()
+            }),
+            tooltip: t('funstats.shortest_runway_tooltip', 'Shortest runway among your custom airports (RWY {rwy}). Click to inspect.', {
+                rwy: shortestRwyObj.id || 'STOL'
+            }),
+            action: () => {
+                flyToAirport(shortestRwyAp.icao);
+            }
+        });
+    }
+
+    if (mostRwysAp && maxRwyCount >= 4) {
+        const cleanName = getCleanAirportName(mostRwysAp.name, mostRwysAp.city) || mostRwysAp.icao;
+        stats.push({
+            id: 'most_runways',
+            html: t('funstats.most_runways', 'MEGA RUNWAY COMPLEX: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({count} RUNWAYS)</span>', {
+                name: cleanName,
+                icao: mostRwysAp.icao,
+                count: maxRwyCount
+            }),
+            tooltip: t('funstats.most_runways_tooltip', 'Airport with the highest number of runways in your collection. Click to inspect.'),
+            action: () => {
+                flyToAirport(mostRwysAp.icao);
+            }
+        });
+    }
+
+    if (totalRwyMeters >= 10000 && totalRwyCount >= 5) {
+        const totalKm = Math.round(totalRwyMeters / 1000).toLocaleString();
+        stats.push({
+            id: 'total_runway_km',
+            html: t('funstats.total_runway_km', 'CUMULATIVE RUNWAYS: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{km} KM</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ACROSS {count} RUNWAYS IN YOUR ADDONS)</span>', {
+                km: totalKm,
+                count: totalRwyCount.toLocaleString()
+            }),
+            tooltip: t('funstats.total_runway_km_tooltip', 'Total combined length of all runways across your custom addon airports.'),
+            action: () => {}
+        });
+    }
+
+    // 15. AIRLINE & ROUTE NETWORK ANALYTICS: BUSIEST HUB + GLOBAL NETWORK SCALE
+    let busiestHubAp = null;
+    let busiestHubDests = 0;
+    let busiestHubAirlines = 0;
+    const globalAirlinesSet = new Set();
+    let totalDirectRoutes = 0;
+
+    pool.forEach(ap => {
+        const airlines = Array.isArray(ap.operating_airlines) ? ap.operating_airlines : [];
+        airlines.forEach(a => globalAirlinesSet.add(a));
+        const routesObj = (ap.routes && typeof ap.routes === 'object') ? ap.routes : {};
+        const destSet = new Set();
+        for (const destList of Object.values(routesObj)) {
+            if (Array.isArray(destList)) {
+                destList.forEach(d => {
+                    destSet.add(d);
+                    totalDirectRoutes++;
+                });
+            }
+        }
+        if (destSet.size > busiestHubDests) {
+            busiestHubDests = destSet.size;
+            busiestHubAirlines = airlines.length;
+            busiestHubAp = ap;
+        }
+    });
+
+    if (busiestHubAp && busiestHubDests >= 10) {
+        const cleanName = getCleanAirportName(busiestHubAp.name, busiestHubAp.city) || busiestHubAp.icao;
+        stats.push({
+            id: 'top_hub_routes',
+            html: t('funstats.top_hub_routes', 'BUSIEST GLOBAL HUB: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({airlines} AIRLINES & {dests} DESTINATIONS)</span>', {
+                name: cleanName,
+                icao: busiestHubAp.icao,
+                airlines: busiestHubAirlines,
+                dests: busiestHubDests
+            }),
+            tooltip: t('funstats.top_hub_routes_tooltip', 'Most connected hub in your addon library. Click to inspect its route network.'),
+            action: () => {
+                flyToAirport(busiestHubAp.icao);
+            }
+        });
+    }
+
+    if (globalAirlinesSet.size >= 10 && totalDirectRoutes >= 50) {
+        stats.push({
+            id: 'network_scale',
+            html: t('funstats.network_scale', 'GLOBAL AIRLINE NETWORK: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{airlines} AIRLINES</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({routes} DIRECT ROUTES)</span>', {
+                airlines: globalAirlinesSet.size.toLocaleString(),
+                routes: totalDirectRoutes.toLocaleString()
+            }),
+            tooltip: t('funstats.network_scale_tooltip', 'Total commercial carriers and scheduled routes connected to your custom airports.'),
+            action: () => {
+                if (busiestHubAp) flyToAirport(busiestHubAp.icao);
+            }
+        });
+    }
+
+    // 17. GEOGRAPHIC EXTREMES: HIGHEST, LOWEST, NORTHERNMOST, SOUTHERNMOST, EQUATOR, HEMISPHERES
+    let highestAp = null;
+    let maxElevation = -9999;
+    let lowestAp = null;
+    let minElevation = 99999;
+    let northernAp = null;
+    let maxLat = -90;
+    let southernAp = null;
+    let minLat = 90;
+    let equatorAp = null;
+    let minAbsLat = 90;
+    let northHemCount = 0;
+    let southHemCount = 0;
+
+    pool.forEach(ap => {
+        const elev = typeof ap.elevation === 'number' ? ap.elevation : (typeof ap.elevation_ft === 'number' ? ap.elevation_ft : null);
+        if (elev !== null && !isNaN(elev)) {
+            if (elev > maxElevation && elev < 20000) {
+                maxElevation = elev;
+                highestAp = ap;
+            }
+            if (elev < minElevation && elev > -1500) {
+                minElevation = elev;
+                lowestAp = ap;
+            }
+        }
+        const lat = typeof ap.lat === 'number' ? ap.lat : (typeof ap.latitude === 'number' ? ap.latitude : null);
+        if (lat !== null && !isNaN(lat) && (ap.lat !== 0 || ap.lon !== 0)) {
+            if (lat >= 0) northHemCount++;
+            else southHemCount++;
+            if (lat > maxLat && lat <= 90) {
+                maxLat = lat;
+                northernAp = ap;
+            }
+            if (lat < minLat && lat >= -90) {
+                minLat = lat;
+                southernAp = ap;
+            }
+            if (Math.abs(lat) < minAbsLat) {
+                minAbsLat = Math.abs(lat);
+                equatorAp = ap;
+            }
+        }
+    });
+
+    if (highestAp && maxElevation > 2500) {
         const cleanName = getCleanAirportName(highestAp.name, highestAp.city) || highestAp.icao;
         stats.push({
             id: 'highest_airport',
-            html: t('funstats.highest_airport', 'HIGHEST ELEVATION: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> AT {elevation} FT !', {
+            html: t('funstats.highest_airport', 'HIGHEST ELEVATION: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({elevation} FT AMSL)</span>', {
                 name: cleanName,
                 icao: highestAp.icao,
                 elevation: maxElevation.toLocaleString()
@@ -3535,21 +4372,27 @@ function computeFunStats(airports) {
         });
     }
 
-    // 8. POLAR / NORTHERNMOST AIRPORT
-    let northernAp = null;
-    let maxLat = -90;
-    (customAirports.length > 0 ? customAirports : airports).forEach(ap => {
-        const lat = typeof ap.lat === 'number' ? ap.lat : (typeof ap.latitude === 'number' ? ap.latitude : -90);
-        if (lat > maxLat && lat <= 90) {
-            maxLat = lat;
-            northernAp = ap;
-        }
-    });
-    if (northernAp && maxLat > 60) {
+    if (lowestAp && minElevation <= 0) {
+        const cleanName = getCleanAirportName(lowestAp.name, lowestAp.city) || lowestAp.icao;
+        stats.push({
+            id: 'lowest_airport',
+            html: t('funstats.lowest_airport', 'BELOW SEA LEVEL: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({elevation} FT AMSL)</span>', {
+                name: cleanName,
+                icao: lowestAp.icao,
+                elevation: minElevation.toLocaleString()
+            }),
+            tooltip: t('funstats.lowest_airport_tooltip', 'Lowest elevation airport in your scenery collection. Click to fly and center camera.'),
+            action: () => {
+                flyToAirport(lowestAp.icao);
+            }
+        });
+    }
+
+    if (northernAp && maxLat > 55) {
         const cleanName = getCleanAirportName(northernAp.name, northernAp.city) || northernAp.icao;
         stats.push({
             id: 'northern_airport',
-            html: t('funstats.northern_airport', 'POLAR OUTPOST: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{name} ({icao})</span> AT {lat}°N', {
+            html: t('funstats.northern_airport', 'POLAR OUTPOST: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({lat}°N LATITUDE)</span>', {
                 name: cleanName,
                 icao: northernAp.icao,
                 lat: maxLat.toFixed(1)
@@ -3561,18 +4404,248 @@ function computeFunStats(airports) {
         });
     }
 
-    // 9. GLOBAL REACH
+    if (southernAp && minLat < -15) {
+        const cleanName = getCleanAirportName(southernAp.name, southernAp.city) || southernAp.icao;
+        stats.push({
+            id: 'southern_airport',
+            html: t('funstats.southern_airport', 'SOUTHERNMOST OUTPOST: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({lat}°S LATITUDE)</span>', {
+                name: cleanName,
+                icao: southernAp.icao,
+                lat: Math.abs(minLat).toFixed(1)
+            }),
+            tooltip: t('funstats.southern_airport_tooltip', 'Southernmost custom airport in your collection. Click to fly and center camera.'),
+            action: () => {
+                flyToAirport(southernAp.icao);
+            }
+        });
+    }
+
+    if (equatorAp && minAbsLat < 12) {
+        const cleanName = getCleanAirportName(equatorAp.name, equatorAp.city) || equatorAp.icao;
+        const hemiChar = (equatorAp.lat >= 0) ? 'N' : 'S';
+        stats.push({
+            id: 'equator_airport',
+            html: t('funstats.equator_airport', 'CLOSEST TO EQUATOR: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({lat} LATITUDE)</span>', {
+                name: cleanName,
+                icao: equatorAp.icao,
+                lat: `${minAbsLat.toFixed(2)}°${hemiChar}`
+            }),
+            tooltip: t('funstats.equator_airport_tooltip', 'Custom airport closest to the 0° Equator line. Click to fly and center camera.'),
+            action: () => {
+                flyToAirport(equatorAp.icao);
+            }
+        });
+    }
+
+    if (northHemCount + southHemCount >= 5) {
+        const totalHem = northHemCount + southHemCount;
+        const northPct = Math.round((northHemCount / totalHem) * 100);
+        const southPct = 100 - northPct;
+        stats.push({
+            id: 'hemispheres',
+            html: t('funstats.hemispheres', 'HEMISPHERE SPLIT: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{northPct}% NORTH / {southPct}% SOUTH</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({north} N / {south} S)</span>', {
+                northPct: northPct,
+                north: northHemCount.toLocaleString(),
+                southPct: southPct,
+                south: southHemCount.toLocaleString()
+            }),
+            tooltip: t('funstats.hemispheres_tooltip', 'Distribution of your custom sceneries between the Northern and Southern hemispheres.'),
+            action: () => {
+                if (southernAp && southHemCount > 0) flyToAirport(southernAp.icao);
+                else if (northernAp) flyToAirport(northernAp.icao);
+            }
+        });
+    }
+
+    // 23. ULTRA LONG-HAUL MAX DISTANCE PAIR AMONG CUSTOM AIRPORTS
+    if (customAirports.length >= 2) {
+        const sampleList = customAirports.length > 220
+            ? customAirports.filter((_, idx) => idx % Math.ceil(customAirports.length / 220) === 0)
+            : customAirports;
+        let maxDistNm = 0;
+        let pairA = null;
+        let pairB = null;
+        for (let i = 0; i < sampleList.length; i++) {
+            const a = sampleList[i];
+            if (!a || !a.lat || !a.lon) continue;
+            for (let j = i + 1; j < sampleList.length; j++) {
+                const b = sampleList[j];
+                if (!b || !b.lat || !b.lon) continue;
+                const nm = _haversineNm(a.lat, a.lon, b.lat, b.lon);
+                if (nm > maxDistNm) {
+                    maxDistNm = nm;
+                    pairA = a;
+                    pairB = b;
+                }
+            }
+        }
+        if (pairA && pairB && maxDistNm >= 1000) {
+            const nmFormatted = Math.round(maxDistNm).toLocaleString();
+            const kmFormatted = Math.round(maxDistNm * 1.852).toLocaleString();
+            stats.push({
+                id: 'longest_haul',
+                html: t('funstats.longest_haul', 'MAX ADDON ULTRA-LONG HAUL: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{icaoA} ↔ {icaoB}</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({nm} NM / {km} KM)</span>', {
+                    icaoA: pairA.icao,
+                    icaoB: pairB.icao,
+                    nm: nmFormatted,
+                    km: kmFormatted
+                }),
+                tooltip: t('funstats.longest_haul_tooltip', 'Farthest pair of custom airports in your library ({nameA} ↔ {nameB}).', {
+                    nameA: getCleanAirportName(pairA.name, pairA.city) || pairA.icao,
+                    nameB: getCleanAirportName(pairB.name, pairB.city) || pairB.icao
+                }),
+                action: () => {
+                    flyToAirport(pairA.icao);
+                }
+            });
+        }
+    }
+
+    // 24. ETOPS STRATEGIC ALTERNATES COVERAGE
+    if (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES) {
+        const etopsIcaos = Object.keys(GLOBAL_ETOPS_ALTERNATES);
+        const etopsSet = new Set(etopsIcaos);
+        const customEtops = customAirports.filter(ap => etopsSet.has(ap.icao));
+        if (etopsIcaos.length > 0) {
+            stats.push({
+                id: 'etops_alternates',
+                html: t('funstats.etops_alternates', 'LONG-HAUL SAFETY: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{customCount} CUSTOM ETOPS</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(OUT OF {totalCount} ETOPS DIVERSION AIRFIELDS)</span>', {
+                    customCount: customEtops.length,
+                    totalCount: etopsIcaos.length
+                }),
+                tooltip: t('funstats.etops_alternates_tooltip', 'Strategic oceanic/polar ETOPS diversion airports equipped with custom sceneries.'),
+                action: () => {
+                    if (customEtops.length > 0) flyToAirport(customEtops[0].icao);
+                }
+            });
+        }
+    }
+
+    // 25. ACTIVE FIXES & OVERLAYS
+    if (activeFixesCount > 0) {
+        stats.push({
+            id: 'fixes_overlays',
+            html: t('funstats.fixes_overlays', 'ACTIVE ENHANCEMENTS: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{fixes} FIXES & OVERLAYS</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ACROSS {airports} AIRPORTS)</span>', {
+                fixes: activeFixesCount,
+                airports: airportsWithFixesCount
+            }),
+            tooltip: t('funstats.fixes_overlays_tooltip', 'Stackable taxiway patches, lighting enhancements, and overlays active on your sceneries.'),
+            action: () => {
+                const firstFixAp = customAirports.find(ap => (ap.all_sources || []).some(s => typeof isFixOrOverlay === 'function' && isFixOrOverlay(s) && !s.is_disabled));
+                if (firstFixAp) flyToAirport(firstFixAp.icao);
+            }
+        });
+    }
+
+    // 26. DORMANT / DISABLED SCENERIES (OPENS MODAL WITH 1 ROW PER AIRPORT)
+    if (disabledAddonCount > 0) {
+        const disSizeStr = disabledBytes >= 1024 * 1024 * 1024
+            ? `${(disabledBytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+            : `${Math.max(1, Math.round(disabledBytes / (1024 * 1024)))} MB`;
+        stats.push({
+            id: 'disabled_addons',
+            html: t('funstats.disabled_addons', 'DORMANT HANGAR: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} DISABLED SCENERIES</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({size} ON DISK)</span>', {
+                count: disabledAddonCount,
+                size: disSizeStr
+            }),
+            tooltip: t('funstats.disabled_addons_tooltip', 'Installed addon sceneries currently deactivated. Click to open the Dormant Sceneries list.'),
+            action: () => {
+                openDormantSceneriesModal();
+            }
+        });
+    }
+
+    // 27. AIRPORT CATEGORY MIX (INTERNATIONAL / REGIONAL / GA & HELI)
+    if (customAirports.length >= 3) {
+        let intlCount = 0;
+        let regCount = 0;
+        let gaHeliCount = 0;
+        customAirports.forEach(ap => {
+            const tp = (ap.english_type || ap.type || '').toLowerCase();
+            if (tp.includes('international') || tp.includes('large')) intlCount++;
+            else if (tp.includes('regional') || tp.includes('medium')) regCount++;
+            else gaHeliCount++;
+        });
+        stats.push({
+            id: 'category_mix',
+            html: t('funstats.category_mix', 'FLEET BREAKDOWN: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{intl} INTL</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">({reg} REGIONAL / {ga} GA & HELI)</span>', {
+                intl: intlCount.toLocaleString(),
+                reg: regCount.toLocaleString(),
+                ga: gaHeliCount.toLocaleString()
+            }),
+            tooltip: t('funstats.category_mix_tooltip', 'Distribution of your custom sceneries by airport operational category. Click to filter International hubs.'),
+            action: () => {
+                if (typeof toggleTypeFilter === 'function') toggleTypeFilter('International', false);
+            }
+        });
+    }
+
+    // 28. SIMULATOR GENERATION SPLIT (MSFS 2024 vs MSFS 2020)
+    if (fs2024Count > 0 || fs2020Count > 0) {
+        stats.push({
+            id: 'sim_split',
+            html: t('funstats.sim_split', 'SIMULATOR SOURCES: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{fs24} MSFS 2024 / {fs20} MSFS 2020</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(PACKAGES)</span>', {
+                fs24: fs2024Count.toLocaleString(),
+                fs20: fs2020Count.toLocaleString()
+            }),
+            tooltip: t('funstats.sim_split_tooltip', 'Breakdown of your custom airport packages across MSFS 2024 and MSFS 2020 folders.'),
+            action: () => {}
+        });
+    }
+
+    // 29. OFFICIAL ASOBO & WORLD UPDATES
+    if (asoboCount > 0) {
+        const wuCount = Math.max(1, worldUpdatesSet.size);
+        stats.push({
+            id: 'world_updates',
+            html: t('funstats.world_updates', 'OFFICIAL HANDCRAFTED: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} ASOBO AIRPORTS</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ACROSS {wuCount} WORLD & CITY UPDATES)</span>', {
+                count: asoboCount.toLocaleString(),
+                wuCount: wuCount
+            }),
+            tooltip: t('funstats.world_updates_tooltip', 'Click to filter bespoke Asobo / World Update handcrafted airports.'),
+            action: () => {
+                if (typeof filterByPricingPill === 'function') filterByPricingPill('Asobo');
+            }
+        });
+    }
+
+    // 30. PILOT STAR RATINGS
+    const ratedAirports = airports.filter(ap => typeof ap.rating === 'number' && ap.rating > 0);
+    if (ratedAirports.length > 0) {
+        const sumRating = ratedAirports.reduce((acc, a) => acc + a.rating, 0);
+        const avgRating = (sumRating / ratedAirports.length).toFixed(1);
+        const fiveStarCount = ratedAirports.filter(a => a.rating >= 4.8).length;
+        stats.push({
+            id: 'user_ratings',
+            html: t('funstats.user_ratings', 'PILOT LOGBOOK RATINGS: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{avg}★ AVERAGE</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(ACROSS {count} RATED SCENERIES)</span>', {
+                avg: avgRating,
+                count: ratedAirports.length
+            }),
+            tooltip: t('funstats.user_ratings_tooltip', 'Your personal quality ratings across {count} reviewed airports ({fiveStar} rated 5★).', {
+                count: ratedAirports.length,
+                fiveStar: fiveStarCount
+            }),
+            action: () => {
+                const topRated = ratedAirports.slice().sort((a, b) => b.rating - a.rating)[0];
+                if (topRated) flyToAirport(topRated.icao);
+            }
+        });
+    }
+
+    // 31. GLOBAL REACH
     const distinctCountriesCount = Object.keys(countryCounts).length;
     if (distinctCountriesCount >= 3) {
         stats.push({
             id: 'global_reach',
-            html: t('funstats.global_reach', 'YOUR ADDONS SPAN OVER <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} COUNTRIES</span> WORLDWIDE', {
+            html: t('funstats.global_reach', 'YOUR ADDONS SPAN OVER <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} COUNTRIES</span> <span class="text-[11px] lg:text-xs font-semibold text-slate-400 ml-1">(WORLDWIDE)</span>', {
                 count: distinctCountriesCount
             }),
             tooltip: t('funstats.global_reach_tooltip', 'Click to reset filters and view your global world coverage.'),
             action: () => {
-                if (typeof resetAllFilters === 'function') resetAllFilters();
-                if (typeof showToast === 'function') showToast(`🌍 Showing all airports across ${distinctCountriesCount} countries`, 'info');
+                if (typeof resetAllFiltersToDefault === 'function') {
+                    resetAllFiltersToDefault(false);
+                    filterAirports();
+                }
             }
         });
     }
@@ -3647,6 +4720,9 @@ function resumeFunStatsCarousel() {
 }
 
 function updateInvestmentBanner() {
+    if (typeof currentSettings !== 'undefined' && currentSettings) {
+        applyHeaderStatsVisibility(currentSettings.show_header_fun_stats !== false);
+    }
     if (!allAirportsData || allAirportsData.length === 0) return;
     currentFunStatsList = computeFunStats(allAirportsData);
     renderFunStatsSlide(currentFunStatsIndex, false);
@@ -5766,7 +6842,9 @@ window.addEventListener('drop', function(e) { e.preventDefault(); }, false);
 
 function getActiveSource(ap) {
     if (!ap || !ap.all_sources) return null;
-    return ap.all_sources.find(s => !s.is_disabled && !isFixOrOverlay(s) && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
+    if (ap._cachedActiveSrc !== undefined) return ap._cachedActiveSrc;
+    ap._cachedActiveSrc = ap.all_sources.find(s => !s.is_disabled && !isFixOrOverlay(s) && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
+    return ap._cachedActiveSrc;
 }
 
 function hasCustomAddonSources(ap) {
@@ -5778,31 +6856,35 @@ function hasCustomAddonSources(ap) {
 
 function getAirportPricingType(ap) {
     if (!ap) return 'Default';
-    
+    if (ap._cachedPricingType !== undefined) return ap._cachedPricingType;
     const activeSrc = getActiveSource(ap);
+    let pt = 'Freeware / Flightsim.to';
     if (!activeSrc) {
-        return 'Default';
+        pt = 'Default';
+    } else if (ap.pricing_type === 'Payware' || activeSrc.is_payware || activeSrc.pricing_type === 'Payware') {
+        pt = 'Payware';
+    } else if (ap.pricing_type === 'Asobo' || activeSrc.is_asobo_official || activeSrc.pricing_type === 'Asobo' || (activeSrc.vendor && activeSrc.vendor.toLowerCase().includes('asobo'))) {
+        pt = 'Asobo';
     }
-
-    if (ap.pricing_type === 'Payware' || activeSrc.is_payware || activeSrc.pricing_type === 'Payware') {
-        return 'Payware';
-    }
-    if (ap.pricing_type === 'Asobo' || activeSrc.is_asobo_official || activeSrc.pricing_type === 'Asobo' || (activeSrc.vendor && activeSrc.vendor.toLowerCase().includes('asobo'))) {
-        return 'Asobo';
-    }
-    return 'Freeware / Flightsim.to';
+    ap._cachedPricingType = pt;
+    return pt;
 }
 
 function getAirportCategory(ap) {
     if (!ap) return 'DEFAULT';
+    if (ap._cachedCategory !== undefined) return ap._cachedCategory;
     const activeSrc = getActiveSource(ap);
-    if (!activeSrc) return 'DEFAULT';
-
-    const pt = getAirportPricingType(ap);
-    if (pt === 'Asobo') return 'ASOBO';
-    if (pt === 'Payware') return 'PAYWARE';
-    if (pt === 'Default') return 'DEFAULT';
-    return 'FREEWARE';
+    let cat = 'FREEWARE';
+    if (!activeSrc) {
+        cat = 'DEFAULT';
+    } else {
+        const pt = getAirportPricingType(ap);
+        if (pt === 'Asobo') cat = 'ASOBO';
+        else if (pt === 'Payware') cat = 'PAYWARE';
+        else if (pt === 'Default') cat = 'DEFAULT';
+    }
+    ap._cachedCategory = cat;
+    return cat;
 }
 
 function updateStats(airports) {
@@ -5846,6 +6928,7 @@ let currentFlightMode = { active: false, icaos: [] };
 
 function getAirportLabelTier(ap) {
     if (!ap) return 8;
+    if (ap._cachedLabelTier !== undefined) return ap._cachedLabelTier;
     const cat = getAirportCategory(ap);
     const isCustom = (cat === 'PAYWARE' || cat === 'FREEWARE' || cat === 'ASOBO');
 
@@ -5861,7 +6944,9 @@ function getAirportLabelTier(ap) {
         typeRank = 3; // General Aviation
     }
 
-    return isCustom ? typeRank : (4 + typeRank);
+    const tier = isCustom ? typeRank : (4 + typeRank);
+    ap._cachedLabelTier = tier;
+    return tier;
 }
 
 let lastAppliedZoomTier = null;
@@ -5955,8 +7040,20 @@ function getCustomIconKey(ap) {
     const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
     const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
                                   (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
-    const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+    const radialEl = document.getElementById('airport-radial-menu');
+    const isRadialOpen = !!(radialEl && !radialEl.classList.contains('hidden') && radialEl.style.display !== 'none');
+    const isRadialActive = isRadialOpen && !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
                               (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
+
+    const isPinVis = (typeof isLoadoutPinVisualMode === 'function' && isLoadoutPinVisualMode());
+    if (isPinVis) {
+        const isPinnedThis = (typeof isAirportPinnedInCurrentEditLoadout === 'function' && isAirportPinnedInCurrentEditLoadout(ap));
+        const addonCat = (typeof getAirportInstalledAddonCategory === 'function') ? getAirportInstalledAddonCategory(ap) : cat;
+        if (!isPinnedThis) {
+            return `PINVIS_GREY_${ap.icao}_${addonCat}`;
+        }
+        return `PINVIS_PINNED_${ap.icao}_${addonCat}_${labelKey}`;
+    }
 
     if (hasAnyLabel) {
         return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_${isRadialActive ? 1 : 0}_${labelKey}`;
@@ -5970,9 +7067,55 @@ function createCustomIcon(ap) {
         return customDivIconCache.get(iconKey);
     }
 
-    const cat = getAirportCategory(ap);
+    const isPinVis = (typeof isLoadoutPinVisualMode === 'function' && isLoadoutPinVisualMode());
+    const isPinnedInEdit = Boolean(isPinVis && typeof isAirportPinnedInCurrentEditLoadout === 'function' && isAirportPinnedInCurrentEditLoadout(ap));
+
+    if (isPinVis && !isPinnedInEdit) {
+        const addonCat = (typeof getAirportInstalledAddonCategory === 'function')
+            ? getAirportInstalledAddonCategory(ap)
+            : getAirportCategory(ap);
+        const catUpper = String(addonCat || '').toUpperCase();
+        let icaoHex = '#22D3EE'; // Freeware cyan
+        if (catUpper === 'PAYWARE') icaoHex = '#C084FC'; // Payware purple
+        else if (catUpper === 'ASOBO') icaoHex = '#FBBF24'; // Asobo amber
+
+        const safeIcao = String(ap.icao || '').replace(/"/g, '&quot;');
+        const greyStarSvg = `
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="block shrink-0">
+                <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z"
+                      fill="#475569" stroke="#94A3B8" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+        `;
+        const greyTagHtml = safeIcao ? `
+            <div class="airport-map-label label-force-visible inline-flex items-center px-2 py-0.5 whitespace-nowrap leading-tight pointer-events-auto ml-1.5"
+                 style="background-color:#1E2532; border:1px solid #334155; border-radius:2px; box-shadow:none;">
+                <span class="font-mono font-black text-[11px] tracking-wide" style="color:${icaoHex};">${safeIcao}</span>
+            </div>
+        ` : '';
+
+        const pinVisHtml = `
+            <div class="custom-marker-wrapper flex items-center whitespace-nowrap">
+                <div class="shrink-0 flex items-center justify-center">${greyStarSvg}</div>
+                ${greyTagHtml}
+            </div>
+        `;
+        const pinVisIcon = L.divIcon({
+            html: pinVisHtml,
+            className: 'custom-map-marker',
+            iconSize: [26, 26],
+            iconAnchor: [13, 13]
+        });
+        customDivIconCache.set(iconKey, pinVisIcon);
+        return pinVisIcon;
+    }
+
+    const rawCat = getAirportCategory(ap);
+    const addonCatUpper = (typeof getAirportInstalledAddonCategory === 'function')
+        ? String(getAirportInstalledAddonCategory(ap) || '').toUpperCase()
+        : rawCat;
+    const cat = (isPinnedInEdit && addonCatUpper && addonCatUpper !== 'DEFAULT') ? addonCatUpper : rawCat;
     const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
-    let isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
+    let isApDisabled = isPinnedInEdit ? false : (cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled))));
 
     // Standard Section 1.B Fixed Airport Categories Palette:
     // Airports: #38bdf8 (sky-400) / Active pin: #0284c7 (sky-600)
@@ -6084,10 +7227,12 @@ function createCustomIcon(ap) {
         const nameSpan = (showName && safeName) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && safeCity) ? `<span class="${cityColorClass} font-semibold text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
-        const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+        const radialElForLabel = document.getElementById('airport-radial-menu');
+        const isRadialOpenForLabel = !!(radialElForLabel && !radialElForLabel.classList.contains('hidden') && radialElForLabel.style.display !== 'none');
+        const isRadialActive = isRadialOpenForLabel && !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
                                   (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
         const isEndpoint = (selectedAirport && ap.icao === selectedAirport.icao) || (flightCorridorArrivalAirport && ap.icao === flightCorridorArrivalAirport.icao);
-        const isForceVisible = ((currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt || isEndpoint) && !isRadialActive;
+        const isForceVisible = (isPinnedInEdit || (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt || isEndpoint) && !isRadialActive;
 
         labelHtml = `
             <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${labelBgClass} shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5 border-0">
@@ -6108,7 +7253,9 @@ function createCustomIcon(ap) {
 
     const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
                                   (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
-    const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+    const radialEl = document.getElementById('airport-radial-menu');
+    const isRadialOpen = !!(radialEl && !radialEl.classList.contains('hidden') && radialEl.style.display !== 'none');
+    const isRadialActive = isRadialOpen && !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
                               (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
 
     const icon = L.divIcon({
@@ -6278,6 +7425,10 @@ function renderAirportsOnMap(airports) {
                     L.DomEvent.stopPropagation(e.originalEvent);
                 }
                 const currentAp = this._airportData || ap;
+                if (typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive()) {
+                    handleLoadoutBuilderMapAirportSelect(currentAp);
+                    return;
+                }
                 const isAlt = e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey);
                 const isOptOpen = typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen();
 
@@ -6339,6 +7490,12 @@ function renderAirportsOnMap(airports) {
 
     renderRouteLines(airports);
     syncRadialAirportMarkerLabels();
+    if (window.globeEngine) {
+        window.globeEngine._cachedWorldClusterKey = '';
+        if (typeof window.globeEngine.requestRender === 'function') {
+            window.globeEngine.requestRender();
+        }
+    }
 }
 
 /* ================= AIRPORT RADIAL MENU (CIRCULAR 4-QUADRANT WHEEL) ================= */
@@ -6756,6 +7913,21 @@ function updateRadialDetailsModalPosition(force = false) {
 function panMapToAirport(ap, forcedZoom = null, forcedDuration = null) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
+    const isForcedCall = (forcedZoom !== null && forcedZoom !== undefined) || (forcedDuration !== null && forcedDuration !== undefined);
+    const panEnabled = isForcedCall || isCameraAutoPanEnabled();
+    const zoomEnabled = isForcedCall || isCameraAutoZoomEnabled();
+
+    if (!panEnabled && !zoomEnabled) {
+        isCameraPanningToRadial = false;
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+        return;
+    }
+
     let flyLat = parseFloat(ap.lat);
     let flyLon = parseFloat(ap.lon);
     if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
@@ -6768,12 +7940,10 @@ function panMapToAirport(ap, forcedZoom = null, forcedDuration = null) {
     while (flyLon - mapCenterLon < -180) flyLon += 360;
 
     const PAN_DURATION = (forcedDuration !== null && forcedDuration !== undefined)
-        ? parseFloat(forcedDuration)
-        : ((currentSettings && currentSettings.camera_pan_duration !== undefined)
-            ? parseFloat(currentSettings.camera_pan_duration)
-            : 1.1);
+        ? (panEnabled ? parseFloat(forcedDuration) : 0)
+        : getCameraPanDuration(1.1);
 
-    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
+    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined && parseFloat(currentSettings.camera_airport_zoom) > 3.5)
         ? parseFloat(currentSettings.camera_airport_zoom)
         : 8.0;
 
@@ -6811,12 +7981,28 @@ function panMapToAirport(ap, forcedZoom = null, forcedDuration = null) {
 
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
     let targetZoom;
-    if (forcedZoom !== null) {
+    if (!zoomEnabled) {
+        targetZoom = currentZoom;
+    } else if (forcedZoom !== null) {
         targetZoom = forcedZoom;
     } else if (isAirlinesModalOpen()) {
         targetZoom = (currentZoom < 4.0) ? 4.0 : Math.min(currentZoom, 7.0);
     } else {
         targetZoom = TARGET_AIRPORT_ZOOM;
+    }
+
+    if (!panEnabled && zoomEnabled) {
+        isCameraPanningToRadial = false;
+        if (targetZoom !== currentZoom) {
+            try { map.setZoom(targetZoom); } catch (e) {}
+        }
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+        return;
     }
 
     if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && typeof startOptimizerPanTracking === 'function') {
@@ -7526,10 +8712,18 @@ function centerMapOnDestination(destIcao, event) {
         name: window.worldAirportCoords[destIcao].name
     } : null);
 
-    if (ap && ap.lat && ap.lon && map) {
-        map.flyTo([parseFloat(ap.lat), parseFloat(ap.lon)], Math.max(6, map.getZoom()), {
-            duration: 1.0
-        });
+    if (ap && ap.lat && ap.lon && map && (isCameraAutoPanEnabled() || isCameraAutoZoomEnabled())) {
+        if (isCameraAutoPanEnabled() && isCameraAutoZoomEnabled()) {
+            map.flyTo([parseFloat(ap.lat), parseFloat(ap.lon)], Math.max(6, map.getZoom()), {
+                duration: getCameraPanDuration(1.0)
+            });
+        } else if (isCameraAutoPanEnabled()) {
+            map.panTo([parseFloat(ap.lat), parseFloat(ap.lon)], {
+                duration: getCameraPanDuration(1.0)
+            });
+        } else if (isCameraAutoZoomEnabled()) {
+            map.setZoom(Math.max(6, map.getZoom()));
+        }
     }
 }
 window.centerMapOnDestination = centerMapOnDestination;
@@ -8842,6 +10036,283 @@ function renderRadialAirportDetails(ap) {
     renderRadialPrice(ap);
 }
 
+window._liveAirportWindCache = window._liveAirportWindCache || {};
+
+function getCachedLiveAirportWind(icao) {
+    if (!icao) return null;
+    const key = String(icao).trim().toUpperCase();
+    const entry = window._liveAirportWindCache[key];
+    if (entry && (Date.now() - entry.ts) < 600000) {
+        return entry.data;
+    }
+    return null;
+}
+
+async function fetchLiveAirportWind(ap, onResult) {
+    if (!ap || !ap.icao) return null;
+    const key = String(ap.icao).trim().toUpperCase();
+    const cached = getCachedLiveAirportWind(key);
+    if (cached) {
+        if (typeof onResult === 'function') onResult(cached);
+        return cached;
+    }
+
+    let data = null;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_live_airport_wind) {
+        try {
+            const raw = await window.pywebview.api.get_live_airport_wind(key, parseFloat(ap.lat || 0), parseFloat(ap.lon || 0));
+            data = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+        } catch (err) {
+            data = null;
+        }
+    }
+
+    if ((!data || data.wdir === null || data.wdir === undefined) && (ap.lat || ap.lon)) {
+        try {
+            const latF = parseFloat(ap.lat || 0).toFixed(4);
+            const lonF = parseFloat(ap.lon || 0).toFixed(4);
+            const resp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latF}&longitude=${lonF}&current=wind_direction_10m,wind_speed_10m&wind_speed_unit=kn`);
+            if (resp.ok) {
+                const om = await resp.json();
+                if (om && om.current) {
+                    data = {
+                        icao: key,
+                        wdir: om.current.wind_direction_10m !== undefined ? Math.round(om.current.wind_direction_10m) : null,
+                        wspd: om.current.wind_speed_10m !== undefined ? Math.round(om.current.wind_speed_10m) : 0,
+                        source: 'Open-Meteo',
+                        metar: '',
+                        atis_dep: [],
+                        atis_arr: []
+                    };
+                }
+            }
+        } catch (err) {}
+    }
+
+    if (data) {
+        window._liveAirportWindCache[key] = { ts: Date.now(), data: data };
+        if (typeof onResult === 'function') onResult(data);
+    }
+    return data;
+}
+
+function _angleDiffDeg(a, b) {
+    return Math.abs(((a - b + 540) % 360) - 180);
+}
+
+function computeActiveRunwaysMap(ap, sortedRunways, windInfo) {
+    const result = {};
+    if (!sortedRunways || sortedRunways.length === 0) return result;
+
+    const openRunways = sortedRunways.filter(r => r && !r.closed && r.id);
+    if (openRunways.length === 0) return result;
+
+    const hasLongPaved = openRunways.some(r => {
+        const surf = String(r.surface || '').toLowerCase();
+        const isSoft = surf.includes('grass') || surf.includes('turf') || surf.includes('dirt') || surf.includes('water');
+        return !isSoft && (r.length_ft || 0) >= 4000;
+    });
+
+    const wdir = (windInfo && typeof windInfo.wdir === 'number' && (windInfo.wspd || 0) >= 2)
+        ? windInfo.wdir
+        : 250;
+
+    let tooltip = 'Live Active Runway';
+    if (windInfo && windInfo.source === 'METAR') {
+        const dirTxt = windInfo.wdir !== null && windInfo.wdir !== undefined ? `${String(windInfo.wdir).padStart(3, '0')}°` : 'VRB';
+        tooltip = `Live Active Runway • Wind ${dirTxt} / ${windInfo.wspd || 0} kt (METAR)`;
+    } else if (windInfo && windInfo.source === 'Open-Meteo' && windInfo.wdir !== null && windInfo.wdir !== undefined) {
+        tooltip = `Live Active Runway • Wind ${String(windInfo.wdir).padStart(3, '0')}° / ${windInfo.wspd || 0} kt (Live Weather)`;
+    }
+
+    const candidates = [];
+    openRunways.forEach(rwy => {
+        const surf = String(rwy.surface || '').toLowerCase();
+        const isSoft = surf.includes('grass') || surf.includes('turf') || surf.includes('dirt') || surf.includes('water');
+        if (hasLongPaved && isSoft && (rwy.length_ft || 0) < 3000) return;
+
+        const parts = String(rwy.id).split('/').map(s => s.trim()).filter(Boolean);
+        const ends = [];
+        parts.forEach(part => {
+            const m = part.match(/^([0-3]?\d)([LRC]?)$/i);
+            if (m) {
+                const num = parseInt(m[1], 10);
+                if (num >= 1 && num <= 36) {
+                    const hdg = (num % 36) * 10;
+                    const diff = _angleDiffDeg(wdir, hdg);
+                    const headwindCos = Math.cos((diff * Math.PI) / 180);
+                    ends.push({
+                        designator: part.toUpperCase(),
+                        num: num,
+                        side: (m[2] || '').toUpperCase(),
+                        hdg: hdg,
+                        diff: diff,
+                        headwindCos: headwindCos
+                    });
+                }
+            }
+        });
+        if (ends.length === 0) return;
+
+        ends.sort((a, b) => b.headwindCos - a.headwindCos);
+        const bestEnd = ends[0];
+        const lenFt = rwy.length_ft || 3000;
+        const score = (bestEnd.headwindCos * 100) + (Math.min(lenFt, 14000) / 700) + (!isSoft ? 8 : 0);
+
+        candidates.push({
+            rwy: rwy,
+            ends: ends,
+            activeEnd: bestEnd.designator,
+            activeHdg: bestEnd.hdg,
+            activeDiff: bestEnd.diff,
+            headwindCos: bestEnd.headwindCos,
+            length_ft: lenFt,
+            isPaved: !isSoft,
+            score: score
+        });
+    });
+
+    if (candidates.length === 0) return result;
+    candidates.sort((a, b) => b.score - a.score);
+
+    const rawType = String((ap && ap.type) || '').toLowerCase();
+    const engType = String((ap && ap.english_type) || '').toLowerCase();
+    const hasParallelDesignators = candidates.some(c => /[0-3]\d[LRC]/i.test(c.rwy.id));
+    const isLargeAirport = (
+        rawType === 'large_airport' ||
+        engType === 'international' ||
+        (hasParallelDesignators && candidates.length >= 2 && (candidates[0].length_ft || 0) >= 7500)
+    );
+
+    if (!isLargeAirport) {
+        const best = candidates[0];
+        result[best.rwy.id] = [{ label: best.activeEnd, tooltip: tooltip }];
+        return result;
+    }
+
+    // Large / International airport: differentiate DEP and ARR
+    // 1. Check if live VATSIM ATIS explicitly defines BOTH DEP and ARR runways matching this airport's runways
+    const atisDep = (windInfo && Array.isArray(windInfo.atis_dep)) ? windInfo.atis_dep : [];
+    const atisArr = (windInfo && Array.isArray(windInfo.atis_arr)) ? windInfo.atis_arr : [];
+    if (atisDep.length > 0 && atisArr.length > 0) {
+        let matchedDep = false;
+        let matchedArr = false;
+        const atisResult = {};
+        candidates.forEach(c => {
+            const pills = [];
+            c.ends.forEach(e => {
+                if (atisDep.includes(e.designator)) {
+                    pills.push({ label: `DEP ${e.designator}`, tooltip: `${tooltip} • VATSIM ATIS` });
+                    matchedDep = true;
+                }
+                if (atisArr.includes(e.designator)) {
+                    pills.push({ label: `ARR ${e.designator}`, tooltip: `${tooltip} • VATSIM ATIS` });
+                    matchedArr = true;
+                }
+            });
+            if (pills.length > 0) {
+                atisResult[c.rwy.id] = pills;
+            }
+        });
+        if (matchedDep && matchedArr) return atisResult;
+    }
+
+    // 2. Wind-based DEP / ARR assignment for large / international airports
+    const primary = candidates[0];
+    const parallelGroup = candidates.filter(c => _angleDiffDeg(c.activeHdg, primary.activeHdg) <= 20 && c.length_ft >= 5500);
+
+    if (parallelGroup.length >= 4) {
+        // Quad+ parallel hub (e.g. LFPG 08L/26R, 09R/27L, 08R/26L, 09L/27R):
+        // Alternate DEP and ARR by length rank so top visible rows immediately show both DEP and ARR
+        parallelGroup.sort((a, b) => (b.length_ft || 0) - (a.length_ft || 0));
+        result[parallelGroup[0].rwy.id] = [{ label: `DEP ${parallelGroup[0].activeEnd}`, tooltip: tooltip }];
+        result[parallelGroup[1].rwy.id] = [{ label: `ARR ${parallelGroup[1].activeEnd}`, tooltip: tooltip }];
+        result[parallelGroup[2].rwy.id] = [{ label: `ARR ${parallelGroup[2].activeEnd}`, tooltip: tooltip }];
+        result[parallelGroup[3].rwy.id] = [{ label: `DEP ${parallelGroup[3].activeEnd}`, tooltip: tooltip }];
+        return result;
+    }
+
+    if (parallelGroup.length >= 2) {
+        // Dual / Triple parallel runways (e.g. EGLL 27R/27L, EDDM 26R/26L, LFMN 04R/04L)
+        parallelGroup.sort((a, b) => (b.length_ft || 0) - (a.length_ft || 0));
+        result[parallelGroup[0].rwy.id] = [{ label: `DEP ${parallelGroup[0].activeEnd}`, tooltip: tooltip }];
+        result[parallelGroup[1].rwy.id] = [{ label: `ARR ${parallelGroup[1].activeEnd}`, tooltip: tooltip }];
+        return result;
+    }
+
+    // Check if a second non-parallel runway is also well-aligned with the wind (diff <= 55 deg, length >= 6500 ft)
+    const secondary = candidates.slice(1).find(c => c.activeDiff <= 55 && c.length_ft >= 6500);
+    if (secondary) {
+        if ((primary.length_ft || 0) >= (secondary.length_ft || 0)) {
+            result[primary.rwy.id] = [{ label: `DEP ${primary.activeEnd}`, tooltip: tooltip }];
+            result[secondary.rwy.id] = [{ label: `ARR ${secondary.activeEnd}`, tooltip: tooltip }];
+        } else {
+            result[secondary.rwy.id] = [{ label: `DEP ${secondary.activeEnd}`, tooltip: tooltip }];
+            result[primary.rwy.id] = [{ label: `ARR ${primary.activeEnd}`, tooltip: tooltip }];
+        }
+        return result;
+    }
+
+    // Single active runway at a large / international airport (e.g. EGKK, KSAN)
+    result[primary.rwy.id] = [
+        { label: `DEP ${primary.activeEnd}`, tooltip: tooltip },
+        { label: `ARR ${primary.activeEnd}`, tooltip: tooltip }
+    ];
+    return result;
+}
+
+function renderActiveRunwayPillsHtml(pillsMap, rwyId) {
+    const pills = (pillsMap && pillsMap[rwyId]) ? pillsMap[rwyId] : null;
+    if (!pills || pills.length === 0) return '';
+    return pills.map(p =>
+        `<span class="text-[10px] font-mono font-bold text-white bg-emerald-600 px-2 py-0.5 rounded border-0 tracking-wide shadow-sm" title="${escapeHtml(p.tooltip || 'Active Runway')}">${escapeHtml(p.label)}</span>`
+    ).join('');
+}
+
+function sortRunwaysWithActiveFirst(runways, activePillsMap) {
+    const baseSorted = (runways || []).slice().sort((a, b) => {
+        const closedA = a.closed ? 1 : 0;
+        const closedB = b.closed ? 1 : 0;
+        if (closedA !== closedB) return closedA - closedB;
+        const activeA = (activePillsMap && activePillsMap[a.id] && activePillsMap[a.id].length > 0) ? 0 : 1;
+        const activeB = (activePillsMap && activePillsMap[b.id] && activePillsMap[b.id].length > 0) ? 0 : 1;
+        if (activeA !== activeB) return activeA - activeB;
+        return (b.length_ft || 0) - (a.length_ft || 0);
+    });
+
+    if (!activePillsMap) return baseSorted;
+
+    const depOnly = [];
+    const arrOnly = [];
+    const otherActive = [];
+    const inactive = [];
+
+    baseSorted.forEach(rwy => {
+        const pills = activePillsMap[rwy.id];
+        if (!pills || pills.length === 0) {
+            inactive.push(rwy);
+            return;
+        }
+        const hasDep = pills.some(p => String(p.label || '').startsWith('DEP '));
+        const hasArr = pills.some(p => String(p.label || '').startsWith('ARR '));
+        if (hasDep && !hasArr) depOnly.push(rwy);
+        else if (hasArr && !hasDep) arrOnly.push(rwy);
+        else otherActive.push(rwy);
+    });
+
+    if (depOnly.length > 0 && arrOnly.length > 0) {
+        const interleaved = [...otherActive];
+        const maxLen = Math.max(depOnly.length, arrOnly.length);
+        for (let i = 0; i < maxLen; i++) {
+            if (i < depOnly.length) interleaved.push(depOnly[i]);
+            if (i < arrOnly.length) interleaved.push(arrOnly[i]);
+        }
+        return [...interleaved, ...inactive];
+    }
+
+    return baseSorted;
+}
+
 async function renderRadialRunways(ap) {
     const listEl = document.getElementById('radial-runways-list');
     const titleEl = document.getElementById('radial-runways-title');
@@ -8876,51 +10347,67 @@ async function renderRadialRunways(ap) {
             return (b.length_ft || 0) - (a.length_ft || 0);
         });
 
-        listEl.innerHTML = sortedRunways.map(rwy => {
-            const isClosed = !!rwy.closed;
-            const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
-            const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
-            const widFt = rwy.width_ft ? rwy.width_ft.toLocaleString() + ' ft' : '';
-            const widM = rwy.width_m ? rwy.width_m.toLocaleString() + ' m' : '';
-            const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
-            const surfaceName = rwy.surface || 'Unknown';
+        const drawRunwayCards = (windInfo) => {
+            const activePillsMap = computeActiveRunwaysMap(ap, sortedRunways, windInfo);
+            const displayRunways = sortRunwaysWithActiveFirst(sortedRunways, activePillsMap);
+            listEl.innerHTML = displayRunways.map(rwy => {
+                const isClosed = !!rwy.closed;
+                const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
+                const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
+                const widFt = rwy.width_ft ? rwy.width_ft.toLocaleString() + ' ft' : '';
+                const widM = rwy.width_m ? rwy.width_m.toLocaleString() + ' m' : '';
+                const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
+                const surfaceName = rwy.surface || 'Unknown';
+                const activePillsHtml = !isClosed ? renderActiveRunwayPillsHtml(activePillsMap, rwy.id) : '';
 
-            const cardBg = isClosed ? 'bg-slate-950/40 border border-slate-800 opacity-60' : 'bg-slate-900/60 border border-slate-800/90';
-            const identColor = isClosed ? 'text-slate-400' : 'text-cyan-400';
+                const cardBg = isClosed ? 'bg-slate-950/40 border border-slate-800 opacity-60' : 'bg-slate-900/60 border border-slate-800/90';
+                const identColor = isClosed ? 'text-slate-400' : 'text-cyan-400';
 
-            return `
-                <div class="p-2 rounded-xl ${cardBg} space-y-1">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-1.5">
-                            <span class="font-mono font-black text-xs ${identColor} px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/50">
-                                ${rwy.id}
-                            </span>
-                            <span class="text-[10px] font-semibold text-slate-300 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/40">
-                                ${surfaceName}
-                            </span>
-                        </div>
-                        ${isClosed ? `
-                            <span class="text-[9px] font-mono font-bold text-red-400 bg-red-950/40 border border-red-800/60 px-1.5 py-0.5 rounded uppercase">
-                                Closed
-                            </span>
-                        ` : ''}
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-slate-800/60">
-                        <div class="flex items-center gap-1 text-slate-300">
-                            <span class="text-slate-500 text-[10px] uppercase font-bold">Length:</span>
-                            <span class="font-bold text-white">${lenFt}</span>
-                            <span class="text-slate-400 text-[10px]">(${lenM})</span>
-                        </div>
-                        ${widthStr ? `
-                            <div class="flex items-center gap-1 text-slate-400 text-[10px]">
-                                <span class="text-slate-500 uppercase font-bold">Width:</span>
-                                <span>${widthStr}</span>
+                return `
+                    <div class="p-2 rounded-xl ${cardBg} space-y-1">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="font-mono font-black text-xs ${identColor} px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/50">
+                                    ${rwy.id}
+                                </span>
+                                <span class="text-[10px] font-semibold text-slate-300 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/40">
+                                    ${surfaceName}
+                                </span>
+                                ${activePillsHtml}
                             </div>
-                        ` : ''}
+                            ${isClosed ? `
+                                <span class="text-[9px] font-mono font-bold text-red-400 bg-red-950/40 border border-red-800/60 px-1.5 py-0.5 rounded uppercase">
+                                    Closed
+                                </span>
+                            ` : ''}
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-slate-800/60">
+                            <div class="flex items-center gap-1 text-slate-300">
+                                <span class="text-slate-500 text-[10px] uppercase font-bold">Length:</span>
+                                <span class="font-bold text-white">${lenFt}</span>
+                                <span class="text-slate-400 text-[10px]">(${lenM})</span>
+                            </div>
+                            ${widthStr ? `
+                                <div class="flex items-center gap-1 text-slate-400 text-[10px]">
+                                    <span class="text-slate-500 uppercase font-bold">Width:</span>
+                                    <span>${widthStr}</span>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
+        };
+
+        const cachedWind = getCachedLiveAirportWind(ap.icao);
+        drawRunwayCards(cachedWind);
+        if (!cachedWind) {
+            fetchLiveAirportWind(ap, (liveWind) => {
+                if (currentRadialAirport && currentRadialAirport.icao === ap.icao) {
+                    drawRunwayCards(liveWind);
+                }
+            });
+        }
     } else {
         listEl.innerHTML = `<span class="text-xs font-mono text-slate-500 italic py-2 block text-center">No runway data available for this airport.</span>`;
     }
@@ -9922,7 +11409,7 @@ let flightPlanningDestination = null;
 let flightCorridorArrivalAirport = null;
 let flightCorridorLayerGroup = L.layerGroup();
 let isFlightPlanningDraggableInitialized = false;
-let flightCorridorProfile = 'CORRIDOR'; // 'CORRIDOR' | 'DIRECT'
+let flightCorridorProfile = null; // null | 'CORRIDOR' | 'DIRECT' | 'SIMBRIEF'
 let isFlightCorridorOptimized = false;
 let flightCorridorDisabledCount = 0;
 
@@ -10290,6 +11777,19 @@ async function executeFlightCorridorOptimization() {
 }
 
 async function restoreFlightCorridorSceneries() {
+    if (_isSceneryMutationInProgress) return;
+    if (isLoadoutSimRunningLocked) {
+        if (typeof showToast === 'function') {
+            showToast('MSFS IS RUNNING - SCENERY RESTORATION LOCKED FOR SAFETY', 'error');
+        }
+        return;
+    }
+    _isSceneryMutationInProgress = true;
+    const restoreBtnEl = document.getElementById('opt-btn-restore-sceneries');
+    const applyBtnEl = document.getElementById('opt-btn-apply-sceneries');
+    if (restoreBtnEl) restoreBtnEl.disabled = true;
+    if (applyBtnEl) applyBtnEl.disabled = true;
+
     showCustomModal({
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
@@ -10304,7 +11804,13 @@ async function restoreFlightCorridorSceneries() {
         if (window.pywebview && window.pywebview.api) {
             const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
             const resRaw = await apiFn.call(window.pywebview.api);
-            const res = JSON.parse(resRaw);
+            const res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
+            if (res && res.status === 'locked_sim_running') {
+                isLoadoutSimRunningLocked = true;
+                if (typeof syncHeaderAndClassicLoadoutUI === 'function') syncHeaderAndClassicLoadoutUI();
+                showCustomModal('Simulator Running', res.message || 'MSFS is running - Scenery restoration is locked for safety.', 'error');
+                return;
+            }
             if (res.status === 'ok' || res.status === 'success') {
                 try {
                     localStorage.removeItem('sceneryx_saved_flight_plan');
@@ -10350,6 +11856,11 @@ async function restoreFlightCorridorSceneries() {
                 }
 
                 applyRestoredAirportsData(res.airports);
+                currentActiveLoadoutId = 'ALL';
+                selectedBaseLoadoutId = 'ALL';
+                pendingActiveLoadoutId = 'ALL';
+                if (typeof syncHeaderAndClassicLoadoutUI === 'function') syncHeaderAndClassicLoadoutUI();
+                if (typeof syncUnifiedBaseLoadoutSummaryUI === 'function') syncUnifiedBaseLoadoutSummaryUI();
 
                 updateFlightModeBannerUI({ active: false, icaos: [] });
                 updatePersistentFlightBannerUI({ active: false });
@@ -10389,6 +11900,10 @@ async function restoreFlightCorridorSceneries() {
     } catch (err) {
         console.error('Error restoring sceneries:', err);
         showCustomModal('Restore Error', String(err), 'error');
+    } finally {
+        _isSceneryMutationInProgress = false;
+        if (restoreBtnEl) restoreBtnEl.disabled = isLoadoutSimRunningLocked;
+        if (applyBtnEl) applyBtnEl.disabled = isLoadoutSimRunningLocked;
     }
 }
 
@@ -10436,10 +11951,22 @@ function restoreFlightPlanningStateOnStartup() {
         const isFlightModeActive = (savedFm && savedFm.active) || (localFp && localFp.active !== false && savedFm && savedFm.active);
         if (!isFlightModeActive) return;
 
+        const savedProfileStr = String((savedFm && savedFm.profile) || '');
+        if (savedProfileStr.startsWith('LOADOUT') || (!savedFm?.dep_icao && !savedFm?.arr_icao && st.active_loadout_id && st.active_loadout_id !== 'ALL')) {
+            const activeLoadoutId = st.active_loadout_id || savedFm?.base_loadout_id || 'ALL';
+            currentActiveLoadoutId = activeLoadoutId;
+            selectedBaseLoadoutId = activeLoadoutId;
+            pendingActiveLoadoutId = activeLoadoutId;
+            if (typeof previewLoadoutProfileOnMap === 'function') {
+                previewLoadoutProfileOnMap(activeLoadoutId);
+            }
+            return;
+        }
+
         let depIcao = (savedFm && savedFm.dep_icao) || (localFp && localFp.dep_icao) || '';
         let arrIcao = (savedFm && savedFm.arr_icao) || (localFp && localFp.arr_icao) || '';
 
-        if (!depIcao && savedFm && Array.isArray(savedFm.icaos) && savedFm.icaos.length >= 2) {
+        if (!depIcao && savedFm && Array.isArray(savedFm.icaos) && savedFm.icaos.length >= 2 && !savedProfileStr.startsWith('LOADOUT')) {
             depIcao = savedFm.icaos[0];
             arrIcao = savedFm.icaos[savedFm.icaos.length - 1];
         }
@@ -10764,6 +12291,22 @@ function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
     const lat2 = arrAp.lat;
     const lon2 = arrAp.lon;
 
+    const effectiveProfile = (typeof optimizerMode !== 'undefined' && optimizerMode) || (typeof flightCorridorProfile !== 'undefined' && flightCorridorProfile) || null;
+    if (effectiveProfile === 'SIMBRIEF' && typeof currentSimBriefFlight !== 'undefined' && currentSimBriefFlight && Array.isArray(currentSimBriefFlight.waypoints) && currentSimBriefFlight.waypoints.length >= 2) {
+        const sbOrig = (currentSimBriefFlight.origin && currentSimBriefFlight.origin.icao || '').toUpperCase();
+        const sbDest = (currentSimBriefFlight.destination && currentSimBriefFlight.destination.icao || '').toUpperCase();
+        if (depAp.icao === sbOrig && arrAp.icao === sbDest) {
+            const sbPath = [[lat1, lon1]];
+            currentSimBriefFlight.waypoints.forEach(wp => {
+                if (wp && typeof wp.lat === 'number' && !isNaN(wp.lat) && typeof wp.lon === 'number' && !isNaN(wp.lon)) {
+                    sbPath.push([Math.min(75.0, wp.lat), wp.lon]);
+                }
+            });
+            sbPath.push([lat2, lon2]);
+            return makeContinuousLongitudePoints(sbPath);
+        }
+    }
+
     const rawPath = [];
     const numPts = 80;
 
@@ -10978,6 +12521,9 @@ function clearFlightCorridor() {
         flightCorridorLayerGroup.clearLayers();
     }
     filterAirports();
+    if (window.globeEngine && typeof window.globeEngine.requestRender === 'function') {
+        window.globeEngine.requestRender();
+    }
 }
 
 function renderFlightCorridor() {
@@ -11050,8 +12596,8 @@ function renderFlightCorridor() {
     // Update floating banner UI with the accurate filtered count
     updateFlightPlanningBannerUI();
 
-    // Smoothly zoom map to fit departure, arrival and all alternates
-    map.fitBounds(allBoundsPts, { padding: [80, 80], animate: true });
+    // Smoothly zoom map to fit departure, arrival and all alternates (respecting Camera Pan/Zoom OFF settings)
+    fitMapBoundsRespectingCameraSettings(allBoundsPts, { padding: [80, 80], animate: true });
 
     // Guarantee badge scale and marker labels synchronize during and after animated fitBounds
     const postFitBoundsSync = () => {
@@ -11101,6 +12647,9 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
 }
 
 function renderRouteLines(filteredAirports) {
+    if (window.globeEngine && typeof window.globeEngine.requestRender === 'function') {
+        window.globeEngine.requestRender();
+    }
     if (!map) return;
 
     if (!map.getPane('routeLinesPane')) {
@@ -11209,21 +12758,29 @@ function selectAirport(icao) {
 function centerMapOnAirport(ap, forcedZoom = null) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
+    const panEnabled = isCameraAutoPanEnabled();
+    const zoomEnabled = isCameraAutoZoomEnabled();
+    if (!panEnabled && !zoomEnabled) return;
+
     let flyLon = ap.lon;
     if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
         flyLon = flyLon + 360;
     }
 
-    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
+    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined && parseFloat(currentSettings.camera_airport_zoom) > 3.5)
         ? parseFloat(currentSettings.camera_airport_zoom)
         : 8.0;
-    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
-        ? parseFloat(currentSettings.camera_pan_duration)
-        : 1.1;
+    const PAN_DURATION = getCameraPanDuration(1.1);
 
     const currentZoom = map.getZoom();
 
-    let targetZoom = forcedZoom !== null ? forcedZoom : TARGET_AIRPORT_ZOOM;
+    let targetZoom = !zoomEnabled ? currentZoom : (forcedZoom !== null ? forcedZoom : TARGET_AIRPORT_ZOOM);
+    if (!panEnabled && zoomEnabled) {
+        if (targetZoom !== currentZoom) {
+            try { map.setZoom(targetZoom); } catch (e) {}
+        }
+        return;
+    }
 
     // Calculate horizontal offset so the airport is centered in the visible area between left sidebar and right drawer
     let xOffset = 0;
@@ -12410,6 +13967,7 @@ function exitCountryMode(flyCamera = false) {
             preCountryModeFilters = null;
         }
 
+        clearCountryHover2D();
         activeDrawerMode = 'MAP';
         selectedCountryCode = null;
         selectedCountryName = '';
@@ -12527,7 +14085,16 @@ async function renderAirportRunways(ap) {
             return (b.length_ft || 0) - (a.length_ft || 0);
         });
 
-        runwaysListEl.innerHTML = sortedRunways.map(rwy => {
+        const activePillsMap = computeActiveRunwaysMap(ap, sortedRunways, getCachedLiveAirportWind(ap.icao));
+        if (!getCachedLiveAirportWind(ap.icao)) {
+            fetchLiveAirportWind(ap, () => {
+                if (selectedAirport && selectedAirport.icao === ap.icao) {
+                    renderAirportRunways(ap);
+                }
+            });
+        }
+        const displayRunways = sortRunwaysWithActiveFirst(sortedRunways, activePillsMap);
+        runwaysListEl.innerHTML = displayRunways.map(rwy => {
             const isClosed = !!rwy.closed;
             const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
             const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
@@ -12535,6 +14102,7 @@ async function renderAirportRunways(ap) {
             const widM = rwy.width_m ? rwy.width_m.toLocaleString() + ' m' : '';
             const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
             const surfaceName = rwy.surface || 'Unknown';
+            const activePillsHtml = !isClosed ? renderActiveRunwayPillsHtml(activePillsMap, rwy.id) : '';
 
             const cardClass = isClosed 
                 ? 'border border-slate-800 bg-slate-950/70 opacity-60' 
@@ -12544,13 +14112,14 @@ async function renderAirportRunways(ap) {
             return `
                 <div class="p-3 rounded-xl ${cardClass} space-y-1.5 transition-all">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="font-mono font-black text-sm ${identColor} px-2 py-0.5 rounded bg-slate-800 tracking-wider">
                                 ${rwy.id}
                             </span>
                             <span class="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">
                                 ${surfaceName}
                             </span>
+                            ${activePillsHtml}
                         </div>
                         <div class="flex items-center gap-1.5">
                             ${isClosed ? `
@@ -12860,12 +14429,20 @@ function toggleRegionFilter(regionKey, isCumulative = false) {
     updateRegionPillUI();
     filterAirports();
 
-    if (map) {
+    if (map && (isCameraAutoPanEnabled() || isCameraAutoZoomEnabled())) {
+        const panEnabled = isCameraAutoPanEnabled();
+        const zoomEnabled = isCameraAutoZoomEnabled();
         if (selectedRegions.size === 1) {
             const singleKey = Array.from(selectedRegions)[0];
             const vp = REGION_VIEWPORTS[singleKey];
             if (vp) {
-                map.flyTo(vp.center, vp.zoom, { duration: 1.2 });
+                if (panEnabled && zoomEnabled) {
+                    map.flyTo(vp.center, vp.zoom, { duration: getCameraPanDuration(1.2) });
+                } else if (panEnabled) {
+                    map.panTo(vp.center, { duration: getCameraPanDuration(1.2) });
+                } else if (zoomEnabled) {
+                    map.setZoom(vp.zoom);
+                }
             } else if (currentlyFilteredAirports.length > 0) {
                 zoomToFilteredAirportsBounds();
             }
@@ -12874,7 +14451,13 @@ function toggleRegionFilter(regionKey, isCumulative = false) {
                 zoomToFilteredAirportsBounds();
             }
         } else {
-            map.flyTo([25.0, 10.0], 3.0, { duration: 0.5 });
+            if (panEnabled && zoomEnabled) {
+                map.flyTo([25.0, 10.0], 3.0, { duration: getCameraPanDuration(0.5) });
+            } else if (panEnabled) {
+                map.panTo([25.0, 10.0], { duration: getCameraPanDuration(0.5) });
+            } else if (zoomEnabled) {
+                map.setZoom(3.0);
+            }
         }
     }
 }
@@ -12927,7 +14510,7 @@ function zoomToAirportsBounds(airports) {
     });
 
     if (minLat !== 90 && maxLat !== -90) {
-        map.fitBounds([[minLat, minLon], [maxLat, maxLon]], { padding: [50, 50], maxZoom: 8, animate: true });
+        fitMapBoundsRespectingCameraSettings([[minLat, minLon], [maxLat, maxLon]], { padding: [50, 50], maxZoom: 8, animate: true });
     }
 }
 
@@ -13164,9 +14747,17 @@ function filterAirports() {
             return false;
         }
 
+        // Fix #8: Hide custom sceneries parked/disabled by a Loadout Profile unless Default airports are explicitly enabled
+        if (ap.is_disabled && !selectedPricing.has('Default')) {
+            return false;
+        }
+
         // Highest Priority: Active Flight Isolation Mode (Strictly limit map and view to isolated flight sceneries)
         if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
-            if (!currentFlightMode.icaos.includes(ap.icao)) {
+            if (!currentFlightMode._icaoSet || currentFlightMode._icaoSet.size !== currentFlightMode.icaos.length) {
+                currentFlightMode._icaoSet = new Set(currentFlightMode.icaos);
+            }
+            if (!currentFlightMode._icaoSet.has(ap.icao)) {
                 return false;
             }
             if (search && search.length > 0) {
@@ -13192,7 +14783,7 @@ function filterAirports() {
         const isRouteWinOpen = (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen());
         const corridorDep = optimizerOrigin || (isFlightPlanningMode && flightPlanningDeparture ? flightPlanningDeparture : selectedAirport);
         const corridorArr = optimizerDest || (isFlightPlanningMode && flightPlanningDestination ? flightPlanningDestination : flightCorridorArrivalAirport);
-        const effectiveProfile = optimizerMode || flightCorridorProfile || 'DIRECT';
+        const effectiveProfile = optimizerMode || flightCorridorProfile || null;
 
         if (corridorDep && corridorArr && (isRouteWinOpen || isFlightPlanningMode || isFlightCorridorOptimized || (currentFlightMode && currentFlightMode.active))) {
             const isCorridorEndpoint = (ap.icao === corridorDep.icao || ap.icao === corridorArr.icao || (effectiveProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
@@ -13202,26 +14793,28 @@ function filterAirports() {
                 return true;
             }
 
-            // In 'DIRECT' profile: ONLY keep Departure & Destination, strictly hide all other airports!
-            if (effectiveProfile === 'DIRECT') {
-                return false;
-            }
+            if (effectiveProfile) {
+                // In 'DIRECT' profile: ONLY keep Departure & Destination, strictly hide all other airports!
+                if (effectiveProfile === 'DIRECT') {
+                    return false;
+                }
 
-            // In 'CORRIDOR' / 'SIMBRIEF' profile: For EN-ROUTE airports, only display custom addon sceneries along corridor
-            const pt = getAirportPricingType(ap);
-            if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
-                return false;
-            }
+                // In 'CORRIDOR' / 'SIMBRIEF' profile: For EN-ROUTE airports, only display custom addon sceneries along corridor
+                const pt = getAirportPricingType(ap);
+                if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
+                    return false;
+                }
 
-            if (!isAirportInCorridor(ap, corridorDep, corridorArr)) {
-                return false;
-            }
+                if (!isAirportInCorridor(ap, corridorDep, corridorArr)) {
+                    return false;
+                }
 
-            if (search && search.length > 0) {
-                const searchStr = ap._searchKey || buildAirportSearchKey(ap);
-                if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
+                if (search && search.length > 0) {
+                    const searchStr = ap._searchKey || buildAirportSearchKey(ap);
+                    if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
+                }
+                return true;
             }
-            return true;
         } else if (corridorDep && (isRouteWinOpen || isFlightPlanningMode) && !corridorArr) {
             // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
             if (ap.icao === corridorDep.icao) {
@@ -15715,6 +17308,11 @@ async function openSettingsModal() {
         gsxInput.value = currentSettings.gsx_profile_path || '';
     }
 
+    const projSelect = document.getElementById('cfg-map-projection');
+    if (projSelect) {
+        projSelect.value = currentSettings.map_projection || '2d';
+    }
+
     const regSelect = document.getElementById('cfg-camera-region');
     if (regSelect) {
         regSelect.value = currentSettings.camera_startup_region || 'world';
@@ -15722,23 +17320,29 @@ async function openSettingsModal() {
 
     const zoomSlider = document.getElementById('cfg-camera-zoom');
     if (zoomSlider) {
-        const zVal = (currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 8.0;
+        const zOff = (currentSettings.camera_zoom_enabled === false) || (currentSettings.camera_airport_zoom !== undefined && parseFloat(currentSettings.camera_airport_zoom) <= 3.5);
+        const zVal = zOff ? 3.5 : ((currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 8.0);
         zoomSlider.value = zVal;
-        const zDisp = document.getElementById('cfg-zoom-display');
-        if (zDisp) zDisp.innerText = zVal.toFixed(1);
     }
 
     const durSlider = document.getElementById('cfg-camera-duration');
     if (durSlider) {
-        const dVal = (currentSettings.camera_pan_duration !== undefined) ? parseFloat(currentSettings.camera_pan_duration) : 1.1;
+        const dOff = (currentSettings.camera_pan_enabled === false) || (currentSettings.camera_pan_duration !== undefined && parseFloat(currentSettings.camera_pan_duration) <= 0.05);
+        const dVal = dOff ? 0.0 : ((currentSettings.camera_pan_duration !== undefined) ? parseFloat(currentSettings.camera_pan_duration) : 1.1);
         durSlider.value = dVal;
-        const dDisp = document.getElementById('cfg-duration-display');
-        if (dDisp) dDisp.innerText = `${dVal.toFixed(1)}s`;
     }
+    syncCameraSlidersUI();
 
     const navStyleSelect = document.getElementById('cfg-nav-style');
     if (navStyleSelect) {
         navStyleSelect.value = currentSettings.navigation_style || 'classic';
+    }
+
+    const chkHeaderStats = document.getElementById('cfg-show-header-stats');
+    if (chkHeaderStats) {
+        const showStats = currentSettings.show_header_fun_stats !== false;
+        chkHeaderStats.checked = showStats;
+        window._settingsInitialHeaderStats = showStats;
     }
 
     const langSelect = document.getElementById('cfg-app-language');
@@ -15751,6 +17355,17 @@ async function openSettingsModal() {
     const currSelect = document.getElementById('cfg-app-currency');
     if (currSelect) {
         currSelect.value = selectedCurrency || currentSettings.currency || 'EUR';
+    }
+
+    const tzSelect = document.getElementById('cfg-local-tz-offset');
+    if (tzSelect) {
+        const tzVal = (currentSettings.local_tz_offset !== undefined && currentSettings.local_tz_offset !== null)
+            ? String(currentSettings.local_tz_offset)
+            : 'auto';
+        tzSelect.value = tzVal;
+        if (typeof previewLocalTimezoneOffset === 'function') {
+            previewLocalTimezoneOffset(tzVal, false);
+        }
     }
 
     const chkIcao = document.getElementById('cfg-label-icao');
@@ -15870,6 +17485,12 @@ function closeSettingsModal() {
         if (typeof setAppLanguage === 'function') {
             setAppLanguage(window._settingsInitialLanguage);
         }
+    }
+    // Revert header fun stats visibility if cancelled without saving
+    if (typeof window._settingsInitialHeaderStats !== 'undefined') {
+        applyHeaderStatsVisibility(window._settingsInitialHeaderStats);
+        const chkHeaderStats = document.getElementById('cfg-show-header-stats');
+        if (chkHeaderStats) chkHeaderStats.checked = window._settingsInitialHeaderStats;
     }
     // Revert navigation style dropdown and active mode if cancelled without saving
     const navStyleSelect = document.getElementById('cfg-nav-style');
@@ -16061,17 +17682,31 @@ async function saveSettings() {
             currentSettings.gsx_profile_path = gsxInput.value.trim();
         }
 
+        const projSelect = document.getElementById('cfg-map-projection');
+        if (projSelect) {
+            currentSettings.map_projection = projSelect.value || '2d';
+            if (typeof setMapProjectionMode === 'function') {
+                setMapProjectionMode(currentSettings.map_projection, false);
+            }
+        }
+        const prevStartupRegion = currentSettings.camera_startup_region || 'world';
         const regSelect = document.getElementById('cfg-camera-region');
         if (regSelect) {
             currentSettings.camera_startup_region = regSelect.value;
         }
         const zoomSlider = document.getElementById('cfg-camera-zoom');
         if (zoomSlider) {
-            currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
+            const zVal = parseFloat(zoomSlider.value);
+            currentSettings.camera_airport_zoom = zVal <= 3.5 ? 0 : zVal;
+            currentSettings.camera_zoom_enabled = zVal > 3.5;
+            if (zVal > 3.5) currentSettings.camera_last_airport_zoom = zVal;
         }
         const durSlider = document.getElementById('cfg-camera-duration');
         if (durSlider) {
-            currentSettings.camera_pan_duration = parseFloat(durSlider.value);
+            const dVal = parseFloat(durSlider.value);
+            currentSettings.camera_pan_duration = dVal <= 0.05 ? 0 : dVal;
+            currentSettings.camera_pan_enabled = dVal > 0.05;
+            if (dVal > 0.05) currentSettings.camera_last_pan_duration = dVal;
         }
 
         const navStyleSelect = document.getElementById('cfg-nav-style');
@@ -16095,6 +17730,14 @@ async function saveSettings() {
         if (currSelect) {
             currentSettings.currency = currSelect.value;
             setCurrency(currSelect.value);
+        }
+
+        const tzSelect = document.getElementById('cfg-local-tz-offset');
+        if (tzSelect) {
+            currentSettings.local_tz_offset = tzSelect.value;
+            if (typeof setLocalTimezoneOffsetSetting === 'function') {
+                setLocalTimezoneOffsetSetting(tzSelect.value, false);
+            }
         }
 
         const chkIcao = document.getElementById('cfg-label-icao');
@@ -16147,8 +17790,8 @@ async function saveSettings() {
             }
         }
 
-        // Only apply startup camera if no airport is currently focused and not in flight planning mode
-        if (!currentRadialAirport && !selectedAirport && !isFlightPlanningMode) {
+        // Only apply startup camera if startup region changed and auto pan/zoom are enabled
+        if (!currentRadialAirport && !selectedAirport && !isFlightPlanningMode && isCameraAutoPanEnabled() && isCameraAutoZoomEnabled() && currentSettings.camera_startup_region !== prevStartupRegion) {
             applyStartupCameraSettings();
         }
 
@@ -16221,22 +17864,114 @@ function previewAppLanguage(lang) {
 
 const saveAndRescanSettings = saveSettings;
 
-function updateCameraSettingsPreview() {
+function syncCameraSlidersUI() {
     const zoomSlider = document.getElementById('cfg-camera-zoom');
     const zoomDisp = document.getElementById('cfg-zoom-display');
+    const zoomOffBtn = document.getElementById('cfg-zoom-off-btn');
     if (zoomSlider && zoomDisp) {
         const zVal = parseFloat(zoomSlider.value);
-        zoomDisp.innerText = zVal.toFixed(1);
-        currentSettings.camera_airport_zoom = zVal;
+        const isOff = isNaN(zVal) || zVal <= 3.5;
+        if (isOff) {
+            zoomDisp.innerText = 'OFF';
+            zoomDisp.classList.add('text-amber-400');
+            zoomDisp.classList.remove('text-slate-200');
+            zoomSlider.classList.add('opacity-50');
+            if (zoomOffBtn) {
+                zoomOffBtn.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-amber-500/60 bg-amber-500/20 text-amber-300 transition-colors cursor-pointer';
+            }
+        } else {
+            zoomDisp.innerText = zVal.toFixed(1);
+            zoomDisp.classList.remove('text-amber-400');
+            zoomDisp.classList.add('text-slate-200');
+            zoomSlider.classList.remove('opacity-50');
+            if (zoomOffBtn) {
+                zoomOffBtn.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-700 bg-slate-800/80 text-slate-400 hover:text-white hover:border-slate-500 transition-colors cursor-pointer';
+            }
+        }
     }
 
     const durSlider = document.getElementById('cfg-camera-duration');
     const durDisp = document.getElementById('cfg-duration-display');
+    const durOffBtn = document.getElementById('cfg-duration-off-btn');
     if (durSlider && durDisp) {
         const dVal = parseFloat(durSlider.value);
-        durDisp.innerText = `${dVal.toFixed(1)}s`;
-        currentSettings.camera_pan_duration = dVal;
+        const isOff = isNaN(dVal) || dVal <= 0.05;
+        if (isOff) {
+            durDisp.innerText = 'OFF';
+            durDisp.classList.add('text-amber-400');
+            durDisp.classList.remove('text-slate-200');
+            durSlider.classList.add('opacity-50');
+            if (durOffBtn) {
+                durOffBtn.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-amber-500/60 bg-amber-500/20 text-amber-300 transition-colors cursor-pointer';
+            }
+        } else {
+            durDisp.innerText = `${dVal.toFixed(1)}s`;
+            durDisp.classList.remove('text-amber-400');
+            durDisp.classList.add('text-slate-200');
+            durSlider.classList.remove('opacity-50');
+            if (durOffBtn) {
+                durOffBtn.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-slate-700 bg-slate-800/80 text-slate-400 hover:text-white hover:border-slate-500 transition-colors cursor-pointer';
+            }
+        }
     }
+}
+
+function updateCameraSettingsPreview() {
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (zoomSlider) {
+        const zVal = parseFloat(zoomSlider.value);
+        const isOff = isNaN(zVal) || zVal <= 3.5;
+        currentSettings.camera_airport_zoom = isOff ? 0 : zVal;
+        currentSettings.camera_zoom_enabled = !isOff;
+        if (!isOff) {
+            currentSettings.camera_last_airport_zoom = zVal;
+        }
+    }
+
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (durSlider) {
+        const dVal = parseFloat(durSlider.value);
+        const isOff = isNaN(dVal) || dVal <= 0.05;
+        currentSettings.camera_pan_duration = isOff ? 0 : dVal;
+        currentSettings.camera_pan_enabled = !isOff;
+        if (!isOff) {
+            currentSettings.camera_last_pan_duration = dVal;
+        }
+    }
+
+    syncCameraSlidersUI();
+}
+
+function toggleCameraZoomOff() {
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (!zoomSlider) return;
+    const zVal = parseFloat(zoomSlider.value);
+    if (isNaN(zVal) || zVal <= 3.5) {
+        const restoreZoom = (currentSettings && currentSettings.camera_last_airport_zoom > 3.5)
+            ? currentSettings.camera_last_airport_zoom
+            : 8.0;
+        zoomSlider.value = restoreZoom;
+    } else {
+        if (currentSettings) currentSettings.camera_last_airport_zoom = zVal;
+        zoomSlider.value = 3.5;
+    }
+    updateCameraSettingsPreview();
+}
+
+function toggleCameraDurationOff() {
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (!durSlider) return;
+    const dVal = parseFloat(durSlider.value);
+    if (isNaN(dVal) || dVal <= 0.05) {
+        const restoreDur = (currentSettings && currentSettings.camera_last_pan_duration > 0.05)
+            ? currentSettings.camera_last_pan_duration
+            : 1.1;
+        durSlider.value = restoreDur;
+    } else {
+        if (currentSettings) currentSettings.camera_last_pan_duration = dVal;
+        durSlider.value = 0.0;
+    }
+    updateCameraSettingsPreview();
 }
 
 function resetCameraSettingsToDefault() {
@@ -16257,20 +17992,27 @@ function resetCameraSettingsToDefault() {
 }
 
 async function saveCameraSettingsOnly() {
+    const prevStartupRegion = currentSettings.camera_startup_region || 'world';
     const regSelect = document.getElementById('cfg-camera-region');
     if (regSelect) {
         currentSettings.camera_startup_region = regSelect.value;
     }
     const zoomSlider = document.getElementById('cfg-camera-zoom');
     if (zoomSlider) {
-        currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
+        const zVal = parseFloat(zoomSlider.value);
+        currentSettings.camera_airport_zoom = zVal <= 3.5 ? 0 : zVal;
+        currentSettings.camera_zoom_enabled = zVal > 3.5;
     }
     const durSlider = document.getElementById('cfg-camera-duration');
     if (durSlider) {
-        currentSettings.camera_pan_duration = parseFloat(durSlider.value);
+        const dVal = parseFloat(durSlider.value);
+        currentSettings.camera_pan_duration = dVal <= 0.05 ? 0 : dVal;
+        currentSettings.camera_pan_enabled = dVal > 0.05;
     }
 
-    applyStartupCameraSettings();
+    if (isCameraAutoPanEnabled() && isCameraAutoZoomEnabled() && currentSettings.camera_startup_region !== prevStartupRegion) {
+        applyStartupCameraSettings();
+    }
 
     try {
         if (window.pywebview) {
@@ -16365,6 +18107,11 @@ function applyNavigationStyle(style) {
     if (map && typeof map.invalidateSize === 'function') {
         setTimeout(() => map.invalidateSize(), 60);
         setTimeout(() => map.invalidateSize(), 250);
+    }
+    if (window.globeEngine && typeof window.globeEngine.resize === 'function') {
+        window.globeEngine.resize();
+        setTimeout(() => window.globeEngine.resize(), 60);
+        setTimeout(() => window.globeEngine.resize(), 250);
     }
 }
 
@@ -16584,8 +18331,11 @@ function updateClassicPanelUI() {
 
     const badgeGraphics = document.getElementById('classic-badge-graphics');
     if (badgeGraphics) {
-        const mode = (typeof currentMsfsGraphicsMode !== 'undefined') ? currentMsfsGraphicsMode : '2D';
-        badgeGraphics.textContent = mode.toUpperCase();
+        const rawMode = (typeof currentMsfsGraphicsMode !== 'undefined') ? String(currentMsfsGraphicsMode).toUpperCase() : '2D';
+        const displayMode = (rawMode === '2D' || rawMode === 'VR')
+            ? rawMode
+            : ((typeof lastMsfsDisplayMode !== 'undefined' && (lastMsfsDisplayMode === '2D' || lastMsfsDisplayMode === 'VR')) ? lastMsfsDisplayMode : '2D');
+        badgeGraphics.textContent = displayMode;
         badgeGraphics.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-slate-300 border border-[#2A3241]';
     }
 
@@ -17386,7 +19136,15 @@ function renderPatchChangelogMarkdown(mdText) {
         if (line.startsWith('# ')) {
             if (inList) { html += '</ul>'; inList = false; }
             html += `<div class="text-xs font-bold text-slate-100 pb-2 border-b border-slate-800">${formatInline(line.slice(2))}</div>`;
-        } else if (line.startsWith('## ') || line.startsWith('### ')) {
+        } else if (line.startsWith('## ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            const secTitle = line.replace(/^##\s*/, '');
+            const isBugSection = /bug|fix|corr|stab/i.test(secTitle);
+            const badgeCls = isBugSection
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                : 'bg-[#00A8FF]/15 text-[#38BDF8] border-[#00A8FF]/30';
+            html += `<div class="pt-3 pb-1"><span class="inline-flex items-center px-2.5 py-1 rounded border text-[11px] font-bold uppercase tracking-wider ${badgeCls}">${formatInline(secTitle)}</span></div>`;
+        } else if (line.startsWith('### ')) {
             if (inList) { html += '</ul>'; inList = false; }
             html += `<div class="text-xs font-bold text-slate-100 pt-1.5">${formatInline(line.replace(/^#+\s*/, ''))}</div>`;
         } else if (line.startsWith('- ') || line.startsWith('* ')) {
@@ -17691,30 +19449,34 @@ async function syncSimBriefFlightPlan() {
     const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || 
                    (currentSettings.settings && (currentSettings.settings.simbrief_username || currentSettings.settings.simbrief_userid)) || '';
     if (!sbUser) {
-        openSettingsModal();
-        setTimeout(() => {
-            const input = document.getElementById('cfg-simbrief-id');
-            if (input) {
-                input.focus();
-                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        openFlightOptimizerModal('route');
+        const inlineSetup = document.getElementById('simbrief-inline-setup');
+        if (inlineSetup) {
+            inlineSetup.classList.remove('hidden');
+            const inlineInput = document.getElementById('simbrief-inline-id-input');
+            if (inlineInput) {
+                setTimeout(() => inlineInput.focus(), 80);
             }
-        }, 200);
-        showToast(t('simbrief.credentials_required', 'Please configure your SimBrief Username or Pilot ID in Settings.'), 'warning');
+        }
+        showToast(t('simbrief.credentials_required', 'Enter your SimBrief Pilot ID or Username in the route bar.'), 'warning');
         return;
     }
 
+    const inlineSetup = document.getElementById('simbrief-inline-setup');
+    if (inlineSetup) inlineSetup.classList.add('hidden');
+
     isSyncingSimBrief = true;
     const fpBtn = document.getElementById('fp-btn-simbrief');
-    const optIcon = document.querySelector('#opt-mode-card-simbrief i');
-    let originalOptIconClass = '';
-    if (optIcon) {
-        originalOptIconClass = optIcon.className;
-        optIcon.className = 'fa-solid fa-spinner fa-spin text-cyan-400 text-xs';
+    const optBtnSpan = document.querySelector('#opt-mode-card-simbrief span');
+    let originalOptBtnText = '';
+    if (optBtnSpan) {
+        originalOptBtnText = optBtnSpan.textContent;
+        optBtnSpan.textContent = 'FETCHING OFP...';
     }
     let originalHtml = '';
     if (fpBtn) {
         originalHtml = fpBtn.innerHTML;
-        fpBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i>';
+        fpBtn.innerHTML = '<span>FETCHING...</span>';
     }
 
     try {
@@ -17818,10 +19580,13 @@ async function syncSimBriefFlightPlan() {
         flightOriginAirport = depAp;
         flightDestinationAirport = arrAp;
 
-        // 4. Update Modal UI
+        // 4. Update Modal UI & Pre-Flight Cross-Audit (Conditional Compact vs Auto-Expanded)
         hasUserDraggedOptimizerModal = false;
         openFlightOptimizerModal('route', depAp);
         updateOptimizerRouteUI();
+        if (typeof renderSimBriefCrossAuditUI === 'function') {
+            renderSimBriefCrossAuditUI(flight.cross_audit || res.cross_audit || null, true);
+        }
         positionFlightOptimizerModal();
 
         // 5. Render corridor, alternates, and fit map bounds
@@ -17858,8 +19623,8 @@ async function syncSimBriefFlightPlan() {
         if (fpBtn && originalHtml) {
             fpBtn.innerHTML = originalHtml;
         }
-        if (optIcon && originalOptIconClass) {
-            optIcon.className = originalOptIconClass;
+        if (optBtnSpan && originalOptBtnText) {
+            optBtnSpan.textContent = originalOptBtnText;
         }
     }
 }
@@ -18361,7 +20126,7 @@ let currentOptimizerTab = 'route';
 let optimizerOrigin = null;
 let optimizerDest = null;
 let optimizerActiveAnchorAirport = null;
-let optimizerMode = 'DIRECT';
+let optimizerMode = null;
 let isOptimizerModalDragging = false;
 let optimizerModalDragStart = { offsetX: 0, offsetY: 0 };
 let hasUserDraggedOptimizerModal = false;
@@ -18464,10 +20229,13 @@ function createRouteAirportBadgeIcon(ap, role = 'DEP') {
     const cleanCity = (typeof getCleanCityName === 'function') ? getCleanCityName(ap.city) : (ap.city || '');
     const locStr = [cleanCity, resolvedCountryName].filter(Boolean).join(', ') || 'Unknown Location';
 
-    const roleTagClass = isDep
-        ? 'bg-cyan-600 text-white font-mono font-black border-0 shadow-sm'
-        : 'bg-purple-600 text-white font-mono font-black border-0 shadow-sm';
-    const roleLabel = isDep ? 'DEPARTURE' : 'ARRIVAL';
+    const isPin = (role === 'PIN');
+    const roleTagClass = isPin
+        ? 'bg-[#00A8FF] text-[#0B0D11] font-mono font-black border-0 shadow-sm'
+        : (isDep
+            ? 'bg-cyan-600 text-white font-mono font-black border-0 shadow-sm'
+            : 'bg-purple-600 text-white font-mono font-black border-0 shadow-sm');
+    const roleLabel = isPin ? 'SELECTED' : (isDep ? 'DEPARTURE' : 'ARRIVAL');
 
     const currentZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 7;
     const initialScale = getRouteBadgeScale(currentZoom);
@@ -18521,10 +20289,11 @@ function updateRouteAirportBadgesZoomScale(targetZoom) {
 
 function syncRouteBadgesWrapping() {
     if (!map) return;
-    if (routeDepartureMarker && optimizerOrigin) {
+    const depRef = optimizerOrigin;
+    if (routeDepartureMarker && depRef) {
         const ll = (typeof getWrappedAirportLatLng === 'function')
-            ? getWrappedAirportLatLng(optimizerOrigin)
-            : [parseFloat(optimizerOrigin.lat), parseFloat(optimizerOrigin.lon)];
+            ? getWrappedAirportLatLng(depRef)
+            : [parseFloat(depRef.lat), parseFloat(depRef.lon)];
         if (ll) routeDepartureMarker.setLatLng(ll);
     }
     if (routeArrivalMarker && optimizerDest) {
@@ -18542,6 +20311,12 @@ function updateRouteAirportBadges() {
         routeAirportBadgesLayerGroup = L.layerGroup().addTo(map);
     } else if (!map.hasLayer(routeAirportBadgesLayerGroup)) {
         map.addLayer(routeAirportBadgesLayerGroup);
+    }
+
+    // In Loadout Builder mode, never display any circular route/selected badge (only base airport stars + planted SVG pins)
+    if (typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive()) {
+        clearRouteAirportBadges();
+        return;
     }
 
     // 1. Departure Badge
@@ -18623,12 +20398,19 @@ function updateRouteAirportBadges() {
     // 3. Keep label hiding & scale synchronized
     syncRouteBadgesAirportMarkerLabels();
     updateRouteAirportBadgesZoomScale();
+    if (window.globeEngine && typeof window.globeEngine.syncDomRouteBadges === 'function') {
+        window.globeEngine.syncDomRouteBadges(true);
+        window.globeEngine.requestRender();
+    }
 }
 
 function syncRouteBadgesAirportMarkerLabels() {
     document.querySelectorAll('.route-badge-active').forEach(el => el.classList.remove('route-badge-active'));
-    if (routeDepartureMarker && optimizerOrigin && optimizerOrigin.icao) {
-        const m = (airportMarkerCache && airportMarkerCache.get(optimizerOrigin.icao));
+    const depRef = (typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive() && typeof loadoutBuilderSelectedMapAirport !== 'undefined' && loadoutBuilderSelectedMapAirport)
+        ? loadoutBuilderSelectedMapAirport
+        : optimizerOrigin;
+    if (routeDepartureMarker && depRef && depRef.icao) {
+        const m = (airportMarkerCache && airportMarkerCache.get(depRef.icao));
         const el = m && (typeof m.getElement === 'function' ? m.getElement() : m._icon);
         if (el) el.classList.add('route-badge-active');
     }
@@ -18646,12 +20428,16 @@ function clearRouteAirportBadges() {
     routeDepartureMarker = null;
     routeArrivalMarker = null;
     document.querySelectorAll('.route-badge-active').forEach(el => el.classList.remove('route-badge-active'));
+    if (window.globeEngine && typeof window.globeEngine.syncDomRouteBadges === 'function') {
+        window.globeEngine.syncDomRouteBadges(true);
+        window.globeEngine.requestRender();
+    }
 }
 
 function isFlightOptimizerModalOpen() {
     const modal = document.getElementById('flight-optimizer-modal');
     const isOldOpen = !!(modal && !modal.classList.contains('hidden'));
-    const routeWin = document.getElementById('float-win-route-opt');
+    const routeWin = document.getElementById('float-win-unified-optimizer') || document.getElementById('float-win-route-opt');
     const isRouteOpen = !!(routeWin && !routeWin.classList.contains('hidden'));
     return isOldOpen || isRouteOpen;
 }
@@ -18683,7 +20469,7 @@ function handleAirportRouteSelection(ap) {
         flightCorridorArrivalAirport = null;
         selectedAirport = ap;
         isFlightPlanningMode = true;
-        flightCorridorProfile = optimizerMode || 'DIRECT';
+        flightCorridorProfile = optimizerMode || null;
         isDirectRouteMode = (flightCorridorProfile === 'DIRECT');
         currentSimBriefFlight = null;
         currentSimBriefAlternates = [];
@@ -18711,7 +20497,7 @@ function handleAirportRouteSelection(ap) {
         flightDestAirport = ap;
         flightCorridorArrivalAirport = ap;
         isFlightPlanningMode = true;
-        flightCorridorProfile = optimizerMode || 'DIRECT';
+        flightCorridorProfile = optimizerMode || null;
         isDirectRouteMode = (flightCorridorProfile === 'DIRECT');
 
         if (typeof renderFlightCorridor === 'function') {
@@ -18929,6 +20715,9 @@ function triggerRadialFlightOptimizer() {
     flightCorridorArrivalAirport = null;
     selectedAirport = targetAp;
     isFlightPlanningMode = true;
+    optimizerMode = null;
+    flightCorridorProfile = null;
+    isDirectRouteMode = false;
     currentSimBriefFlight = null;
     currentSimBriefAlternates = [];
 
@@ -19024,7 +20813,7 @@ class WindowManager {
         const id = modalEl.id || modalEl.dataset?.modalId || '';
         return id === 'float-win-my-rig' ||
                id === 'float-win-smart-lod' ||
-               id === 'float-win-route-opt' ||
+               id === 'float-win-unified-optimizer' || id === 'float-win-route-opt' ||
                id === 'float-win-telemetry' ||
                id === 'float-win-remote-panel' ||
                id === 'float-win-bug-report' ||
@@ -19115,8 +20904,11 @@ class WindowManager {
                 modalEl.style.height = `${height}px`;
             }
             if (width !== undefined) {
-                if (modalId === 'float-win-route-opt') {
-                    modalEl.style.width = 'fit-content';
+                if (modalId === 'float-win-unified-optimizer' || modalId === 'float-win-route-opt') {
+                    const isBuilderView = (typeof currentUnifiedOptimizerView !== 'undefined' && currentUnifiedOptimizerView === 'BUILDER');
+                    const isLeftCollapsed = (typeof isLoadoutLeftPanelCollapsed !== 'undefined' && isLoadoutLeftPanelCollapsed);
+                    const desiredW = isBuilderView ? (isLeftCollapsed ? 680 : 1060) : 920;
+                    modalEl.style.width = `${Math.min(desiredW, window.innerWidth - 32)}px`;
                 } else {
                     modalEl.style.width = `${Math.min(window.innerWidth - minLeft - 24, width)}px`;
                 }
@@ -19186,26 +20978,43 @@ class WindowManager {
         const graphics = document.getElementById('float-win-graphics');
         const detailsModal = document.getElementById('radial-details-modal');
         const airlinesModal = document.getElementById('radial-airlines-modal');
-        const routeOpt = document.getElementById('float-win-route-opt');
+        const routeOpt = document.getElementById('float-win-unified-optimizer') || document.getElementById('float-win-route-opt');
         const remotePanel = document.getElementById('float-win-remote-panel');
         const bugReport = document.getElementById('float-win-bug-report');
         const reportViewer = document.getElementById('float-win-report-viewer');
 
         const isRouteOpen = isWinOpen(routeOpt);
 
-        // FLIGHT ROUTE OPTIMIZATION: ALWAYS A HORIZONTAL BANNER (BANDEAU), NEVER A VERTICAL COLUMN!
+        // FLIGHT ROUTE OPTIMIZATION MODAL: ALWAYS CENTERED, NEVER SQUEEZED INTO TILED COLUMNS!
         if (isRouteOpen) {
-            routeOpt.style.width = 'fit-content';
-            routeOpt.style.maxWidth = `calc(100vw - ${minLeft + rightMargin}px)`;
+            const isTourActive = !!(window.onboardingTour && window.onboardingTour.isOpen);
+            const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassic ? 304 : 16;
+            const isBuilderView = (typeof currentUnifiedOptimizerView !== 'undefined' && currentUnifiedOptimizerView === 'BUILDER');
+            const isLeftCollapsed = (typeof isLoadoutLeftPanelCollapsed !== 'undefined' && isLoadoutLeftPanelCollapsed);
+            const desiredW = isBuilderView ? (isLeftCollapsed ? 680 : 1060) : 920;
+            const maxAllowedW = isTourActive
+                ? Math.max(680, window.innerWidth - minLeft - 390)
+                : (window.innerWidth - 32);
+            const targetW = Math.min(desiredW, maxAllowedW);
+            const routeH = Math.max(240, window.innerHeight - baseTopBound - botBound);
+            routeOpt.style.width = `${targetW}px`;
+            routeOpt.style.maxWidth = 'calc(100vw - 24px)';
             routeOpt.style.height = 'auto';
-            routeOpt.style.maxHeight = 'none';
+            routeOpt.style.maxHeight = `${routeH}px`;
             routeOpt.style.right = 'auto';
             routeOpt.style.bottom = 'auto';
-            routeOpt.style.transform = 'none';
-            routeOpt.style.top = `${baseTopBound}px`;
-            const routeW = routeOpt.offsetWidth || 960;
-            const routeLeft = Math.max(minLeft, Math.floor(minLeft + Math.max(0, (availableW - routeW) / 2)));
-            routeOpt.style.left = `${routeLeft}px`;
+            if (!routeOpt._hasBeenDragged || isTourActive) {
+                const targetLeft = isTourActive
+                    ? minLeft
+                    : Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+                const estH = routeOpt.offsetHeight || 420;
+                const availH = window.innerHeight - baseTopBound - botBound;
+                const targetTop = Math.max(baseTopBound, baseTopBound + Math.round((availH - estH) / 2));
+                routeOpt.style.top = `${targetTop}px`;
+                routeOpt.style.left = `${targetLeft}px`;
+                routeOpt.style.transform = 'none';
+            }
         }
 
         // FLIGHT REPORT VIEWER: ALWAYS A STANDALONE WIDE INSPECTION MODAL, NEVER SQUEEZED INTO TILED COLUMNS!
@@ -19735,8 +21544,8 @@ class WindowManager {
             modalEl.style.zIndex = '2800';
             return;
         }
-        if (id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt') {
-            modalEl.style.width = 'fit-content';
+        if (id === 'float-win-unified-optimizer' || id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-unified-optimizer') {
+            modalEl.style.width = '1060px';
             return;
         }
         if (id === 'float-win-graphics') {
@@ -20074,7 +21883,12 @@ const FLOATING_WINDOW_MAP = {
     'smart_lod': 'float-win-smart-lod',
     'telemetry': 'float-win-telemetry',
     'blackbox': 'float-win-telemetry',
-    'route': 'float-win-route-opt',
+    'route': 'float-win-unified-optimizer',
+    'loadouts': 'float-win-unified-optimizer',
+    'unified_optimizer': 'float-win-unified-optimizer',
+    'float-win-route-opt': 'float-win-unified-optimizer',
+    'float-win-loadouts': 'float-win-unified-optimizer',
+    'float-win-unified-optimizer': 'float-win-unified-optimizer',
     'bug_report': 'float-win-bug-report',
     'remote_panel': 'float-win-remote-panel',
     'in_game_panel': 'float-win-remote-panel',
@@ -20088,6 +21902,7 @@ const FLOATING_DEFAULT_OFFSETS = {
     'smart_lod': { x: 340, y: 126 },
     'telemetry': { x: 320, y: 126 },
     'route': { x: 310, y: 126 },
+    'loadouts': { x: 320, y: 126 },
     'bug_report': { x: 340, y: 126 },
     'remote_panel': { x: 330, y: 126 },
     'report_viewer': { x: 310, y: 126 },
@@ -20098,7 +21913,7 @@ const LITE_LOCKED_FLOATING_WINDOWS = new Set([
     'smart_lod', 'graphics', 'my_rig', 'rig', 'telemetry', 'route',
     'remote_panel', 'report_viewer', 'report-viewer',
     'float-win-smart-lod', 'float-win-graphics', 'float-win-my-rig',
-    'float-win-telemetry', 'float-win-route-opt', 'float-win-remote-panel',
+    'float-win-telemetry', 'float-win-unified-optimizer', 'float-win-route-opt', 'float-win-remote-panel',
     'float-win-report-viewer'
 ]);
 
@@ -20182,12 +21997,22 @@ function openFloatingWindow(winKey, targetAp = null) {
             const isRigPinnedOpen = pinnedRig && pinnedRig.classList.contains('is-pinned') && !pinnedRig.classList.contains('hidden');
             const effectiveTopBound = isRigPinnedOpen ? Math.min(window.innerHeight - botBound - 300, (pinnedRig.offsetHeight || 135) + 126 + 10) : topBound;
 
-            if (winKey === 'route' || elId === 'float-win-route-opt') {
-                winEl.style.width = 'fit-content';
-                const targetW = winEl.offsetWidth || parseInt(winEl.style.width) || 960;
-                const left = Math.max(minLeft, Math.floor(minLeft + Math.max(0, (availableW - targetW) / 2)));
-                winEl.style.left = `${left}px`;
-                winEl.style.top = `${effectiveTopBound}px`;
+            if (winKey === 'route' || winKey === 'loadouts' || elId === 'float-win-unified-optimizer' || elId === 'float-win-route-opt') {
+                const isBuilderView = (typeof currentUnifiedOptimizerView !== 'undefined' && currentUnifiedOptimizerView === 'BUILDER');
+                const isLeftCollapsed = (typeof isLoadoutLeftPanelCollapsed !== 'undefined' && isLoadoutLeftPanelCollapsed);
+                const desiredW = isBuilderView ? (isLeftCollapsed ? 680 : 1060) : 920;
+                const targetW = Math.min(desiredW, window.innerWidth - 32);
+                winEl.style.width = `${targetW}px`;
+                winEl.style.maxWidth = 'calc(100vw - 24px)';
+                winEl.style.height = 'auto';
+                winEl.style.maxHeight = `${maxAllowedH}px`;
+                winEl.style.transform = 'none';
+                const targetLeft = Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+                const estH = 380;
+                const availH = window.innerHeight - effectiveTopBound - botBound;
+                const targetTop = Math.max(effectiveTopBound, effectiveTopBound + Math.round((availH - estH) / 2));
+                winEl.style.left = `${targetLeft}px`;
+                winEl.style.top = `${targetTop}px`;
             } else if (winKey === 'my_rig' || winKey === 'rig' || elId === 'float-win-my-rig') {
                 const targetW = 700;
                 winEl.style.width = `${targetW}px`;
@@ -20266,7 +22091,7 @@ function openFloatingWindow(winKey, targetAp = null) {
     } else if (winKey === 'telemetry' || winKey === 'blackbox') {
         startBlackboxTelemetryPolling();
         refreshBenchmarksList();
-    } else if (winKey === 'route') {
+    } else if (winKey === 'route' || winKey === 'loadouts' || elId === 'float-win-unified-optimizer') {
         if (typeof closeAirportRadialMenu === 'function') {
             closeAirportRadialMenu(false);
         }
@@ -20281,6 +22106,12 @@ function openFloatingWindow(winKey, targetAp = null) {
             optimizerOrigin = currentClassicAirport;
             flightPlanningDeparture = currentClassicAirport;
             selectedAirport = currentClassicAirport;
+        }
+        if (typeof openLoadoutProfilesManager === 'function') {
+            openLoadoutProfilesManager();
+        }
+        if (typeof switchUnifiedOptimizerView === 'function') {
+            switchUnifiedOptimizerView(winKey === 'loadouts' ? 'BUILDER' : 'MAIN');
         }
         updateOptimizerRouteUI();
     } else if (winKey === 'remote_panel') {
@@ -20327,7 +22158,21 @@ function closeFloatingWindow(winKey) {
         const inGameBtn = document.getElementById('in-game-panel-btn');
         if (inGameBtn) inGameBtn.classList.remove('bg-slate-700');
     }
-    if (winKey === 'route' || elId === 'float-win-route-opt') {
+    if (winKey === 'route' || winKey === 'loadouts' || elId === 'float-win-unified-optimizer' || elId === 'float-win-route-opt') {
+        if (typeof closeOptimizerDrawer === 'function') {
+            closeOptimizerDrawer();
+        }
+        if (typeof _savedRouteStateBeforeBuilder !== 'undefined' && _savedRouteStateBeforeBuilder) {
+            restoreRouteStateAfterBuilder();
+        }
+        loadoutBuilderSelectedMapAirport = null;
+        if (!_isApplyingLoadoutProfile) {
+            pendingActiveLoadoutId = currentActiveLoadoutId;
+            selectedBaseLoadoutId = currentActiveLoadoutId;
+            if (typeof previewLoadoutProfileOnMap === 'function') {
+                previewLoadoutProfileOnMap(currentActiveLoadoutId);
+            }
+        }
         if (!isFlightCorridorOptimized) {
             if (typeof clearOptimizerRoutePlanning === 'function') {
                 clearOptimizerRoutePlanning(true);
@@ -20765,9 +22610,9 @@ function forceExitOptimizerClean() {
     isFlightOptimizerActive = false;
     isFlightCorridorOptimized = false;
     flightCorridorDisabledCount = 0;
-    optimizerMode = 'DIRECT';
-    flightCorridorProfile = 'DIRECT';
-    isDirectRouteMode = true;
+    optimizerMode = null;
+    flightCorridorProfile = null;
+    isDirectRouteMode = false;
 
     try {
         localStorage.removeItem('sceneryx_saved_flight_plan');
@@ -20855,9 +22700,9 @@ function clearOptimizerRoutePlanning(silent = false) {
     isFlightPlanningMode = true;
     isFlightCorridorOptimized = false;
     flightCorridorDisabledCount = 0;
-    optimizerMode = 'DIRECT';
-    flightCorridorProfile = 'DIRECT';
-    isDirectRouteMode = true;
+    optimizerMode = null;
+    flightCorridorProfile = null;
+    isDirectRouteMode = false;
     hasUserDraggedOptimizerModal = false;
 
     try {
@@ -20890,6 +22735,11 @@ function clearOptimizerRoutePlanning(silent = false) {
         banner.classList.remove('flex');
         banner.style.display = 'none';
     }
+
+    const sbAuditPanel = document.getElementById('simbrief-cross-audit-panel');
+    if (sbAuditPanel) sbAuditPanel.classList.add('hidden');
+    const sbInlineSetup = document.getElementById('simbrief-inline-setup');
+    if (sbInlineSetup) sbInlineSetup.classList.add('hidden');
 
     updateOptimizerRouteUI();
 
@@ -20938,17 +22788,16 @@ function updateOptimizerRouteUI() {
     const origName = document.getElementById('opt-route-origin-name');
     const destIcao = document.getElementById('opt-route-dest-icao');
     const destName = document.getElementById('opt-route-dest-name');
-    const flightBadge = document.getElementById('opt-modal-flight-badge');
 
     if (origIcao) {
         origIcao.textContent = optimizerOrigin ? optimizerOrigin.icao : '----';
-        origIcao.className = `font-mono text-xl font-bold ${getAirportPricingTextColor(optimizerOrigin)} leading-none`;
-        if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || '') : '';
+        origIcao.className = `font-mono text-lg font-black ${optimizerOrigin ? getAirportPricingTextColor(optimizerOrigin) : 'text-[#F1F5F9]'} leading-none block mt-0.5`;
+        if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.city || optimizerOrigin.name || optimizerOrigin.icao) : 'CLICK MAP TO SET';
     }
     if (destIcao) {
         destIcao.textContent = optimizerDest ? optimizerDest.icao : '----';
-        destIcao.className = `font-mono text-xl font-bold ${getAirportPricingTextColor(optimizerDest)} leading-none`;
-        if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || '') : '';
+        destIcao.className = `font-mono text-lg font-black ${optimizerDest ? getAirportPricingTextColor(optimizerDest) : 'text-[#F1F5F9]'} leading-none block mt-0.5`;
+        if (destName) destName.textContent = optimizerDest ? (optimizerDest.city || optimizerDest.name || optimizerDest.icao) : 'CLICK MAP TO SET';
     }
 
     const origBox = document.getElementById('opt-route-origin-box');
@@ -20960,54 +22809,43 @@ function updateOptimizerRouteUI() {
         destBox.title = optimizerDest ? `Arrival: ${optimizerDest.icao} - ${optimizerDest.name || ''} (Click to focus on map)` : 'Click an airport on the map to set Arrival';
     }
 
-    if (flightBadge) {
-        flightBadge.classList.add('hidden');
+    // Auto-select DIRECT mode if user selected Departure & Arrival on map while mode was null/NONE
+    const hasRouteAirports = !!(optimizerOrigin && optimizerDest);
+    if (hasRouteAirports && (!optimizerMode || optimizerMode === 'NONE')) {
+        optimizerMode = 'DIRECT';
+        flightCorridorProfile = 'DIRECT';
+        isDirectRouteMode = true;
+    }
+    // If user activated a route while Step 1 was still on default ALL, switch Step 1 to NONE_ROUTE_ONLY so savings are immediately active
+    if (hasRouteAirports && typeof selectedBaseLoadoutId !== 'undefined' && selectedBaseLoadoutId === 'ALL' && !window._userExplicitlyChoseAllWithRoute) {
+        selectedBaseLoadoutId = 'NONE_ROUTE_ONLY';
     }
 
-    ['direct', 'corridor', 'simbrief'].forEach(m => {
+    const activeRouteMode = (optimizerMode && optimizerMode !== 'NONE') ? optimizerMode.toUpperCase() : 'NONE';
+    ['none', 'direct', 'corridor', 'simbrief'].forEach(m => {
         const card = document.getElementById(`opt-mode-card-${m}`);
         if (card) {
-            const titleSpan = card.querySelector('span');
-            if (m.toUpperCase() === optimizerMode) {
-                card.className = 'h-8 px-3 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
-                if (titleSpan) titleSpan.className = 'font-bold text-[#0F1115]';
+            if (m.toUpperCase() === activeRouteMode) {
+                card.className = 'sx-btn-flat sx-btn-flat-primary py-1 px-2.5 text-[10px]';
             } else {
-                card.className = 'h-8 px-3.5 rounded-md bg-transparent hover:bg-[#1C212B] text-slate-400 hover:text-white font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center';
-                if (titleSpan) titleSpan.className = 'font-semibold text-slate-400';
+                card.className = 'sx-btn-flat py-1 px-2.5 text-[10px]';
             }
         }
     });
 
-    const clearRouteBtn = document.getElementById('opt-btn-clear-route');
-    if (clearRouteBtn) {
-        const hasRoute = !!(optimizerOrigin || optimizerDest);
-        clearRouteBtn.disabled = false;
-        clearRouteBtn.className = 'h-9 px-3.5 rounded-md bg-[#1C212B] hover:bg-[#242B38] border border-[#2A3241] text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm';
-        clearRouteBtn.title = hasRoute ? 'Clear current flight route' : 'Start a new flight route';
-    }
-
     const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
     if (restoreBtn) {
-        restoreBtn.className = 'h-9 px-3.5 rounded-md bg-[#1C212B] hover:bg-[#242B38] border border-[#2A3241] text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm';
-        if (isFlightCorridorOptimized) {
+        const isModifiedState = isFlightCorridorOptimized || (typeof currentActiveLoadoutId !== 'undefined' && currentActiveLoadoutId !== 'ALL');
+        if (isModifiedState) {
             restoreBtn.classList.remove('hidden');
         } else {
             restoreBtn.classList.add('hidden');
         }
     }
 
-    const routeWinEl = document.getElementById('float-win-route-opt');
-    if (routeWinEl) {
-        routeWinEl.style.width = 'fit-content';
-        if (!routeWinEl._hasBeenDragged && typeof centerModal === 'function') {
-            const w = routeWinEl.offsetWidth;
-            if (w > 0) {
-                const left = Math.max(16, Math.floor((window.innerWidth - w) / 2));
-                routeWinEl.style.left = `${left}px`;
-            }
-        }
+    if (typeof syncUnifiedBaseLoadoutSummaryUI === 'function') {
+        syncUnifiedBaseLoadoutSummaryUI();
     }
-
     updateOptimizerSavings();
     if (typeof updateClassicSidebarRouteBadge === 'function') {
         updateClassicSidebarRouteBadge();
@@ -21015,53 +22853,20 @@ function updateOptimizerRouteUI() {
 }
 
 function updateOptimizerSavings() {
+    const activeCountEl = document.getElementById('opt-total-active-scenery-count');
     const savingCountEl = document.getElementById('opt-saving-scenery-count');
     const savingRamEl = document.getElementById('opt-saving-ram-val');
     const savingVramEl = document.getElementById('opt-saving-vram-val');
-    if (!savingCountEl) return;
+    const routeAddedEl = document.getElementById('unified-route-added-count');
 
-    if (!optimizerOrigin || !optimizerDest) {
-        savingCountEl.textContent = '--';
-        if (savingRamEl) savingRamEl.textContent = '0.00 GB';
-        if (savingVramEl) savingVramEl.textContent = '0 MB';
-        return;
+    if (typeof computeUnifiedCombinedSets === 'function') {
+        const calc = computeUnifiedCombinedSets();
+        if (activeCountEl) activeCountEl.textContent = `${calc.finalActiveCount}`;
+        if (savingCountEl) savingCountEl.textContent = `${calc.parkedCount}`;
+        if (savingRamEl) savingRamEl.textContent = `${calc.ramSavedGb} GB`;
+        if (savingVramEl) savingVramEl.textContent = `${calc.vramSavedMb} MB`;
+        if (routeAddedEl) routeAddedEl.textContent = `+${calc.routeAddedToBaseCount} SCENERIES`;
     }
-
-    if (isFlightCorridorOptimized && flightCorridorDisabledCount > 0) {
-        savingCountEl.textContent = `${flightCorridorDisabledCount}`;
-        const ramSavedGb = (flightCorridorDisabledCount * 0.0053).toFixed(2);
-        const vramSavedMb = Math.round(flightCorridorDisabledCount * 1.25);
-        if (savingRamEl) savingRamEl.textContent = `${ramSavedGb} GB`;
-        if (savingVramEl) savingVramEl.textContent = `${vramSavedMb} MB`;
-        return;
-    }
-
-    const allThirdParty = (typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData))
-        ? allAirportsData.filter(ap => {
-            if (!ap) return false;
-            const pt = typeof getAirportPricingType === 'function' ? getAirportPricingType(ap) : ap.pricing_type;
-            return !(pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default ||
-                     (ap.package_name && ap.package_name.startsWith('msfs-default-')));
-        })
-        : [];
-
-    let keptCount = 2;
-    if (optimizerMode === 'CORRIDOR' && typeof getCorridorAddonsList === 'function') {
-        const corridorAddons = getCorridorAddonsList();
-        keptCount = 2 + corridorAddons.length;
-    } else if (optimizerMode === 'SIMBRIEF') {
-        const altCount = (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) ? currentSimBriefAlternates.length : 0;
-        const corridorAddons = (typeof getCorridorAddonsList === 'function') ? getCorridorAddonsList() : [];
-        keptCount = 2 + altCount + corridorAddons.length;
-    }
-
-    const disabledCount = Math.max(0, allThirdParty.length - keptCount);
-    savingCountEl.textContent = `${disabledCount}`;
-
-    const ramSavedGb = (disabledCount * 0.0053).toFixed(2);
-    const vramSavedMb = Math.round(disabledCount * 1.25);
-    if (savingRamEl) savingRamEl.textContent = `${ramSavedGb} GB`;
-    if (savingVramEl) savingVramEl.textContent = `${vramSavedMb} MB`;
 }
 
 function updateClassicSidebarRouteBadge() {
@@ -21086,18 +22891,22 @@ function updateClassicSidebarRouteBadge() {
     const arrIcao = arr ? (arr.icao || '').toUpperCase() : '';
 
     if (depIcao && arrIcao) {
-        badgeRoute.textContent = `${depIcao} ➔ ${arrIcao}`;
+        badgeRoute.textContent = `${depIcao} TO ${arrIcao}`;
         if (typeof isFlightCorridorOptimized !== 'undefined' && isFlightCorridorOptimized) {
-            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded sx-status-ok';
         } else {
-            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00A8FF] text-[#0F1115] shadow-sm';
+            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded sx-cat-freeware';
         }
-    } else if (depIcao) {
-        badgeRoute.textContent = `${depIcao} ➔ ...`;
-        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#38BDF8] text-[#0F1115] shadow-sm';
+    } else if (typeof currentActiveLoadoutId !== 'undefined' && currentActiveLoadoutId !== 'ALL') {
+        const activeProf = (typeof savedLoadoutProfiles !== 'undefined' && Array.isArray(savedLoadoutProfiles))
+            ? savedLoadoutProfiles.find(p => p.id === currentActiveLoadoutId)
+            : null;
+        const lbl = activeProf ? activeProf.name.slice(0, 14) : 'LOADOUT';
+        badgeRoute.textContent = lbl;
+        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded sx-cat-freeware';
     } else {
-        badgeRoute.textContent = 'OFF';
-        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+        badgeRoute.textContent = 'ALL ACTIVE';
+        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#10B981] border border-[#253046]';
     }
 }
 
@@ -21120,8 +22929,6 @@ function swapOptimizerRouteAirports() {
         if (typeof panMapToAirport === 'function') {
             panMapToAirport(optimizerOrigin);
         }
-        positionFlightOptimizerModal(optimizerOrigin);
-        startOptimizerPanTracking(1400);
     }
 }
 
@@ -21130,8 +22937,25 @@ async function setOptimizerMode(mode) {
         showUnlockProModal();
         return;
     }
+    if (mode === 'NONE') {
+        clearOptimizerRoutePlanning(true);
+        optimizerMode = 'NONE';
+        flightCorridorProfile = null;
+        isDirectRouteMode = false;
+        if (typeof selectedBaseLoadoutId !== 'undefined' && selectedBaseLoadoutId === 'NONE_ROUTE_ONLY') {
+            selectedBaseLoadoutId = (typeof currentActiveLoadoutId !== 'undefined' && currentActiveLoadoutId !== 'NONE_ROUTE_ONLY') ? currentActiveLoadoutId : 'ALL';
+        }
+        updateOptimizerRouteUI();
+        return;
+    }
+
+    if (typeof selectedBaseLoadoutId !== 'undefined' && selectedBaseLoadoutId === 'ALL' && !window._userExplicitlyChoseAllWithRoute) {
+        selectedBaseLoadoutId = 'NONE_ROUTE_ONLY';
+    }
+
     optimizerMode = mode;
     flightCorridorProfile = mode;
+    isDirectRouteMode = (mode === 'DIRECT');
     isFlightPlanningMode = true;
 
     if (optimizerOrigin) {
@@ -21147,6 +22971,8 @@ async function setOptimizerMode(mode) {
 
     if (mode === 'DIRECT') {
         currentSimBriefAlternates = [];
+        const sbPanel = document.getElementById('simbrief-cross-audit-panel');
+        if (sbPanel) sbPanel.classList.add('hidden');
         if (currentFlightMode && currentFlightMode.active && optimizerOrigin && optimizerDest) {
             currentFlightMode.icaos = [optimizerOrigin.icao, optimizerDest.icao];
         }
@@ -21157,10 +22983,12 @@ async function setOptimizerMode(mode) {
         }
         updateOptimizerRouteUI();
         if (typeof showToast === 'function') {
-            showToast("Flight Mode: Direct A -> B (Departure & Destination only)", "info");
+            showToast("ROUTE OVERLAY: DIRECT A TO B (DEP + ARR)", "info");
         }
     } else if (mode === 'CORRIDOR') {
         currentSimBriefAlternates = [];
+        const sbPanel = document.getElementById('simbrief-cross-audit-panel');
+        if (sbPanel) sbPanel.classList.add('hidden');
         if (optimizerOrigin && optimizerDest) {
             renderFlightCorridor();
         } else {
@@ -21168,7 +22996,7 @@ async function setOptimizerMode(mode) {
         }
         updateOptimizerRouteUI();
         if (typeof showToast === 'function') {
-            showToast("Flight Mode: En-Route Corridor (Flight path & intermediate addons)", "info");
+            showToast("ROUTE OVERLAY: EN-ROUTE CORRIDOR", "info");
         }
     } else if (mode === 'SIMBRIEF') {
         hasUserDraggedOptimizerModal = false;
@@ -21178,26 +23006,8 @@ async function setOptimizerMode(mode) {
 }
 
 function applyOptimizerRouteSceneries() {
-    if (window.IS_LITE) {
-        showUnlockProModal();
-        return;
-    }
-    if (!optimizerOrigin) {
-        if (typeof showToast === 'function') showToast("Please select at least a Departure airport.", "warning");
-        return;
-    }
-    flightOriginAirport = optimizerOrigin;
-    flightDestinationAirport = optimizerDest;
-    flightPlanningDeparture = optimizerOrigin;
-    flightPlanningDestination = optimizerDest;
-    flightCorridorProfile = optimizerMode || 'DIRECT';
-    isDirectRouteMode = (optimizerMode === 'DIRECT');
-    if (optimizerMode === 'DIRECT') {
-        currentSimBriefAlternates = [];
-    }
-    
-    if (typeof executeFlightCorridorOptimization === 'function') {
-        executeFlightCorridorOptimization();
+    if (typeof applyUnifiedOptimization === 'function') {
+        return applyUnifiedOptimization();
     }
 }
 
@@ -21252,6 +23062,7 @@ const MSFS_GRAPHICS_CATEGORIES = {
 };
 
 let currentMsfsGraphicsMode = '2D';
+let lastMsfsDisplayMode = '2D';
 let currentFlightMissionProfile = 'LINER';
 let currentVrRefreshRate = 72;
 let currentGraphicsSettingsPage = 0;
@@ -22811,6 +24622,17 @@ window.checkFirstSystemTuningScanOnStartup = checkFirstSystemTuningScanOnStartup
 
 function switchMsfsGraphicsMode(mode, resetPage = false) {
     currentMsfsGraphicsMode = mode;
+    const modeUpper = String(mode || '2D').toUpperCase();
+    if (modeUpper === '2D' || modeUpper === 'VR') {
+        lastMsfsDisplayMode = modeUpper;
+    }
+    if (!window.IS_LITE) {
+        const badgeGraphics = document.getElementById('classic-badge-graphics');
+        if (badgeGraphics) {
+            badgeGraphics.textContent = (modeUpper === '2D' || modeUpper === 'VR') ? modeUpper : (lastMsfsDisplayMode || '2D');
+            badgeGraphics.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-slate-300 border border-[#2A3241]';
+        }
+    }
     const btnCommon = document.getElementById('opt-msfs-mode-btn-common');
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
@@ -25469,6 +27291,8 @@ function formatProfileDate(dateStr) {
 
 function detectProfileCategoryMode(profile) {
     if (!profile) return '2D';
+    if (profile.mode && String(profile.mode).toUpperCase() === 'VR') return 'VR';
+    if (profile.mode && String(profile.mode).toUpperCase() === '2D') return '2D';
     const name = String(profile.name || '').toLowerCase();
     const id = String(profile.id || '').toLowerCase();
     if (/\b(?:vr|3d)\b/i.test(name) || id.includes('vr') || id.includes('3d') || name.includes('vr') || name.includes('3d')) {
@@ -25696,9 +27520,9 @@ function renderCustomProfilesDropdownList() {
             modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#0284c7] text-white leading-none tracking-wider whitespace-nowrap select-none">TAA - LINER</span>`;
         } else if (p.id === 'profile_vr_bush_fast_vfr' || (p.name && p.name.includes('Bush'))) {
             modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#d97706] text-white leading-none tracking-wider whitespace-nowrap select-none">OFXR - BUSH</span>`;
-        } else if (p.id === 'profile_vr_headset_standard' || (p.name && p.name.includes('VR Headset'))) {
+        } else if (p.id === 'profile_vr_headset_standard' || (p.name && p.name.includes('VR Headset')) || String(p.mode || '').toUpperCase() === 'VR') {
             modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#7c3aed] text-white leading-none tracking-wider whitespace-nowrap select-none">VR</span>`;
-        } else if (p.id === 'profile_2d_display_standard' || (p.name && p.name.includes('2D Display'))) {
+        } else if (p.id === 'profile_2d_display_standard' || (p.name && p.name.includes('2D Display')) || String(p.mode || '').toUpperCase() === '2D') {
             modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#475569] text-white leading-none tracking-wider whitespace-nowrap select-none">2D</span>`;
         } else if (p.tag) {
             const cleanTag = String(p.tag).replace(/\s*•\s*/g, ' - ').trim();
@@ -26711,7 +28535,8 @@ async function executeSaveCurrentCustomProfile(name, overwriteId = null) {
     const input = document.getElementById('opt-profile-universal-input');
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_custom_profile) return;
     try {
-        const resStr = await window.pywebview.api.save_custom_profile(name, overwriteId);
+        const saveMode = (String(currentMsfsGraphicsMode || "").toUpperCase() === "VR" || (String(currentMsfsGraphicsMode || "").toUpperCase() === "COMMON" && lastMsfsDisplayMode === "VR")) ? "VR" : "2D";
+        const resStr = await window.pywebview.api.save_custom_profile(name, overwriteId, saveMode);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             const actionText = overwriteId ? 'updated' : 'saved';
@@ -27038,8 +28863,12 @@ async function toggleBlackboxRecording() {
 
             const acEl = document.getElementById('opt-live-aircraft');
             if (acEl) { acEl.textContent = "Not detected"; acEl.title = "Not detected"; }
+            const depEl = document.getElementById('opt-live-dep');
+            if (depEl) { depEl.textContent = "Waiting for flight"; depEl.title = "Waiting for flight"; }
+            const arrEl = document.getElementById('opt-live-arr');
+            if (arrEl) { arrEl.textContent = "UNKNOWN"; arrEl.title = "UNKNOWN"; }
             const rLbl = document.getElementById('opt-live-route-lbl');
-            if (rLbl) rLbl.textContent = "ORIGIN :";
+            if (rLbl) rLbl.textContent = "ACTUAL POSITION:";
             const rEl = document.getElementById('opt-live-route');
             if (rEl) { rEl.textContent = "Waiting for flight"; rEl.title = "Waiting for flight"; }
             const flTag = document.getElementById('opt-mode-flight-tag');
@@ -27218,19 +29047,29 @@ function startBlackboxTelemetryPolling() {
                 aircraftEl.title = acVal;
             }
 
+            const depEl = document.getElementById('opt-live-dep');
+            if (depEl) {
+                const depVal = isDisconnected ? 'Waiting for flight' : (telem.dep_display || telem.dep || 'Waiting for flight');
+                depEl.textContent = depVal;
+                depEl.title = depVal;
+            }
+            const arrEl = document.getElementById('opt-live-arr');
+            if (arrEl) {
+                const arrVal = isDisconnected ? 'UNKNOWN' : (telem.arr_display || telem.arr || 'UNKNOWN');
+                arrEl.textContent = arrVal;
+                arrEl.title = arrVal;
+            }
             const routeLbl = document.getElementById('opt-live-route-lbl');
             const routeEl = document.getElementById('opt-live-route');
             if (routeLbl) {
-                routeLbl.textContent = isDisconnected ? 'ORIGIN :' : (telem.route_label || (telem.flight_type_tag === 'SIMBRIEF OFP' ? 'ROUTE :' : 'ORIGIN :'));
+                routeLbl.textContent = 'ACTUAL POSITION:';
             }
             if (routeEl) {
-                const rVal = isDisconnected 
+                const posVal = isDisconnected 
                     ? 'Waiting for flight' 
-                    : ((telem.flight_type_tag === 'SIMBRIEF OFP' && telem.route_display)
-                        ? telem.route_display
-                        : (telem.route_display || telem.nearest_icao || telem.dep || 'Waiting for flight'));
-                routeEl.textContent = rVal;
-                routeEl.title = rVal;
+                    : (telem.actual_position_display || telem.nearest_icao || 'Waiting for flight');
+                routeEl.textContent = posVal;
+                routeEl.title = posVal;
             }
 
             const flightTag = document.getElementById('opt-mode-flight-tag');
@@ -30281,6 +32120,132 @@ class OnboardingTourController {
                 },
                 async beforeExit() {}
             },
+            // STEP 6: 2D Planisphere & 3D Terrestrial Globe (Top-Right Switcher)
+            {
+                id: 'map_2d_3d_globe',
+                isNew: true,
+                targetSelector: '#map-view-mode-group',
+                titleKey: 'onboarding.step_map_2d_3d_title',
+                bodyKey: 'onboarding.step_map_2d_3d_body',
+                defaultTitle: '2D Planisphere & 3D Terrestrial Globe',
+                defaultBody: 'Switch seamlessly between the 2D Mercator planisphere and the interactive 3D Terrestrial Globe with full spherical projection, fine mouse-wheel zoom increments, great-circle flight arcs, and airport clustering.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._hideLfpgReticle();
+                    }
+                    window._tourBypassLiteLock = true;
+                    if (typeof toggleDayNightTerminator === 'function') {
+                        toggleDayNightTerminator(false);
+                    }
+                    if (typeof setMapStyleTheme === 'function') {
+                        setMapStyleTheme('avionics_blue', false);
+                    }
+                    if (typeof setMapProjectionMode === 'function') {
+                        setMapProjectionMode('globe', false);
+                    }
+                    if (window.globeEngine) {
+                        window.globeEngine.animateTo(32.0, 8.0, 2.7, 0.45);
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'prev') {
+                        if (typeof setMapProjectionMode === 'function') {
+                            setMapProjectionMode('2d', false);
+                        }
+                        window._tourBypassLiteLock = false;
+                    }
+                }
+            },
+            // STEP 7: Map Display Styles & VFR / IFR Aeronautical Charts
+            {
+                id: 'map_display_themes',
+                isNew: true,
+                targetSelector: '#map-theme-select-wrap',
+                titleKey: 'onboarding.step_map_themes_title',
+                bodyKey: 'onboarding.step_map_themes_body',
+                defaultTitle: 'Map Display Styles & VFR / IFR Charts',
+                defaultBody: 'Choose from 8 unified 2D/3D cartographic styles: 4 dark cockpit themes (Avionics Blue, Deep Navy, Carbon Dark, Radar Emerald), official OpenAIP VFR & IFR Enroute aeronautical charts (controlled airspaces, VOR/NDB navaids, frequencies), Satellite imagery, and Street Map.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._hideLfpgReticle();
+                    }
+                    window._tourBypassLiteLock = true;
+                    if (typeof toggleDayNightTerminator === 'function') {
+                        toggleDayNightTerminator(false);
+                    }
+                    if (typeof setMapProjectionMode === 'function') {
+                        setMapProjectionMode('globe', false);
+                    }
+                    if (typeof setMapStyleTheme === 'function') {
+                        setMapStyleTheme('ifr_enroute', false);
+                    }
+                    if (window.globeEngine) {
+                        window.globeEngine.animateTo(46.0, 4.0, 3.8, 0.45);
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                },
+                async beforeExit(direction) {
+                    if (typeof setMapStyleTheme === 'function') {
+                        setMapStyleTheme('avionics_blue', false);
+                    }
+                }
+            },
+            // STEP 8: Day / Night Solar Terminator & UTC / Local Time Control
+            {
+                id: 'map_day_night_solar',
+                isNew: true,
+                targetSelector: '#day-night-time-panel',
+                titleKey: 'onboarding.step_day_night_title',
+                bodyKey: 'onboarding.step_day_night_body',
+                defaultTitle: 'Day / Night Solar Terminator & UTC / Local Time',
+                defaultBody: 'Visualize real-time daylight, twilight, and night across the world in 2D and 3D. Scrub through the 24-hour timeline using the slider or -1H / +1H buttons, switch between UTC (Zulu) and Local Time (UTC±), or click LIVE to sync with the real-time clock.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._hideLfpgReticle();
+                    }
+                    window._tourBypassLiteLock = true;
+                    if (typeof setMapProjectionMode === 'function') {
+                        setMapProjectionMode('globe', false);
+                    }
+                    if (typeof setMapStyleTheme === 'function') {
+                        setMapStyleTheme('avionics_blue', false);
+                    }
+                    if (typeof toggleDayNightTerminator === 'function') {
+                        toggleDayNightTerminator(true);
+                    }
+                    if (typeof onSolarTimeSliderInput === 'function') {
+                        onSolarTimeSliderInput(1140); // 19:00 UTC twilight over Europe/Africa
+                    }
+                    if (window.globeEngine) {
+                        window.globeEngine.animateTo(28.0, 12.0, 2.55, 0.45);
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                },
+                async beforeExit(direction) {
+                    if (typeof resetSolarTimeToLive === 'function') {
+                        resetSolarTimeToLive();
+                    }
+                    if (typeof toggleDayNightTerminator === 'function') {
+                        toggleDayNightTerminator(false);
+                    }
+                    if (direction === 'next') {
+                        if (typeof setMapStyleTheme === 'function') {
+                            setMapStyleTheme('avionics_blue', false);
+                        }
+                        if (typeof setMapProjectionMode === 'function') {
+                            setMapProjectionMode('2d', false);
+                        }
+                        window._tourBypassLiteLock = false;
+                    }
+                }
+            },
             // STEP 6: Interactive Airport Hub (e.g. LFPG on Map)
             {
                 id: 'lfpg_map_hub',
@@ -30306,15 +32271,8 @@ class OnboardingTourController {
                         currentRadialAirport = ap;
                         selectedAirport = ap;
                         currentClassicAirport = ap;
-                        if (typeof panMapToAirport === 'function') {
-                            panMapToAirport(ap, 10.5, 0.35);
-                        } else {
-                            const lMap = (window.onboardingTour && typeof window.onboardingTour._getLeafletMap === 'function')
-                                ? window.onboardingTour._getLeafletMap()
-                                : null;
-                            if (lMap && ap.lat && ap.lon) {
-                                lMap.flyTo([ap.lat, ap.lon], 10.5, { duration: 0.35 });
-                            }
+                        if (window.onboardingTour && typeof window.onboardingTour._focusLfpgOn2DMap === 'function') {
+                            window.onboardingTour._focusLfpgOn2DMap('hub');
                         }
                         if (typeof setAirportMarkerLabelFocus === 'function') {
                             setAirportMarkerLabelFocus(ap.icao);
@@ -30343,7 +32301,6 @@ class OnboardingTourController {
                 async beforeEnter() {
                     if (window.onboardingTour) {
                         window.onboardingTour._cleanupOpenedModals();
-                        window.onboardingTour._showLfpgReticle();
                     }
                     const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
                     if (ap) {
@@ -30359,6 +32316,10 @@ class OnboardingTourController {
                         radialEl.classList.add('hidden');
                         radialEl.classList.remove('radial-only-core');
                         radialEl.style.display = 'none';
+                    }
+                    if (window.onboardingTour) {
+                        window.onboardingTour._focusLfpgOn2DMap('sidebar');
+                        window.onboardingTour._showLfpgReticle();
                     }
                     const card = document.getElementById('classic-ap-header-card');
                     if (card) {
@@ -30381,7 +32342,6 @@ class OnboardingTourController {
                 async beforeEnter() {
                     if (window.onboardingTour) {
                         window.onboardingTour._cleanupOpenedModals();
-                        window.onboardingTour._showLfpgReticle();
                     }
                     const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
                     if (ap) {
@@ -30407,13 +32367,14 @@ class OnboardingTourController {
                     }
                     if (dModal) {
                         dModal.classList.remove('hidden');
-                        dModal.style.display = 'flex';
+                        dModal.style.setProperty('display', 'flex', 'important');
+                        dModal.style.setProperty('z-index', '9996', 'important');
                         const vpH = window.innerHeight;
                         const vpW = window.innerWidth;
-                        const dWidth = Math.min(840, Math.max(540, vpW - 400));
-                        const dTop = Math.max(340, Math.round(vpH * 0.44));
+                        const dWidth = Math.min(820, Math.max(540, vpW - 420));
+                        const dTop = Math.max(350, Math.round(vpH * 0.45));
                         const dHeight = Math.max(260, vpH - dTop - 84);
-                        const dLeft = Math.max(300, Math.round((vpW - dWidth) / 2));
+                        const dLeft = Math.max(300, Math.round((vpW - dWidth) / 2) - 40);
                         dModal.style.left = `${dLeft}px`;
                         dModal.style.top = `${dTop}px`;
                         dModal.style.width = `${dWidth}px`;
@@ -30421,14 +32382,19 @@ class OnboardingTourController {
                         dModal.style.maxHeight = `${dHeight}px`;
                         dModal._hasBeenDragged = true;
                     }
-                    if (ap && typeof panMapToAirport === 'function') {
-                        panMapToAirport(ap, 10.5, 0.35);
+                    if (window.onboardingTour) {
+                        window.onboardingTour._focusLfpgOn2DMap('details');
+                        window.onboardingTour._showLfpgReticle();
                     }
                     await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit() {
                     const dModal = document.getElementById('radial-details-modal');
-                    if (dModal) dModal._hasBeenDragged = false;
+                    if (dModal) {
+                        dModal._hasBeenDragged = false;
+                        dModal.style.removeProperty('z-index');
+                        dModal.style.removeProperty('display');
+                    }
                 }
             },
             // STEP 9: Available Add-ons (Main Sceneries) (Docked Modal)
@@ -30443,7 +32409,6 @@ class OnboardingTourController {
                 async beforeEnter() {
                     if (window.onboardingTour) {
                         window.onboardingTour._cleanupOpenedModals();
-                        window.onboardingTour._showLfpgReticle();
                     }
                     const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
                     if (ap) {
@@ -30476,6 +32441,10 @@ class OnboardingTourController {
                             radialEl.style.display = '';
                         }
                     }
+                    if (window.onboardingTour) {
+                        window.onboardingTour._focusLfpgOn2DMap('addons');
+                        window.onboardingTour._showLfpgReticle();
+                    }
                     const extEl = document.getElementById('radial-sceneries-extension');
                     if (extEl && ap) {
                         if (typeof renderRadialSceneriesExtension === 'function') {
@@ -30489,13 +32458,9 @@ class OnboardingTourController {
                         extEl.style.setProperty('z-index', '9996', 'important');
                         extEl.style.setProperty('pointer-events', 'auto', 'important');
 
-                        if (typeof panMapToAirport === 'function') {
-                            panMapToAirport(ap, 10.5, 0.35);
-                        }
-
                         const reticlePos = window.onboardingTour ? window.onboardingTour._positionLfpgReticle() : null;
-                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.52);
-                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.5);
+                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.54);
+                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.48);
 
                         // Strictly pop to the LEFT of the pulsing circle reticle
                         const circleLeftEdge = cx - 95;
@@ -30524,6 +32489,13 @@ class OnboardingTourController {
                 defaultBody: 'Unlike full sceneries, the Available Fixes & Overlays section groups stackable enhancements (custom GSX profiles, taxiway corrections, night lighting, photogrammetry fixes). Each has an independent green switch toggle to run simultaneously on top of your main scenery.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
+                    // Explicitly close Airlines / Details modals when arriving via Previous from Slide 14!
+                    if (typeof closeRadialAirlinesModal === 'function') {
+                        closeRadialAirlinesModal();
+                    }
+                    if (typeof closeRadialDetailsModal === 'function') {
+                        closeRadialDetailsModal(null, true);
+                    }
                     const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
                     if (ap) {
                         currentRadialAirport = ap;
@@ -30532,13 +32504,28 @@ class OnboardingTourController {
                         if (typeof showClassicAirportView === 'function') {
                             showClassicAirportView(ap);
                         }
+                        if (typeof radialStoreCache !== 'undefined' && !radialStoreCache['LFPG']) {
+                            radialStoreCache['LFPG'] = [
+                                {
+                                    name: 'simMarket',
+                                    store_key: 'simmarket',
+                                    title: 'LFPG - PARIS CHARLES DE GAULLE AIRPORT MSFS',
+                                    vendor: 'Illuminators',
+                                    price: 11.76,
+                                    currency: 'EUR',
+                                    found: true,
+                                    url: 'https://secure.simmarket.com/illuminators-lfpg-paris-charles-de-gaulle-msfs.phtml'
+                                }
+                            ];
+                        }
                     }
                     if (window.onboardingTour) {
+                        window.onboardingTour._focusLfpgOn2DMap('addons');
                         window.onboardingTour._showLfpgReticle();
                     }
                     const extEl = document.getElementById('radial-sceneries-extension');
                     if (extEl && ap) {
-                        if (extEl.classList.contains('hidden') || !extEl.innerHTML.trim()) {
+                        if (extEl.classList.contains('hidden') || !extEl.innerHTML.trim() || !document.getElementById('radial-fixes-container')) {
                             if (typeof renderRadialSceneriesExtension === 'function') {
                                 renderRadialSceneriesExtension(ap, false);
                             }
@@ -30552,8 +32539,8 @@ class OnboardingTourController {
                         extEl.style.setProperty('pointer-events', 'auto', 'important');
 
                         const reticlePos = window.onboardingTour ? window.onboardingTour._positionLfpgReticle() : null;
-                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.52);
-                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.5);
+                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.54);
+                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.48);
 
                         const circleLeftEdge = cx - 95;
                         const extWidth = Math.min(420, Math.max(330, circleLeftEdge - 28));
@@ -30621,7 +32608,11 @@ class OnboardingTourController {
                     }
                     await new Promise(r => setTimeout(r, 40));
                 },
-                async beforeExit() {}
+                async beforeExit() {
+                    if (typeof closeRadialAirlinesModal === 'function') {
+                        closeRadialAirlinesModal();
+                    }
+                }
             },
             // STEP 11: Pricing Model
             {
@@ -30710,7 +32701,8 @@ class OnboardingTourController {
             // STEP 17: Route Optimization
             {
                 id: 'route_optimization',
-                targetSelector: '#float-win-route-opt',
+                isNew: true,
+                targetSelector: '#float-win-unified-optimizer',
                 titleKey: 'onboarding.step_route_opt_title',
                 bodyKey: 'onboarding.step_route_opt_body',
                 defaultTitle: 'Flight Route Optimization',
@@ -30738,14 +32730,57 @@ class OnboardingTourController {
                     if (typeof openFloatingWindow === 'function') {
                         openFloatingWindow('route');
                     }
-                    const win = document.getElementById('float-win-route-opt');
+                    if (typeof switchUnifiedOptimizerView === 'function') {
+                        switchUnifiedOptimizerView('MAIN');
+                    }
+                    const win = document.getElementById('float-win-unified-optimizer') || document.getElementById('float-win-route-opt');
                     if (win) {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows();
+                    }
                     await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
+                    if (typeof closeFloatingWindow === 'function') {
+                        closeFloatingWindow('route');
+                    }
+                }
+            },
+            // STEP 17B: Edit Loadout Rules & Custom Scenery Profiles
+            {
+                id: 'loadout_rules_builder',
+                isNew: true,
+                targetSelector: '#float-win-unified-optimizer',
+                titleKey: 'onboarding.step_loadout_rules_title',
+                bodyKey: 'onboarding.step_loadout_rules_body',
+                defaultTitle: 'Edit Loadout Rules & Custom Profiles',
+                defaultBody: "Create and manage reusable Base Loadout Profiles (e.g., Europe Airliners, North America). Toggle scenery categories (Payware, Freeware, Asobo), select active world regions or specific countries, and click 'Pin Airports on Map' to lock favorite hubs so they always stay enabled before applying your profile.",
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('route');
+                    }
+                    const win = document.getElementById('float-win-unified-optimizer') || document.getElementById('float-win-route-opt');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    if (typeof switchUnifiedOptimizerView === 'function') {
+                        switchUnifiedOptimizerView('BUILDER');
+                    }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows();
+                    }
+                    await new Promise(r => setTimeout(r, 50));
+                },
+                async beforeExit(direction) {
+                    if (typeof switchUnifiedOptimizerView === 'function') {
+                        switchUnifiedOptimizerView('MAIN');
+                    }
                     if (typeof closeFloatingWindow === 'function') {
                         closeFloatingWindow('route');
                     }
@@ -31258,7 +33293,15 @@ class OnboardingTourController {
     }
 
     _isLfpgTourActive() {
-        return this.isOpen && this.currentStepIndex >= 5 && this.currentStepIndex <= 9;
+        if (!this.isOpen || !this.steps || !this.steps[this.currentStepIndex]) return false;
+        const lfpgStepIds = new Set([
+            'lfpg_map_hub',
+            'lfpg_sidebar_card',
+            'lfpg_details_modal',
+            'lfpg_addons_modal',
+            'lfpg_fixes_modal'
+        ]);
+        return lfpgStepIds.has(this.steps[this.currentStepIndex].id);
     }
 
     _positionLfpgReticle() {
@@ -31302,7 +33345,138 @@ class OnboardingTourController {
         return { screenX, screenY };
     }
 
+    _ensureTourLfpgMarker(ap) {
+        const lMap = this._getLeafletMap();
+        if (!lMap || !ap || typeof L === 'undefined') return;
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl && isClassicNavMode()) {
+            radialEl.classList.add('hidden');
+            radialEl.style.display = 'none';
+        }
+        if (typeof syncRadialAirportMarkerLabels === 'function') {
+            syncRadialAirportMarkerLabels();
+        }
+        const existingMarker = (typeof airportMarkerCache !== 'undefined' && airportMarkerCache) ? airportMarkerCache.get('LFPG') : null;
+        let realMarkerVisible = false;
+        if (existingMarker) {
+            if (typeof createCustomIcon === 'function') {
+                try { existingMarker.setIcon(createCustomIcon(ap)); } catch (e) {}
+            }
+            const el = (typeof existingMarker.getElement === 'function') ? existingMarker.getElement() : existingMarker._icon;
+            if (el && el.isConnected) {
+                el.classList.remove('radial-active');
+                const lbl = el.querySelector('.airport-map-label');
+                if (lbl) lbl.classList.add('label-force-visible');
+                realMarkerVisible = true;
+            }
+        }
+        if (realMarkerVisible) {
+            this._removeTourLfpgMarker();
+            return;
+        }
+        if (!this._tourLfpgMarker) {
+            const icon = (typeof createCustomIcon === 'function') ? createCustomIcon(ap) : null;
+            this._tourLfpgMarker = L.marker([ap.lat, ap.lon], icon ? { icon, interactive: false, zIndexOffset: 2500 } : { interactive: false, zIndexOffset: 2500 });
+        } else {
+            this._tourLfpgMarker.setLatLng([ap.lat, ap.lon]);
+            if (typeof createCustomIcon === 'function') {
+                try { this._tourLfpgMarker.setIcon(createCustomIcon(ap)); } catch (e) {}
+            }
+        }
+        if (!lMap.hasLayer(this._tourLfpgMarker)) {
+            this._tourLfpgMarker.addTo(lMap);
+        }
+        const tourEl = (typeof this._tourLfpgMarker.getElement === 'function') ? this._tourLfpgMarker.getElement() : this._tourLfpgMarker._icon;
+        if (tourEl) {
+            tourEl.classList.remove('radial-active');
+            const lbl = tourEl.querySelector('.airport-map-label');
+            if (lbl) lbl.classList.add('label-force-visible');
+        }
+    }
+
+    _removeTourLfpgMarker() {
+        if (this._tourLfpgMarker) {
+            const lMap = this._getLeafletMap();
+            try {
+                if (lMap && lMap.hasLayer(this._tourLfpgMarker)) {
+                    lMap.removeLayer(this._tourLfpgMarker);
+                } else if (typeof this._tourLfpgMarker.remove === 'function') {
+                    this._tourLfpgMarker.remove();
+                }
+            } catch (e) {}
+            this._tourLfpgMarker = null;
+        }
+    }
+
+    _focusLfpgOn2DMap(layoutMode = 'hub') {
+        if (typeof isGlobeModeActive === 'function' && isGlobeModeActive() && typeof setMapProjectionMode === 'function') {
+            setMapProjectionMode('2d', false);
+        }
+        const lMap = this._getLeafletMap();
+        const ap = this._getLfpgTourAirport();
+        if (!lMap || !ap || ap.lat === undefined || ap.lon === undefined) return;
+
+        try { lMap.stop(); } catch (e) {}
+
+        const targetZoom = 11.0; // Strictly above cluster disable threshold (z >= 8) so individual LFPG pin is shown
+        const vpW = window.innerWidth;
+        const vpH = window.innerHeight;
+        const mapContainer = (typeof lMap.getContainer === 'function') ? lMap.getContainer() : document.getElementById('map');
+        const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0, width: vpW, height: vpH };
+
+        let desiredScreenX = Math.round(vpW * 0.56);
+        let desiredScreenY = Math.round(vpH * 0.44);
+
+        if (layoutMode === 'details') {
+            // Position LFPG airport and its 95px-radius circle cleanly above #radial-details-modal
+            const dTop = Math.max(350, Math.round(vpH * 0.45));
+            desiredScreenX = Math.round(vpW * 0.54);
+            desiredScreenY = Math.max(200, Math.min(245, dTop - 110));
+        } else if (layoutMode === 'addons') {
+            // Position LFPG airport in the center column between Available Addons (left) and Tour Tooltip (right)
+            desiredScreenX = Math.round(vpW * 0.54);
+            desiredScreenY = Math.round(vpH * 0.48);
+        } else if (layoutMode === 'sidebar') {
+            desiredScreenX = Math.round(vpW * 0.58);
+            desiredScreenY = Math.round(vpH * 0.46);
+        }
+
+        const desiredContainerX = desiredScreenX - mapRect.left;
+        const desiredContainerY = desiredScreenY - mapRect.top;
+        const mapW = mapRect.width || vpW;
+        const mapH = mapRect.height || vpH;
+
+        try {
+            const apProjected = lMap.project([ap.lat, ap.lon], targetZoom);
+            const centerProjected = L.point(
+                apProjected.x + (mapW / 2 - desiredContainerX),
+                apProjected.y + (mapH / 2 - desiredContainerY)
+            );
+            const centerLatLng = lMap.unproject(centerProjected, targetZoom);
+            if (typeof lMap._origSetView === 'function') {
+                lMap._origSetView(centerLatLng, targetZoom, { animate: false });
+            } else {
+                lMap.setView(centerLatLng, targetZoom, { animate: false });
+            }
+        } catch (e) {
+            try { lMap.setView([ap.lat, ap.lon], targetZoom, { animate: false }); } catch (err) {}
+        }
+
+        if (typeof updateMapZoomTier === 'function') {
+            updateMapZoomTier();
+        }
+        if (typeof setAirportMarkerLabelFocus === 'function') {
+            setAirportMarkerLabelFocus('LFPG');
+        }
+        this._ensureTourLfpgMarker(ap);
+        this._positionLfpgReticle();
+    }
+
     _showLfpgReticle() {
+        const ap = this._getLfpgTourAirport();
+        if (ap) {
+            this._ensureTourLfpgMarker(ap);
+        }
         const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
         if (reticleEl) {
             reticleEl.classList.remove('hidden');
@@ -31316,6 +33490,7 @@ class OnboardingTourController {
     }
 
     _hideLfpgReticle() {
+        this._removeTourLfpgMarker();
         const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
         if (reticleEl) {
             reticleEl.classList.add('hidden');
@@ -31476,6 +33651,11 @@ class OnboardingTourController {
         if (typeof closeExportModal === 'function') {
             closeExportModal();
         }
+        const dModal = document.getElementById('radial-details-modal');
+        if (dModal) {
+            dModal.style.removeProperty('z-index');
+            dModal.style.removeProperty('display');
+        }
         if (typeof closeRadialDetailsModal === 'function') {
             closeRadialDetailsModal(null, true);
         }
@@ -31495,8 +33675,18 @@ class OnboardingTourController {
             if (typeof stagedRadialScenerySelection !== 'undefined') stagedRadialScenerySelection = null;
         }
         this._cleanupFloatingWindows();
-        if (!this.isOpen || this.currentStepIndex < 5 || this.currentStepIndex > 9) {
+        if (!this._isLfpgTourActive()) {
             this._hideLfpgReticle();
+        }
+        const curStepId = (this.isOpen && this.steps && this.steps[this.currentStepIndex]) ? this.steps[this.currentStepIndex].id : '';
+        if (curStepId !== 'map_2d_3d_globe' && curStepId !== 'map_display_themes' && curStepId !== 'map_day_night_solar') {
+            if (window._tourBypassLiteLock || window.IS_LITE) {
+                window._tourBypassLiteLock = false;
+                if (typeof resetSolarTimeToLive === 'function') resetSolarTimeToLive();
+                if (typeof toggleDayNightTerminator === 'function') toggleDayNightTerminator(false);
+                if (typeof setMapStyleTheme === 'function') setMapStyleTheme('avionics_blue', false);
+                if (typeof setMapProjectionMode === 'function') setMapProjectionMode('2d', false);
+            }
         }
         if (window.windowManager) {
             window.windowManager.autoTileWindows();
@@ -31768,7 +33958,8 @@ class OnboardingTourController {
         const stepCounterText = `${index + 1}/${totalSteps}`;
 
         const proStepIds = new Set([
-            'route_optimization', 'smart_lod', 'graphics_settings',
+            'map_2d_3d_globe', 'map_display_themes', 'map_day_night_solar',
+            'route_optimization', 'loadout_rules_builder', 'smart_lod', 'graphics_settings',
             'bg_tools_ofxr_autofps', 'my_rig_tuning', 'my_rig',
             'my_rig_display', 'my_rig_maintenance', 'ingame_panel_install',
             'ingame_panel_cockpit', 'ingame_panel_live_graphics', 'flight_report'
@@ -31777,7 +33968,15 @@ class OnboardingTourController {
         const rawTitle = (typeof t === 'function') ? t(step.titleKey, step.defaultTitle) : step.defaultTitle;
         const rawBody = (typeof t === 'function') ? t(step.bodyKey, step.defaultBody) : step.defaultBody;
 
-        if (badge) badge.innerText = stepCounterText;
+        if (badge) {
+            if (step && step.isNew) {
+                badge.className = 'font-mono text-xs font-semibold text-[#94A3B8] tracking-wider select-none inline-flex items-center gap-2';
+                badge.innerHTML = `<span>${stepCounterText}</span><span class="px-2 py-0.5 rounded bg-[#00A8FF] text-white font-sans text-[10px] font-bold uppercase tracking-wider leading-none">NEW</span>`;
+            } else {
+                badge.className = 'font-mono text-xs font-semibold text-[#94A3B8] tracking-wider select-none';
+                badge.innerText = stepCounterText;
+            }
+        }
         if (titleEl) {
             if (isProStepInLite) {
                 titleEl.className = 'text-xs font-bold text-[#F1F5F9] uppercase tracking-wide leading-snug flex items-center justify-between gap-2 w-full';
@@ -32008,9 +34207,11 @@ class OnboardingTourController {
         let left = 0;
         let top = 0;
 
-        // Custom Layout for Step 9 & 10 (LFPG Add-ons & Fixes):
+        const curStepId = (this.steps && this.steps[this.currentStepIndex]) ? this.steps[this.currentStepIndex].id : '';
+
+        // Custom Layout for LFPG Add-ons & Fixes:
         // 3-Column Layout: Available Addons modal on Left, LFPG pulsing circle in Center, Tooltip Card on Right!
-        if (this.currentStepIndex === 8 || this.currentStepIndex === 9) {
+        if (curStepId === 'lfpg_addons_modal' || curStepId === 'lfpg_fixes_modal') {
             const reticlePos = this._positionLfpgReticle();
             const cx = reticlePos ? reticlePos.screenX : Math.round(vpW * 0.55);
             const cy = reticlePos ? reticlePos.screenY : Math.round(vpH * 0.5);
@@ -32027,9 +34228,9 @@ class OnboardingTourController {
             return;
         }
 
-        // Custom Layout for Step 8 (Airport Details modal):
+        // Custom Layout for Airport Details modal:
         // Details modal is positioned lower; place tooltip card to the right of the modal if room, or top-right
-        if (this.currentStepIndex === 7) {
+        if (curStepId === 'lfpg_details_modal') {
             if (targetRect.right + pad + tooltipW <= vpW - margin) {
                 left = targetRect.right + pad;
                 top = Math.max(126, Math.min(vpH - tooltipH - margin, targetRect.top));
@@ -32310,11 +34511,7 @@ class OnboardingTourController {
             glow.setAttribute('opacity', '0');
         }
 
-        const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
-        if (reticleEl) {
-            reticleEl.classList.add('hidden');
-            reticleEl.style.display = 'none';
-        }
+        this._hideLfpgReticle();
 
         const overlay = document.getElementById('onboarding-tour-overlay');
         if (overlay) overlay.classList.add('hidden');
@@ -32382,4 +34579,5462 @@ window.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && window.onboardingTour && window.onboardingTour.isOpen) {
         window.onboardingTour.skip();
     }
+});
+
+
+/* =========================================================================
+   SCENERY X - 3D TERRESTRIAL GLOBE ENGINE & 2D/3D PROJECTION CONTROLLER
+   Multi-Zoom Dynamic Tile Quadtree (z=2..13), Unified 2D/3D Themes & Clusters
+   ========================================================================= */
+
+let currentMapProjectionMode = '2d'; // '2d' | 'globe'
+let currentMapStyleThemeKey = 'avionics_blue';
+
+const MAP_STYLE_THEMES = {
+    avionics_blue: {
+        key: 'avionics_blue',
+        label: 'Avionics Blue',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+        tileCssFilter: 'sepia(55%) saturate(280%) hue-rotate(180deg) brightness(102%)',
+        map2dOceanBg: '#101724',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.65,
+        map2dBorderOpacity: 0.45,
+        spaceBg: '#070A10',
+        atmoInner: 'rgba(14, 165, 233, 0.16)',
+        atmoMid: 'rgba(14, 165, 233, 0.05)',
+        limbStroke: 'rgba(56, 189, 248, 0.34)',
+        oceanTop: '#131B29',
+        oceanMid: '#101724',
+        oceanBot: '#080C14',
+        landFill: '#1B2333',
+        landStroke: 'rgba(71, 95, 130, 0.45)',
+        graticule: 'rgba(56, 189, 248, 0.08)',
+        useRasterGlobe: true
+    },
+    midnight_navy: {
+        key: 'midnight_navy',
+        label: 'Deep Navy',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+        tileCssFilter: 'sepia(70%) saturate(360%) hue-rotate(186deg) brightness(96%)',
+        map2dOceanBg: '#0B1322',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.65,
+        map2dBorderOpacity: 0.50,
+        spaceBg: '#04070D',
+        atmoInner: 'rgba(56, 189, 248, 0.22)',
+        atmoMid: 'rgba(56, 189, 248, 0.06)',
+        limbStroke: 'rgba(56, 189, 248, 0.42)',
+        oceanTop: '#0E192E',
+        oceanMid: '#0B1322',
+        oceanBot: '#050912',
+        landFill: '#132238',
+        landStroke: 'rgba(56, 110, 175, 0.48)',
+        graticule: 'rgba(56, 189, 248, 0.10)',
+        useRasterGlobe: true
+    },
+    carbon_dark: {
+        key: 'carbon_dark',
+        label: 'Carbon Dark',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+        tileCssFilter: 'none',
+        map2dOceanBg: '#1f2023',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.5,
+        map2dBorderOpacity: 0.35,
+        spaceBg: '#090A0C',
+        atmoInner: 'rgba(148, 163, 184, 0.12)',
+        atmoMid: 'rgba(148, 163, 184, 0.04)',
+        limbStroke: 'rgba(148, 163, 184, 0.28)',
+        oceanTop: '#232529',
+        oceanMid: '#1f2023',
+        oceanBot: '#141518',
+        landFill: '#26282c',
+        landStroke: 'rgba(100, 116, 139, 0.35)',
+        graticule: 'rgba(100, 116, 139, 0.10)',
+        useRasterGlobe: true
+    },
+    emerald_radar: {
+        key: 'emerald_radar',
+        label: 'Radar Emerald',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+        tileCssFilter: 'sepia(60%) saturate(280%) hue-rotate(120deg) brightness(98%)',
+        map2dOceanBg: '#0D1916',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.65,
+        map2dBorderOpacity: 0.45,
+        spaceBg: '#040A09',
+        atmoInner: 'rgba(16, 185, 129, 0.18)',
+        atmoMid: 'rgba(16, 185, 129, 0.05)',
+        limbStroke: 'rgba(16, 185, 129, 0.35)',
+        oceanTop: '#10221E',
+        oceanMid: '#0D1916',
+        oceanBot: '#060D0B',
+        landFill: '#122923',
+        landStroke: 'rgba(33, 105, 88, 0.45)',
+        graticule: 'rgba(16, 185, 129, 0.10)',
+        useRasterGlobe: true
+    },
+    satellite: {
+        key: 'satellite',
+        label: 'Satellite',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+        tileCssFilter: 'brightness(92%) saturate(108%)',
+        map2dOceanBg: '#081B2E',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.8,
+        map2dBorderOpacity: 0.55,
+        spaceBg: '#05080E',
+        atmoInner: 'rgba(56, 189, 248, 0.24)',
+        atmoMid: 'rgba(56, 189, 248, 0.07)',
+        limbStroke: 'rgba(125, 211, 252, 0.42)',
+        oceanTop: '#0E2942',
+        oceanMid: '#081B2E',
+        oceanBot: '#05101C',
+        landFill: '#1D3124',
+        landStroke: 'rgba(226, 232, 240, 0.38)',
+        graticule: 'rgba(226, 232, 240, 0.12)',
+        useRasterGlobe: true
+    },
+    vfr_chart: {
+        key: 'vfr_chart',
+        label: 'VFR Chart',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: null,
+        aeroTileUrl: 'https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=2cd316bebc5f839bbc571c044dffe8f5',
+        tileCssFilter: 'brightness(93%) contrast(103%)',
+        map2dOceanBg: '#79A5C6',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.65,
+        map2dBorderOpacity: 0.40,
+        spaceBg: '#060A11',
+        atmoInner: 'rgba(56, 189, 248, 0.22)',
+        atmoMid: 'rgba(56, 189, 248, 0.06)',
+        limbStroke: 'rgba(56, 189, 248, 0.40)',
+        oceanTop: '#88B2D2',
+        oceanMid: '#709CBE',
+        oceanBot: '#4D7696',
+        landFill: '#DFDCD2',
+        landStroke: 'rgba(71, 85, 105, 0.35)',
+        graticule: 'rgba(51, 65, 85, 0.16)',
+        useRasterGlobe: true
+    },
+    ifr_enroute: {
+        key: 'ifr_enroute',
+        label: 'IFR Enroute',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+        aeroTileUrl: 'https://api.tiles.openaip.net/api/data/openaip/{z}/{x}/{y}.png?apiKey=2cd316bebc5f839bbc571c044dffe8f5',
+        tileCssFilter: 'sepia(65%) saturate(300%) hue-rotate(182deg) brightness(98%)',
+        map2dOceanBg: '#0E1624',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.75,
+        map2dBorderOpacity: 0.50,
+        spaceBg: '#05080F',
+        atmoInner: 'rgba(14, 165, 233, 0.20)',
+        atmoMid: 'rgba(14, 165, 233, 0.06)',
+        limbStroke: 'rgba(56, 189, 248, 0.40)',
+        oceanTop: '#121B2B',
+        oceanMid: '#0E1624',
+        oceanBot: '#070B13',
+        landFill: '#172133',
+        landStroke: 'rgba(56, 189, 248, 0.32)',
+        graticule: 'rgba(56, 189, 248, 0.14)',
+        useRasterGlobe: true
+    },
+    street: {
+        key: 'street',
+        label: 'Street Map',
+        tileUrl: 'https://{s}.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        labelTileUrl: null,
+        aeroTileUrl: null,
+        tileCssFilter: 'brightness(92%)',
+        map2dOceanBg: '#7398B8',
+        map2dLandFillOpacity: 0.0,
+        map2dBorderWeight: 0.7,
+        map2dBorderOpacity: 0.40,
+        spaceBg: '#070A10',
+        atmoInner: 'rgba(56, 189, 248, 0.20)',
+        atmoMid: 'rgba(56, 189, 248, 0.06)',
+        limbStroke: 'rgba(56, 189, 248, 0.38)',
+        oceanTop: '#84A8C6',
+        oceanMid: '#6B90B0',
+        oceanBot: '#4E708E',
+        landFill: '#D8D4C8',
+        landStroke: 'rgba(71, 85, 105, 0.35)',
+        graticule: 'rgba(71, 85, 105, 0.12)',
+        useRasterGlobe: true
+    }
+};
+
+function getActiveMapStyleTheme() {
+    return MAP_STYLE_THEMES[currentMapStyleThemeKey] || MAP_STYLE_THEMES.avionics_blue;
+}
+
+function setMapStyleTheme(themeKey, persist = true) {
+    if (window.IS_LITE && themeKey && themeKey !== 'avionics_blue' && !isTourDemoAllowingProPreview()) {
+        const sel = document.getElementById('map-theme-select');
+        if (sel) sel.value = 'avionics_blue';
+        if (persist) showUnlockProModal();
+        themeKey = 'avionics_blue';
+        persist = false;
+    }
+    const normalized = MAP_STYLE_THEMES[themeKey] ? themeKey : 'avionics_blue';
+    currentMapStyleThemeKey = normalized;
+    const th = MAP_STYLE_THEMES[normalized];
+
+    if (currentSettings && typeof currentSettings === 'object') {
+        currentSettings.map_theme = normalized;
+        if (persist && window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+            window.pywebview.api.save_settings(JSON.stringify(currentSettings)).catch(() => {});
+        }
+    }
+
+    const sel = document.getElementById('map-theme-select');
+    if (sel && sel.value !== normalized) {
+        sel.value = normalized;
+    }
+
+    // 1. Apply to 2D Map (#map background, tileLayer URL & CSS filter, OpenAIP aero overlay, countryGeoJsonLayer style)
+    const mapEl = document.getElementById('map');
+    const filterCss = th.tileCssFilter || 'none';
+    if (mapEl) {
+        mapEl.style.setProperty('background-color', th.map2dOceanBg, 'important');
+        const tilePane = mapEl.querySelector('.leaflet-tile-pane');
+        if (tilePane) {
+            // If an unfiltered aeronautical overlay (OpenAIP) is active, apply the CSS filter only to base/reference containers
+            tilePane.style.filter = th.aeroTileUrl ? 'none' : filterCss;
+        }
+    }
+    if (window.mainBaseTileLayer && typeof window.mainBaseTileLayer.setUrl === 'function') {
+        if (window.mainBaseTileLayer._currentThemeUrl !== th.tileUrl) {
+            window.mainBaseTileLayer._currentThemeUrl = th.tileUrl;
+            window.mainBaseTileLayer.setUrl(th.tileUrl);
+        }
+        const baseCont = window.mainBaseTileLayer.getContainer ? window.mainBaseTileLayer.getContainer() : null;
+        if (baseCont) {
+            baseCont.style.filter = th.aeroTileUrl ? filterCss : 'none';
+        }
+    }
+    if (map) {
+        if (th.labelTileUrl) {
+            if (!window.mainReferenceTileLayer) {
+                window.mainReferenceTileLayer = L.tileLayer(th.labelTileUrl, {
+                    subdomains: ['server', 'services'],
+                    maxZoom: 16,
+                    updateWhenIdle: false,
+                    updateWhenZooming: false,
+                    updateInterval: 65,
+                    keepBuffer: 2,
+                    crossOrigin: true
+                }).addTo(map);
+                window.mainReferenceTileLayer._currentThemeUrl = th.labelTileUrl;
+            } else {
+                if (window.mainReferenceTileLayer._currentThemeUrl !== th.labelTileUrl) {
+                    window.mainReferenceTileLayer._currentThemeUrl = th.labelTileUrl;
+                    window.mainReferenceTileLayer.setUrl(th.labelTileUrl);
+                }
+                window.mainReferenceTileLayer.setOpacity(1.0);
+            }
+            const refCont = window.mainReferenceTileLayer.getContainer ? window.mainReferenceTileLayer.getContainer() : null;
+            if (refCont) {
+                refCont.style.filter = th.aeroTileUrl ? filterCss : 'none';
+            }
+        } else if (window.mainReferenceTileLayer) {
+            window.mainReferenceTileLayer.setOpacity(0.0);
+        }
+
+        if (th.aeroTileUrl) {
+            if (!window.mainAeroTileLayer) {
+                window.mainAeroTileLayer = L.tileLayer(th.aeroTileUrl, {
+                    maxZoom: 14,
+                    minZoom: 2,
+                    updateWhenIdle: false,
+                    updateWhenZooming: false,
+                    updateInterval: 65,
+                    keepBuffer: 2,
+                    crossOrigin: true
+                }).addTo(map);
+                window.mainAeroTileLayer._currentThemeUrl = th.aeroTileUrl;
+            } else {
+                if (window.mainAeroTileLayer._currentThemeUrl !== th.aeroTileUrl) {
+                    window.mainAeroTileLayer._currentThemeUrl = th.aeroTileUrl;
+                    window.mainAeroTileLayer.setUrl(th.aeroTileUrl);
+                }
+                window.mainAeroTileLayer.setOpacity(1.0);
+            }
+            if (typeof window.mainAeroTileLayer.bringToFront === 'function') {
+                window.mainAeroTileLayer.bringToFront();
+            }
+            const aeroCont = window.mainAeroTileLayer.getContainer ? window.mainAeroTileLayer.getContainer() : null;
+            if (aeroCont) {
+                aeroCont.style.filter = 'none';
+            }
+        } else if (window.mainAeroTileLayer) {
+            window.mainAeroTileLayer.setOpacity(0.0);
+        }
+    }
+    if (countryGeoJsonLayer && typeof countryGeoJsonLayer.eachLayer === 'function') {
+        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+    }
+
+    // 2. Apply to 3D Globe
+    if (window.globeEngine) {
+        window.globeEngine.preloadBaseTiles(th.tileUrl, th.labelTileUrl, th.aeroTileUrl);
+        window.globeEngine.requestRender();
+    }
+}
+window.setMapStyleTheme = setMapStyleTheme;
+window.getActiveMapStyleTheme = getActiveMapStyleTheme;
+
+function isGlobeModeActive() {
+    return currentMapProjectionMode === 'globe';
+}
+
+function globeZoomStep(delta) {
+    if (!window.globeEngine) return;
+    window.globeEngine.animateTo(window.globeEngine.lat, window.globeEngine.lon, Math.max(2.0, Math.min(13.0, window.globeEngine.zoom + delta)), 0.28);
+}
+
+function setMapProjectionMode(mode, persist = true) {
+    if (window.IS_LITE && (mode === 'globe' || mode === '3d') && !isTourDemoAllowingProPreview()) {
+        const projSelect = document.getElementById('cfg-map-projection');
+        if (projSelect) projSelect.value = '2d';
+        if (persist) showUnlockProModal();
+        mode = '2d';
+        persist = false;
+    }
+    const normalized = (mode === 'globe' || mode === '3d') ? 'globe' : '2d';
+    const prevMode = currentMapProjectionMode;
+    currentMapProjectionMode = normalized;
+
+    if (currentSettings && typeof currentSettings === 'object') {
+        currentSettings.map_projection = normalized;
+        if (persist && window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+            window.pywebview.api.save_settings(JSON.stringify(currentSettings)).catch(() => {});
+        }
+    }
+
+    // Update top-right switcher buttons (no icons)
+    const btn2d = document.getElementById('btn-view-mode-2d');
+    const btnGlobe = document.getElementById('btn-view-mode-globe');
+    if (btn2d && btnGlobe) {
+        if (normalized === 'globe') {
+            btnGlobe.className = 'h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0B0D11] font-sans font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]';
+            btn2d.className = 'h-7 px-2.5 rounded-md bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-sans font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border border-[#00A8FF]/40';
+        } else {
+            btn2d.className = 'h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0B0D11] font-sans font-bold text-[11px] uppercase tracking-wider flex items-center justify-center cursor-pointer transition-colors border border-[#00A8FF]';
+            btnGlobe.className = 'h-7 px-2.5 rounded-md bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-sans font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]/40';
+        }
+    }
+
+    const projSelect = document.getElementById('cfg-map-projection');
+    if (projSelect && projSelect.value !== normalized) {
+        projSelect.value = normalized;
+    }
+
+    const globeContainer = document.getElementById('globe-container');
+    if (!globeContainer) return;
+
+    if (normalized === 'globe') {
+        if (prevMode !== 'globe' && map && map._origGetCenter && map._origGetZoom && window.globeEngine) {
+            const c = map._origGetCenter();
+            const z = map._origGetZoom();
+            if (c) {
+                window.globeEngine.lat = Math.max(-80, Math.min(80, c.lat || 20));
+                let lon = c.lng || 0;
+                while (lon > 180) lon -= 360;
+                while (lon < -180) lon += 360;
+                window.globeEngine.lon = lon;
+            }
+            if (typeof z === 'number') {
+                window.globeEngine.zoom = Math.max(2.0, Math.min(13.0, z));
+            }
+        }
+        globeContainer.classList.remove('hidden');
+        if (window.globeEngine) {
+            const th = getActiveMapStyleTheme();
+            window.globeEngine.preloadBaseTiles(th.tileUrl, th.labelTileUrl, th.aeroTileUrl);
+            window.globeEngine.resize();
+            window.globeEngine.syncDomRouteBadges(true);
+            window.globeEngine.requestRender();
+        }
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+    } else {
+        globeContainer.classList.add('hidden');
+        if (prevMode === 'globe' && map && map._origSetView && window.globeEngine) {
+            try {
+                map._origSetView([window.globeEngine.lat, window.globeEngine.lon], Math.round(window.globeEngine.zoom * 2) / 2, { animate: false });
+            } catch (e) {}
+        }
+        if (map && typeof map.invalidateSize === 'function') {
+            map.invalidateSize();
+        }
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.style.visibility = '';
+        }
+        if (typeof updateRouteAirportBadges === 'function') {
+            updateRouteAirportBadges();
+        }
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+    }
+}
+window.setMapProjectionMode = setMapProjectionMode;
+window.globeZoomStep = globeZoomStep;
+
+function canonicalLon(lon) {
+    let l = parseFloat(lon) || 0;
+    while (l > 180) l -= 360;
+    while (l < -180) l += 360;
+    return l;
+}
+
+function latLonToUnitVec3(latDeg, lonDeg) {
+    const phi = (latDeg * Math.PI) / 180;
+    const lam = (canonicalLon(lonDeg) * Math.PI) / 180;
+    const cosPhi = Math.cos(phi);
+    return [
+        cosPhi * Math.sin(lam),
+        Math.sin(phi),
+        cosPhi * Math.cos(lam)
+    ];
+}
+
+function unitVec3ToLatLon(u) {
+    const lat = (Math.asin(Math.max(-1, Math.min(1, u[1]))) * 180) / Math.PI;
+    const lon = (Math.atan2(u[0], u[2]) * 180) / Math.PI;
+    return { lat, lon: canonicalLon(lon) };
+}
+
+function mercatorNormToLatLon(gx, gy) {
+    const lon = gx * 360.0 - 180.0;
+    const n = Math.PI - 2.0 * Math.PI * gy;
+    const lat = (180.0 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+    return { lat, lon };
+}
+
+function slerpUnitVec3(u, v, t) {
+    let dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+    dot = Math.max(-1.0, Math.min(1.0, dot));
+    const omega = Math.acos(dot);
+    if (omega < 1e-5) {
+        return [u[0], u[1], u[2]];
+    }
+    const sinOmega = Math.sin(omega);
+    const s0 = Math.sin((1 - t) * omega) / sinOmega;
+    const s1 = Math.sin(t * omega) / sinOmega;
+    return [
+        s0 * u[0] + s1 * v[0],
+        s0 * u[1] + s1 * v[1],
+        s0 * u[2] + s1 * v[2]
+    ];
+}
+
+class Globe3DEngine {
+    constructor(canvasEl, overlayEl) {
+        this.canvas = canvasEl;
+        this.ctx = canvasEl ? canvasEl.getContext('2d') : null;
+        this.overlay = overlayEl;
+        this.lat = 25.0;
+        this.lon = 10.0;
+        this.zoom = 2.6;
+        this.width = 800;
+        this.height = 600;
+        this.dpr = window.devicePixelRatio || 1;
+
+        this.countries = [];
+        this.hoveredCountryIso = null;
+        this.hoveredAirport = null;
+        this.renderedAirportHits = [];
+        this.renderedClusterHits = [];
+
+        // World-space cluster cache (0% stroboscopic flicker during camera pan/rotation)
+        this._cachedWorldClusterKey = '';
+        this._cachedWorldEntries = [];
+
+        // Multi-zoom tile cache, priority download scheduler & surface cache for ultra-fast 3D tile transitions
+        this.tileImageCache = new Map();
+        this.tileGeomCache = new Map();
+        this.inFlightTileMap = new Map();
+        this.pendingTileQueue = new Map();
+        this.tileLoadGeneration = 0;
+        this._lastSurfaceCacheKey = '';
+        this.tileLayerCanvas = document.createElement('canvas');
+        this.tileLayerCtx = this.tileLayerCanvas.getContext('2d');
+        this.aeroLayerCanvas = document.createElement('canvas');
+        this.aeroLayerCtx = this.aeroLayerCanvas.getContext('2d');
+
+        this.isDragging = false;
+        this.dragMoved = false;
+        this.dragStartX = 0;
+        this.dragStartY = 0;
+        this.dragStartLat = 0;
+        this.dragStartLon = 0;
+
+        this.animFrame = null;
+        this.renderPending = false;
+        this.pressedArrowKeys = new Set();
+        this.keyRotateRaf = null;
+        this.lastKeyRotateTs = 0;
+        this.routeArcCache = new Map();
+
+        this.depBadgeWrapper = null;
+        this.arrBadgeWrapper = null;
+        this.hoverTooltipEl = null;
+
+        this._initDomElements();
+        this._bindEvents();
+        this.resize();
+    }
+
+    _formatTileUrl(tileUrlTemplate, z, tx, ty) {
+        const host = ((tx + ty) & 1) ? 'services' : 'server';
+        return tileUrlTemplate
+            .replace('{s}', host)
+            .replace('{z}', z)
+            .replace('{y}', ty)
+            .replace('{x}', tx);
+    }
+
+    preloadBaseTiles(tileUrlTemplate, labelUrlTemplate = null, aeroUrlTemplate = null) {
+        if (!tileUrlTemplate) return;
+        // Preload only z = 2 (16 tiles) so the browser HTTP connection pool is never clogged by z = 3 back-hemisphere tiles
+        const z = 2;
+        const count = 1 << z;
+        for (let ty = 0; ty < count; ty++) {
+            for (let tx = 0; tx < count; tx++) {
+                this._enqueueTileFetch(tileUrlTemplate, z, tx, ty, 0, z);
+                if (labelUrlTemplate) {
+                    this._enqueueTileFetch(labelUrlTemplate, z, tx, ty, 1, z);
+                }
+                if (aeroUrlTemplate) {
+                    this._enqueueTileFetch(aeroUrlTemplate, z, tx, ty, 2, z);
+                }
+            }
+        }
+        this._flushTileDownloadQueue(2);
+    }
+
+    _enqueueTileFetch(tileUrlTemplate, z, tx, ty, priorityDistSq = 0, targetZ = z) {
+        const key = `${tileUrlTemplate}_${z}_${tx}_${ty}`;
+        let entry = this.tileImageCache.get(key);
+        if (entry) {
+            return entry;
+        }
+        const existingReq = this.pendingTileQueue.get(key);
+        if (!existingReq || priorityDistSq < existingReq.priorityDistSq) {
+            this.pendingTileQueue.set(key, {
+                key,
+                tileUrlTemplate,
+                z,
+                tx,
+                ty,
+                priorityDistSq,
+                targetZ
+            });
+        }
+        return null;
+    }
+
+    _startTileDownload(req) {
+        const { key, tileUrlTemplate, z, tx, ty } = req;
+        if (this.tileImageCache.has(key)) return;
+
+        if (this.tileImageCache.size > 1100) {
+            let deleted = 0;
+            for (const [k, v] of this.tileImageCache.entries()) {
+                if (!k.includes('_2_') && !v.loading) {
+                    this.tileImageCache.delete(k);
+                    if (++deleted > 280) break;
+                }
+            }
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        const entry = { img, loaded: false, loading: true, error: false, z, key, filteredMap: new Map() };
+        this.tileImageCache.set(key, entry);
+        this.inFlightTileMap.set(key, entry);
+
+        img.onload = () => {
+            entry.loaded = true;
+            entry.loading = false;
+            this.inFlightTileMap.delete(key);
+            this.tileLoadGeneration++;
+            this._flushTileDownloadQueue(this._currentTargetZ || z);
+            this.requestRender();
+        };
+        img.onerror = () => {
+            entry.error = true;
+            entry.loading = false;
+            this.inFlightTileMap.delete(key);
+            this._flushTileDownloadQueue(this._currentTargetZ || z);
+        };
+        img.src = this._formatTileUrl(tileUrlTemplate, z, tx, ty);
+    }
+
+    _flushTileDownloadQueue(targetZ) {
+        this._currentTargetZ = targetZ;
+
+        // 1. Abort obsolete in-flight downloads from far-off zoom levels when user zooms rapidly
+        for (const [k, entry] of this.inFlightTileMap.entries()) {
+            if (entry.z > 2 && (entry.z > targetZ || entry.z < targetZ - 1)) {
+                entry.loading = false;
+                try { entry.img.src = ''; } catch (e) {}
+                this.inFlightTileMap.delete(k);
+                this.tileImageCache.delete(k);
+            }
+        }
+
+        if (this.pendingTileQueue.size === 0) return;
+
+        // 2. Sort pending queue: base z=2 first, then current targetZ closest to optical center (cx, cy)
+        const requests = [];
+        for (const [k, req] of this.pendingTileQueue.entries()) {
+            if (req.z > 2 && (req.z > targetZ || req.z < targetZ - 1)) {
+                this.pendingTileQueue.delete(k);
+                continue;
+            }
+            requests.push(req);
+        }
+
+        requests.sort((a, b) => {
+            const aRank = (a.z === targetZ) ? 0 : (a.z === 2 ? 1 : 2);
+            const bRank = (b.z === targetZ) ? 0 : (b.z === 2 ? 1 : 2);
+            if (aRank !== bRank) return aRank - bRank;
+            return a.priorityDistSq - b.priorityDistSq;
+        });
+
+        const maxConcurrent = 24;
+        for (let i = 0; i < requests.length; i++) {
+            if (this.inFlightTileMap.size >= maxConcurrent) break;
+            const req = requests[i];
+            this.pendingTileQueue.delete(req.key);
+            this._startTileDownload(req);
+        }
+    }
+
+    _getTileGeometry(z, tx, ty) {
+        const key = `${z}_${tx}_${ty}`;
+        let geom = this.tileGeomCache.get(key);
+        if (geom) return geom;
+
+        const invN = 1.0 / (1 << z);
+        // Compact subdivision: 4x4 at z=2, 2x2 at z=3..4, 1x1 at z>=5 -> 4x fewer quads per frame for 120 FPS rotation!
+        const subDiv = (z <= 2) ? 4 : (z <= 4 ? 2 : 1);
+        const grid = [];
+        for (let iy = 0; iy <= subDiv; iy++) {
+            const gy = (ty + iy / subDiv) * invN;
+            const row = [];
+            for (let ix = 0; ix <= subDiv; ix++) {
+                const gx = (tx + ix / subDiv) * invN;
+                const ll = mercatorNormToLatLon(gx, gy);
+                row.push(latLonToUnitVec3(ll.lat, ll.lon));
+            }
+            grid.push(row);
+        }
+
+        const centerLL = mercatorNormToLatLon((tx + 0.5) * invN, (ty + 0.5) * invN);
+        const uCenter = latLonToUnitVec3(centerLL.lat, centerLL.lon);
+        const u00 = grid[0][0];
+        const u10 = grid[0][subDiv];
+        const u01 = grid[subDiv][0];
+        const u11 = grid[subDiv][subDiv];
+
+        geom = { subDiv, grid, uCenter, corners: [u00, u10, u01, u11] };
+        if (this.tileGeomCache.size > 2500) this.tileGeomCache.clear();
+        this.tileGeomCache.set(key, geom);
+        return geom;
+    }
+
+    _getPreFilteredTileSource(entry, filterCss) {
+        if (!entry || !entry.img) return null;
+        if (!filterCss || filterCss === 'none') return entry.img;
+        if (!entry.filteredMap) entry.filteredMap = new Map();
+        let cachedCanvas = entry.filteredMap.get(filterCss);
+        if (cachedCanvas) return cachedCanvas;
+        try {
+            const c = document.createElement('canvas');
+            c.width = entry.img.naturalWidth || 256;
+            c.height = entry.img.naturalHeight || 256;
+            const cCtx = c.getContext('2d');
+            cCtx.filter = filterCss;
+            cCtx.drawImage(entry.img, 0, 0);
+            entry.filteredMap.set(filterCss, c);
+            return c;
+        } catch (e) {
+            return entry.img;
+        }
+    }
+
+    _resolveTileWithAncestorFallback(urlTemplate, z, tx, ty, distSq = 0, targetZ = z, filterCss = 'none') {
+        if (!urlTemplate) return null;
+        const leafKey = `${urlTemplate}_${z}_${tx}_${ty}`;
+        const leafEntry = this.tileImageCache.get(leafKey);
+        if (leafEntry && leafEntry.loaded) {
+            return { img: this._getPreFilteredTileSource(leafEntry, filterCss), cropX: 0, cropY: 0, cropSize: 256 };
+        }
+        // Enqueue high-priority fetch for the target leaf tile
+        this._enqueueTileFetch(urlTemplate, z, tx, ty, distSq, targetZ);
+
+        // Immediately display the sharpest cached ancestor tile while leaf streams in
+        for (let ancZ = z - 1; ancZ >= 2; ancZ--) {
+            const shift = z - ancZ;
+            const ancX = tx >> shift;
+            const ancY = ty >> shift;
+            const ancKey = `${urlTemplate}_${ancZ}_${ancX}_${ancY}`;
+            const ancEntry = this.tileImageCache.get(ancKey);
+            if (ancEntry && ancEntry.loaded) {
+                const subSize = 256 / (1 << shift);
+                const mask = (1 << shift) - 1;
+                return {
+                    img: this._getPreFilteredTileSource(ancEntry, filterCss),
+                    cropX: (tx & mask) * subSize,
+                    cropY: (ty & mask) * subSize,
+                    cropSize: subSize
+                };
+            }
+            if (ancZ === 2) {
+                this._enqueueTileFetch(urlTemplate, 2, ancX, ancY, 0, targetZ);
+            }
+        }
+        return null;
+    }
+
+    _collectVisibleQuadtreeTiles(z, tx, ty, targetZ, tileUrlTemplate, labelUrlTemplate, aeroUrlTemplate, basis, outTiles) {
+        const geom = this._getTileGeometry(z, tx, ty);
+        const { F } = basis;
+        const { cx, cy, R } = basis.meta;
+
+        // 1. Fast Back-Hemisphere Cull (use unfolded surface projection so horizon-straddling tiles never invert)
+        const centerDot = geom.uCenter[0] * F[0] + geom.uCenter[1] * F[1] + geom.uCenter[2] * F[2];
+        const c0 = this.projectSurfaceUnitVec3(geom.corners[0], basis);
+        const c1 = this.projectSurfaceUnitVec3(geom.corners[1], basis);
+        const c2 = this.projectSurfaceUnitVec3(geom.corners[2], basis);
+        const c3 = this.projectSurfaceUnitVec3(geom.corners[3], basis);
+        const pc = this.projectSurfaceUnitVec3(geom.uCenter, basis);
+
+        const maxZ = Math.max(centerDot, c0.z, c1.z, c2.z, c3.z);
+        if (maxZ <= (z <= 2 ? -0.20 : -0.06)) {
+            return;
+        }
+
+        const minX = Math.min(c0.x, c1.x, c2.x, c3.x, pc.x);
+        const maxX = Math.max(c0.x, c1.x, c2.x, c3.x, pc.x);
+        const minY = Math.min(c0.y, c1.y, c2.y, c3.y, pc.y);
+        const maxY = Math.max(c0.y, c1.y, c2.y, c3.y, pc.y);
+        const spanPx = Math.max(maxX - minX, maxY - minY);
+
+        // 2. Screen Bounding-Box Frustum Cull (for z >= 3)
+        if (z >= 3) {
+            const pad = Math.max(40, (R * 1.15) / (1 << z));
+            if (maxX < -pad || minX > this.width + pad || maxY < -pad || minY > this.height + pad) {
+                return;
+            }
+        }
+
+        // 3. Focal-Cone LOD Subdivision:
+        // Only subdivide to highest targetZ inside the visible frontal cone (maxZ > 0.22 and spanPx > 125)
+        // so foreshortened limb tiles stay at targetZ - 1 (cutting total tiles by 65% for zero-lag rotation!)
+        const shouldSubdivide = (z < 3) || (z < targetZ - 1 && spanPx > 96 && maxZ > 0.05) || (spanPx > 125 && maxZ > 0.22);
+        if (z < targetZ && shouldSubdivide) {
+            const nx = tx * 2;
+            const ny = ty * 2;
+            const nz = z + 1;
+            this._collectVisibleQuadtreeTiles(nz, nx, ny, targetZ, tileUrlTemplate, labelUrlTemplate, aeroUrlTemplate, basis, outTiles);
+            this._collectVisibleQuadtreeTiles(nz, nx + 1, ny, targetZ, tileUrlTemplate, labelUrlTemplate, aeroUrlTemplate, basis, outTiles);
+            this._collectVisibleQuadtreeTiles(nz, nx, ny + 1, targetZ, tileUrlTemplate, labelUrlTemplate, aeroUrlTemplate, basis, outTiles);
+            this._collectVisibleQuadtreeTiles(nz, nx + 1, ny + 1, targetZ, tileUrlTemplate, labelUrlTemplate, aeroUrlTemplate, basis, outTiles);
+            return;
+        }
+
+        const distSq = (pc.x - cx) * (pc.x - cx) + (pc.y - cy) * (pc.y - cy);
+        const activeFilter = this._activeThemeFilterCss || 'none';
+        const baseResolved = this._resolveTileWithAncestorFallback(tileUrlTemplate, z, tx, ty, distSq, targetZ, activeFilter);
+        if (baseResolved) {
+            const labelResolved = labelUrlTemplate
+                ? this._resolveTileWithAncestorFallback(labelUrlTemplate, z, tx, ty, distSq + 1, targetZ, activeFilter)
+                : null;
+            const aeroResolved = aeroUrlTemplate
+                ? this._resolveTileWithAncestorFallback(aeroUrlTemplate, z, tx, ty, distSq + 2, targetZ, 'none')
+                : null;
+            outTiles.push({
+                geom,
+                base: baseResolved,
+                label: labelResolved,
+                aero: aeroResolved
+            });
+        }
+    }
+
+    _drawTexturedTri(ctx, img, sx0, sy0, sx1, sy1, sx2, sy2, x0, y0, x1, y1, x2, y2, scaleDpr = 1.0, padPx = 0.42) {
+        // Screen-space backface / degeneracy cull: never draw a folded or inverted triangle
+        const screenCross = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+        if (screenCross * ((sx1 - sx0) * (sy2 - sy0) - (sy1 - sy0) * (sx2 - sx0)) <= 1e-3) return;
+
+        const denom = (sx0 * (sy1 - sy2) + sx1 * (sy2 - sy0) + sx2 * (sy0 - sy1));
+        if (Math.abs(denom) < 1e-6) return;
+        const inv = 1.0 / denom;
+        const a = (x0 * (sy1 - sy2) + x1 * (sy2 - sy0) + x2 * (sy0 - sy1)) * inv;
+        const b = (y0 * (sy1 - sy2) + y1 * (sy2 - sy0) + y2 * (sy0 - sy1)) * inv;
+        const c = (x0 * (sx2 - sx1) + x1 * (sx0 - sx2) + x2 * (sx1 - sx0)) * inv;
+        const d = (y0 * (sx2 - sx1) + y1 * (sx0 - sx2) + y2 * (sx1 - sx0)) * inv;
+        const e = (x0 * (sx1 * sy2 - sx2 * sy1) + x1 * (sx2 * sy0 - sx0 * sy2) + x2 * (sx0 * sy1 - sx1 * sy0)) * inv;
+        const f = (y0 * (sx1 * sy2 - sx2 * sy1) + y1 * (sx2 * sy0 - sx0 * sy2) + y2 * (sx0 * sy1 - sx1 * sy0)) * inv;
+
+        ctx.save();
+        ctx.beginPath();
+        if (padPx > 0) {
+            const cx = (x0 + x1 + x2) * 0.3333333;
+            const cy = (y0 + y1 + y2) * 0.3333333;
+            const dx0 = x0 - cx, dy0 = y0 - cy;
+            const invL0 = padPx / (Math.hypot(dx0, dy0) || 1);
+            const dx1 = x1 - cx, dy1 = y1 - cy;
+            const invL1 = padPx / (Math.hypot(dx1, dy1) || 1);
+            const dx2 = x2 - cx, dy2 = y2 - cy;
+            const invL2 = padPx / (Math.hypot(dx2, dy2) || 1);
+            ctx.moveTo(x0 + dx0 * invL0, y0 + dy0 * invL0);
+            ctx.lineTo(x1 + dx1 * invL1, y1 + dy1 * invL1);
+            ctx.lineTo(x2 + dx2 * invL2, y2 + dy2 * invL2);
+        } else {
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.lineTo(x2, y2);
+        }
+        ctx.closePath();
+        ctx.clip();
+        ctx.setTransform(a * scaleDpr, b * scaleDpr, c * scaleDpr, d * scaleDpr, e * scaleDpr, f * scaleDpr);
+        ctx.drawImage(img, 0, 0);
+        ctx.restore();
+    }
+
+    _drawTilePatchOnSphere(tCtx, projGrid, subDiv, tileInfo, scaleDpr = 1.0, isOverlay = false, isMoving = false) {
+        if (!tileInfo || !tileInfo.img) return;
+        const { img, cropX, cropY, cropSize } = tileInfo;
+        const stepSrc = cropSize / subDiv;
+        // Fast hardware affine quad path (no ctx.clip() stencil overhead!)
+        const errThresh = isMoving ? 1.85 : 0.40;
+        const triPadPx = isOverlay ? 0.0 : 0.42;
+
+        for (let iy = 0; iy < subDiv; iy++) {
+            const sy0 = cropY + iy * stepSrc;
+            const sy1 = sy0 + stepSrc;
+            for (let ix = 0; ix < subDiv; ix++) {
+                const p00 = projGrid[iy][ix];
+                const p10 = projGrid[iy][ix + 1];
+                const p01 = projGrid[iy + 1][ix];
+                const p11 = projGrid[iy + 1][ix + 1];
+
+                // Skip any sub-quad where all 4 vertices lie on the occluded back hemisphere
+                if (p00.z <= 0 && p10.z <= 0 && p01.z <= 0 && p11.z <= 0) continue;
+
+                const sx0 = cropX + ix * stepSrc;
+                const sx1 = sx0 + stepSrc;
+
+                const errX = (p10.x + p01.x - p00.x) - p11.x;
+                const errY = (p10.y + p01.y - p00.y) - p11.y;
+                const quadCross = (p10.x - p00.x) * (p01.y - p00.y) - (p10.y - p00.y) * (p01.x - p00.x);
+                if (errX * errX + errY * errY < errThresh && quadCross > 1e-2) {
+                    const dx10 = p10.x - p00.x;
+                    const dy10 = p10.y - p00.y;
+                    const dx01 = p01.x - p00.x;
+                    const dy01 = p01.y - p00.y;
+                    const a = (dx10 / stepSrc) * scaleDpr;
+                    const b = (dy10 / stepSrc) * scaleDpr;
+                    const c = (dx01 / stepSrc) * scaleDpr;
+                    const d = (dy01 / stepSrc) * scaleDpr;
+                    tCtx.setTransform(a, b, c, d, p00.x * scaleDpr, p00.y * scaleDpr);
+                    if (isOverlay) {
+                        tCtx.drawImage(img, sx0, sy0, stepSrc, stepSrc, 0, 0, stepSrc, stepSrc);
+                    } else {
+                        const len10 = Math.hypot(dx10, dy10) || 1;
+                        const len01 = Math.hypot(dx01, dy01) || 1;
+                        const padSrcX = Math.min(0.35, (0.30 * stepSrc) / len10);
+                        const padSrcY = Math.min(0.35, (0.30 * stepSrc) / len01);
+                        tCtx.drawImage(img, sx0, sy0, stepSrc, stepSrc, -padSrcX, -padSrcY, stepSrc + padSrcX * 2, stepSrc + padSrcY * 2);
+                    }
+                } else {
+                    tCtx.setTransform(scaleDpr, 0, 0, scaleDpr, 0, 0);
+                    this._drawTexturedTri(tCtx, img, sx0, sy0, sx1, sy0, sx0, sy1, p00.x, p00.y, p10.x, p10.y, p01.x, p01.y, scaleDpr, triPadPx);
+                    this._drawTexturedTri(tCtx, img, sx1, sy1, sx0, sy1, sx1, sy0, p11.x, p11.y, p01.x, p01.y, p10.x, p10.y, scaleDpr, triPadPx);
+                }
+            }
+        }
+        tCtx.setTransform(scaleDpr, 0, 0, scaleDpr, 0, 0);
+    }
+
+    _renderMultiZoomSphericalTiles(ctx, basis, th) {
+        if (!th || !th.tileUrl) return false;
+        const isMoving = this.isDragging || this.animFrame !== null || (this.pressedArrowKeys && this.pressedArrowKeys.size > 0);
+        const { cx, cy, R } = basis.meta;
+        // Exact 1:1 optical circumference match: +1 zoom level sharper than old code without over-subdividing into 4x tiny tiles
+        const targetZ = Math.max(3, Math.min(14, Math.round(Math.log2((2.0 * Math.PI * R) / 215.0))));
+        const tileDpr = isMoving ? 1.0 : Math.min(this.dpr, 1.4);
+        const cw = Math.round(this.width * tileDpr);
+        const ch = Math.round(this.height * tileDpr);
+        this._activeThemeFilterCss = th.tileCssFilter || 'none';
+
+        // Fast Framebuffer Cache: if camera (lat, lon, zoom, optical center), theme and loaded tiles haven't changed,
+        // reuse the already-warped tileLayerCanvas in 0.05ms
+        const surfaceCacheKey = `${this.lat.toFixed(4)}_${this.lon.toFixed(4)}_${this.zoom.toFixed(4)}_${Math.round(cx)}_${Math.round(cy)}_${cw}_${ch}_${th.key}_${this.tileLoadGeneration}`;
+        if (this._lastSurfaceCacheKey !== surfaceCacheKey) {
+            const visibleTiles = [];
+            for (let ty = 0; ty < 4; ty++) {
+                for (let tx = 0; tx < 4; tx++) {
+                    this._collectVisibleQuadtreeTiles(2, tx, ty, targetZ, th.tileUrl, th.labelTileUrl, th.aeroTileUrl, basis, visibleTiles);
+                }
+            }
+            this._flushTileDownloadQueue(targetZ);
+            if (visibleTiles.length === 0) return false;
+
+            if (this.tileLayerCanvas.width !== cw || this.tileLayerCanvas.height !== ch) {
+                this.tileLayerCanvas.width = cw;
+                this.tileLayerCanvas.height = ch;
+            }
+            const tCtx = this.tileLayerCtx;
+            tCtx.save();
+            tCtx.setTransform(1, 0, 0, 1, 0, 0);
+            tCtx.clearRect(0, 0, cw, ch);
+            tCtx.imageSmoothingEnabled = true;
+            tCtx.imageSmoothingQuality = isMoving ? 'low' : 'high';
+            tCtx.scale(tileDpr, tileDpr);
+            tCtx.beginPath();
+            tCtx.arc(cx, cy, R, 0, Math.PI * 2);
+            tCtx.clip();
+
+            let aCtx = null;
+            if (th.aeroTileUrl) {
+                if (this.aeroLayerCanvas.width !== cw || this.aeroLayerCanvas.height !== ch) {
+                    this.aeroLayerCanvas.width = cw;
+                    this.aeroLayerCanvas.height = ch;
+                }
+                aCtx = this.aeroLayerCtx;
+                aCtx.save();
+                aCtx.setTransform(1, 0, 0, 1, 0, 0);
+                aCtx.clearRect(0, 0, cw, ch);
+                aCtx.imageSmoothingEnabled = true;
+                aCtx.imageSmoothingQuality = isMoving ? 'low' : 'high';
+                aCtx.scale(tileDpr, tileDpr);
+                aCtx.beginPath();
+                aCtx.arc(cx, cy, R, 0, Math.PI * 2);
+                aCtx.clip();
+            }
+
+            for (let i = 0; i < visibleTiles.length; i++) {
+                const item = visibleTiles[i];
+                const { geom, base, label, aero } = item;
+                const subDiv = geom.subDiv;
+
+                const projGrid = [];
+                for (let iy = 0; iy <= subDiv; iy++) {
+                    const row = [];
+                    for (let ix = 0; ix <= subDiv; ix++) {
+                        row.push(this.projectSurfaceUnitVec3(geom.grid[iy][ix], basis));
+                    }
+                    projGrid.push(row);
+                }
+
+                this._drawTilePatchOnSphere(tCtx, projGrid, subDiv, base, tileDpr, false, isMoving);
+                if (label) {
+                    this._drawTilePatchOnSphere(tCtx, projGrid, subDiv, label, tileDpr, true, isMoving);
+                }
+                if (aCtx && aero) {
+                    this._drawTilePatchOnSphere(aCtx, projGrid, subDiv, aero, tileDpr, true, isMoving);
+                }
+            }
+            tCtx.restore();
+            if (aCtx) aCtx.restore();
+            this._lastSurfaceCacheKey = surfaceCacheKey;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = isMoving ? 'low' : 'high';
+        // Tiles already have the theme filter pre-baked at 256x256 download time -> zero per-frame full-screen filter pass!
+        ctx.drawImage(this.tileLayerCanvas, 0, 0, this.width, this.height);
+
+        // Composite the OpenAIP Aeronautical Overlay (VFR/IFR airspaces, VORs, waypoints) with authentic unfiltered ICAO colors
+        if (th.aeroTileUrl) {
+            ctx.drawImage(this.aeroLayerCanvas, 0, 0, this.width, this.height);
+        }
+
+        // Subtle 3D spherical limb shading for depth
+        const shadeGrad = ctx.createRadialGradient(cx - R * 0.25, cy - R * 0.25, R * 0.25, cx, cy, R);
+        shadeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        shadeGrad.addColorStop(0.75, 'rgba(4, 8, 16, 0.10)');
+        shadeGrad.addColorStop(1, 'rgba(2, 6, 14, 0.48)');
+        ctx.fillStyle = shadeGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.fill();
+
+        return true;
+    }
+
+    _initDomElements() {
+        if (!this.overlay) return;
+        this.depBadgeWrapper = document.createElement('div');
+        this.depBadgeWrapper.id = 'globe-route-badge-dep';
+        this.depBadgeWrapper.className = 'absolute left-0 top-0 pointer-events-auto hidden';
+        this.depBadgeWrapper.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof focusOptimizerAirport === 'function') focusOptimizerAirport('origin');
+        });
+        this.depBadgeWrapper.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            if (typeof clearOptimizerRoutePlanning === 'function') clearOptimizerRoutePlanning();
+        });
+
+        this.arrBadgeWrapper = document.createElement('div');
+        this.arrBadgeWrapper.id = 'globe-route-badge-arr';
+        this.arrBadgeWrapper.className = 'absolute left-0 top-0 pointer-events-auto hidden';
+        this.arrBadgeWrapper.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof focusOptimizerAirport === 'function') focusOptimizerAirport('dest');
+        });
+        this.arrBadgeWrapper.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            if (typeof clearOptimizerRoutePlanning === 'function') clearOptimizerRoutePlanning();
+        });
+
+        this.hoverTooltipEl = document.createElement('div');
+        this.hoverTooltipEl.id = 'globe-airport-tooltip';
+        this.hoverTooltipEl.className = 'hidden absolute z-[500] pointer-events-none px-2.5 py-1.5 rounded-lg bg-[#0E121A]/95 border border-[#2D3A54] text-xs font-sans text-[#F1F5F9] shadow-xl whitespace-nowrap';
+
+        this.overlay.appendChild(this.depBadgeWrapper);
+        this.overlay.appendChild(this.arrBadgeWrapper);
+        this.overlay.appendChild(this.hoverTooltipEl);
+    }
+
+    setCountriesGeoJson(geoData) {
+        if (!geoData || !Array.isArray(geoData.features)) return;
+        const parsed = [];
+        for (const feat of geoData.features) {
+            if (!feat || !feat.geometry) continue;
+            const iso = (typeof getFeatureIso === 'function') ? getFeatureIso(feat) : '';
+            const props = feat.properties || {};
+            const name = props.NAME || props.ADMIN || props.NAME_LONG || 'Country';
+            const geom = feat.geometry;
+            const rawPolys = geom.type === 'Polygon'
+                ? [geom.coordinates]
+                : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+
+            const rings3D = [];
+            for (const poly of rawPolys) {
+                if (!poly || !poly[0] || poly[0].length < 3) continue;
+                const outer = poly[0];
+                const ptsFull = [];
+                const ptsLod = [];
+                const rawLod = [];
+                let cx = 0, cy = 0, cz = 0;
+                let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+                const step = Math.max(1, Math.floor(outer.length / 90));
+                const fullStep = Math.max(1, Math.floor(outer.length / 320));
+                for (let i = 0; i < outer.length; i++) {
+                    const coord = outer[i];
+                    const lon = coord[0];
+                    const lat = coord[1];
+                    if (lat < minLat) minLat = lat;
+                    if (lat > maxLat) maxLat = lat;
+                    if (lon < minLon) minLon = lon;
+                    if (lon > maxLon) maxLon = lon;
+                    const v = latLonToUnitVec3(lat, lon);
+                    if (i === 0 || i === outer.length - 1 || i % fullStep === 0) {
+                        ptsFull.push(v);
+                    }
+                    cx += v[0];
+                    cy += v[1];
+                    cz += v[2];
+                    if (i === 0 || i === outer.length - 1 || i % step === 0) {
+                        ptsLod.push(v);
+                        rawLod.push(coord);
+                    }
+                }
+                const len = Math.hypot(cx, cy, cz) || 1;
+                cx /= len; cy /= len; cz /= len;
+                let minDot = 1.0;
+                for (let i = 0; i < ptsLod.length; i++) {
+                    const p = ptsLod[i];
+                    const d = p[0] * cx + p[1] * cy + p[2] * cz;
+                    if (d < minDot) minDot = d;
+                }
+                rings3D.push({
+                    raw: outer,
+                    rawLod,
+                    minLat,
+                    maxLat,
+                    minLon,
+                    maxLon,
+                    full: ptsFull,
+                    lod: ptsLod,
+                    center: [cx, cy, cz],
+                    minDot: minDot
+                });
+            }
+            if (rings3D.length > 0) {
+                parsed.push({ iso, name, rings: rings3D });
+            }
+        }
+        this.countries = parsed;
+        this.requestRender();
+    }
+
+    getOpticalCenter() {
+        return {
+            cx: this.width / 2,
+            cy: this.height / 2
+        };
+    }
+
+    getGlobeRadius() {
+        const baseR = Math.min(this.width, this.height) * 0.36;
+        return baseR * Math.pow(2, this.zoom - 2.5);
+    }
+
+    getBasisVectors() {
+        const phi0 = (this.lat * Math.PI) / 180;
+        const lam0 = (this.lon * Math.PI) / 180;
+        const cosPhi0 = Math.cos(phi0);
+        const sinPhi0 = Math.sin(phi0);
+        const cosLam0 = Math.cos(lam0);
+        const sinLam0 = Math.sin(lam0);
+
+        return {
+            E: [cosLam0, 0, -sinLam0],
+            N: [-sinPhi0 * sinLam0, cosPhi0, -sinPhi0 * cosLam0],
+            F: [cosPhi0 * sinLam0, sinPhi0, cosPhi0 * cosLam0],
+            meta: { cx: this.getOpticalCenter().cx, cy: this.getOpticalCenter().cy, R: this.getGlobeRadius() }
+        };
+    }
+
+    projectUnitVec3(u, basis, altitudeFactor = 1.0) {
+        const { E, N, F, meta } = basis;
+        const x3d = altitudeFactor * (u[0] * E[0] + u[2] * E[2]);
+        const y3d = altitudeFactor * (u[0] * N[0] + u[1] * N[1] + u[2] * N[2]);
+        const z3d = altitudeFactor * (u[0] * F[0] + u[1] * F[1] + u[2] * F[2]);
+        const visible = (altitudeFactor > 1.001)
+            ? (z3d >= 0 || (x3d * x3d + y3d * y3d) >= 0.995)
+            : (z3d >= 0);
+        return {
+            x: meta.cx + x3d * meta.R,
+            y: meta.cy - y3d * meta.R,
+            z: z3d,
+            visible
+        };
+    }
+
+    projectSurfaceUnitVec3(u, basis) {
+        const { E, N, F, meta } = basis;
+        let x3d = u[0] * E[0] + u[2] * E[2];
+        let y3d = u[0] * N[0] + u[1] * N[1] + u[2] * N[2];
+        const z3d = u[0] * F[0] + u[1] * F[1] + u[2] * F[2];
+        if (z3d < 0) {
+            const rxy = Math.hypot(x3d, y3d);
+            if (rxy > 1e-6) {
+                const unfoldedR = 2.0 - rxy;
+                const scale = unfoldedR / rxy;
+                x3d *= scale;
+                y3d *= scale;
+            }
+        }
+        return {
+            x: meta.cx + x3d * meta.R,
+            y: meta.cy - y3d * meta.R,
+            z: z3d,
+            visible: z3d >= 0
+        };
+    }
+
+    projectLatLng(lat, lon, altitudeFactor = 1.0) {
+        const u = latLonToUnitVec3(parseFloat(lat) || 0, parseFloat(lon) || 0);
+        const basis = this.getBasisVectors();
+        return this.projectUnitVec3(u, basis, altitudeFactor);
+    }
+
+    screenToLatLng(screenX, screenY) {
+        const { cx, cy } = this.getOpticalCenter();
+        const R = this.getGlobeRadius();
+        const nx = (screenX - cx) / R;
+        const ny = (cy - screenY) / R;
+        const rho2 = nx * nx + ny * ny;
+        if (rho2 > 1.0) return null;
+        const cosC = Math.sqrt(Math.max(0, 1.0 - rho2));
+        const phi0 = (this.lat * Math.PI) / 180;
+        const lam0 = (this.lon * Math.PI) / 180;
+        const sinPhi0 = Math.sin(phi0);
+        const cosPhi0 = Math.cos(phi0);
+
+        const phi = Math.asin(Math.max(-1, Math.min(1, cosC * sinPhi0 + ny * cosPhi0)));
+        const lam = lam0 + Math.atan2(nx, cosC * cosPhi0 - ny * sinPhi0);
+        return {
+            lat: (phi * 180) / Math.PI,
+            lng: canonicalLon((lam * 180) / Math.PI)
+        };
+    }
+
+    stopAnimation() {
+        if (this.animFrame) {
+            cancelAnimationFrame(this.animFrame);
+            this.animFrame = null;
+        }
+    }
+
+    _getKeyboardPanSpeedMultiplier() {
+        let rawDur = 1.1;
+        if (typeof currentSettings !== 'undefined' && currentSettings) {
+            const d = parseFloat(currentSettings.camera_pan_duration);
+            const lastD = parseFloat(currentSettings.camera_last_pan_duration);
+            if (!isNaN(d) && d > 0.05) {
+                rawDur = d;
+            } else if (!isNaN(lastD) && lastD > 0.05) {
+                rawDur = lastD;
+            }
+        }
+        const clampedDur = Math.max(0.2, Math.min(2.0, rawDur));
+        return Math.pow(1.1 / clampedDur, 0.85);
+    }
+
+    _startKeyRotationLoop() {
+        if (this.keyRotateRaf) return;
+        this.stopAnimation();
+        this.lastKeyRotateTs = performance.now();
+        const tick = (now) => {
+            if (!isGlobeModeActive() || this.pressedArrowKeys.size === 0 || this.isDragging) {
+                this.keyRotateRaf = null;
+                this._notifyMapMove(true);
+                return;
+            }
+            const dt = Math.min(0.05, Math.max(0.001, (now - this.lastKeyRotateTs) / 1000));
+            this.lastKeyRotateTs = now;
+
+            let vx = (this.pressedArrowKeys.has('ArrowRight') ? 1 : 0) - (this.pressedArrowKeys.has('ArrowLeft') ? 1 : 0);
+            let vy = (this.pressedArrowKeys.has('ArrowUp') ? 1 : 0) - (this.pressedArrowKeys.has('ArrowDown') ? 1 : 0);
+
+            if (vx !== 0 || vy !== 0) {
+                if (vx !== 0 && vy !== 0) {
+                    const inv = 1 / Math.SQRT2;
+                    vx *= inv;
+                    vy *= inv;
+                }
+                const R = this.getGlobeRadius();
+                const degPerPx = (180 / Math.PI) / Math.max(60, R);
+                const basePxPerSec = 420;
+                const pxStep = basePxPerSec * this._getKeyboardPanSpeedMultiplier() * dt;
+
+                this.lon = canonicalLon(this.lon + vx * pxStep * degPerPx);
+                this.lat = Math.max(-82, Math.min(82, this.lat + vy * pxStep * degPerPx));
+                this.render();
+                this._notifyMapMove(false);
+            }
+            this.keyRotateRaf = requestAnimationFrame(tick);
+        };
+        this.keyRotateRaf = requestAnimationFrame(tick);
+    }
+
+    _stopKeyRotationLoop(notifyEnd = true) {
+        if (this.keyRotateRaf) {
+            cancelAnimationFrame(this.keyRotateRaf);
+            this.keyRotateRaf = null;
+            if (notifyEnd && isGlobeModeActive()) {
+                this.requestRender();
+                this._notifyMapMove(true);
+            }
+        }
+    }
+
+    animateTo(targetLat, targetLon, targetZoom, durationSec = 1.0) {
+        this.stopAnimation();
+        const startLat = this.lat;
+        const startLon = this.lon;
+        const startZoom = this.zoom;
+        const endLat = Math.max(-82, Math.min(82, parseFloat(targetLat) || 0));
+        let endLon = canonicalLon(targetLon);
+        while (endLon - startLon > 180) endLon -= 360;
+        while (endLon - startLon < -180) endLon += 360;
+        const endZoom = (targetZoom !== null && targetZoom !== undefined && !isNaN(targetZoom))
+            ? Math.max(2.0, Math.min(13.0, parseFloat(targetZoom)))
+            : startZoom;
+
+        if (durationSec <= 0.05) {
+            this.lat = endLat;
+            this.lon = canonicalLon(endLon);
+            this.zoom = endZoom;
+            this.requestRender();
+            this._notifyMapMove(true);
+            return;
+        }
+
+        const startTime = performance.now();
+        const durMs = durationSec * 1000;
+        const step = (now) => {
+            const t = Math.min(1.0, (now - startTime) / durMs);
+            const ease = 1 - Math.pow(1 - t, 3);
+            this.lat = startLat + (endLat - startLat) * ease;
+            this.lon = canonicalLon(startLon + (endLon - startLon) * ease);
+            this.zoom = startZoom + (endZoom - startZoom) * ease;
+            if (t >= 1.0) {
+                this.animFrame = null;
+            }
+            this.render();
+            this._notifyMapMove(t >= 1.0);
+            if (t < 1.0) {
+                this.animFrame = requestAnimationFrame(step);
+            }
+        };
+        this.animFrame = requestAnimationFrame(step);
+    }
+
+    _notifyMapMove(isEnd = false) {
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(false);
+        }
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+        this.syncDomRouteBadges(false);
+        if (map && typeof map.fire === 'function') {
+            try {
+                map.fire('move');
+                if (isEnd) {
+                    map.fire('moveend');
+                    map.fire('zoomend');
+                }
+            } catch (e) {}
+        }
+    }
+
+    resize() {
+        if (!this.canvas) return;
+        const container = this.canvas.parentElement;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        this.width = Math.max(300, rect.width || window.innerWidth);
+        this.height = Math.max(300, rect.height || window.innerHeight);
+        this.dpr = window.devicePixelRatio || 1;
+        this.canvas.width = Math.round(this.width * this.dpr);
+        this.canvas.height = Math.round(this.height * this.dpr);
+        this.requestRender();
+    }
+
+    requestRender() {
+        if (!isGlobeModeActive()) return;
+        if (this.renderPending) return;
+        this.renderPending = true;
+        requestAnimationFrame(() => {
+            this.renderPending = false;
+            this.render();
+        });
+    }
+
+    syncDomRouteBadges(rebuildHtml = false) {
+        if (!this.depBadgeWrapper || !this.arrBadgeWrapper) return;
+        if (!isGlobeModeActive()) {
+            this.depBadgeWrapper.classList.add('hidden');
+            this.arrBadgeWrapper.classList.add('hidden');
+            return;
+        }
+
+        const scale = (typeof getRouteBadgeScale === 'function') ? getRouteBadgeScale(this.zoom) : 0.6;
+
+        if (typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.lat !== undefined && optimizerOrigin.lon !== undefined) {
+            if (rebuildHtml || !this.depBadgeWrapper.innerHTML) {
+                const icon = createRouteAirportBadgeIcon(optimizerOrigin, 'DEP');
+                this.depBadgeWrapper.innerHTML = icon && icon.options ? icon.options.html : '';
+            }
+            const pt = this.projectLatLng(optimizerOrigin.lat, optimizerOrigin.lon, 1.0);
+            if (pt.visible && pt.z > 0.04) {
+                this.depBadgeWrapper.classList.remove('hidden');
+                this.depBadgeWrapper.style.left = `${Math.round(pt.x)}px`;
+                this.depBadgeWrapper.style.top = `${Math.round(pt.y)}px`;
+                const circle = this.depBadgeWrapper.querySelector('.route-airport-circle');
+                if (circle) {
+                    circle.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+                }
+            } else {
+                this.depBadgeWrapper.classList.add('hidden');
+            }
+        } else {
+            this.depBadgeWrapper.classList.add('hidden');
+            this.depBadgeWrapper.innerHTML = '';
+        }
+
+        if (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.lat !== undefined && optimizerDest.lon !== undefined) {
+            if (rebuildHtml || !this.arrBadgeWrapper.innerHTML) {
+                const icon = createRouteAirportBadgeIcon(optimizerDest, 'ARR');
+                this.arrBadgeWrapper.innerHTML = icon && icon.options ? icon.options.html : '';
+            }
+            const pt = this.projectLatLng(optimizerDest.lat, optimizerDest.lon, 1.0);
+            if (pt.visible && pt.z > 0.04) {
+                this.arrBadgeWrapper.classList.remove('hidden');
+                this.arrBadgeWrapper.style.left = `${Math.round(pt.x)}px`;
+                this.arrBadgeWrapper.style.top = `${Math.round(pt.y)}px`;
+                const circle = this.arrBadgeWrapper.querySelector('.route-airport-circle');
+                if (circle) {
+                    circle.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+                }
+            } else {
+                this.arrBadgeWrapper.classList.add('hidden');
+            }
+        } else {
+            this.arrBadgeWrapper.classList.add('hidden');
+            this.arrBadgeWrapper.innerHTML = '';
+        }
+
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl && currentRadialAirport && !radialEl.classList.contains('hidden')) {
+            const rPt = this.projectLatLng(currentRadialAirport.lat, currentRadialAirport.lon, 1.0);
+            radialEl.style.visibility = (rPt.visible && rPt.z > 0.02) ? 'visible' : 'hidden';
+        }
+    }
+
+    _bindEvents() {
+        if (!this.canvas) return;
+        window.addEventListener('resize', () => {
+            if (isGlobeModeActive()) this.resize();
+        });
+        if (typeof ResizeObserver !== 'undefined' && this.canvas.parentElement) {
+            this._resizeObserver = new ResizeObserver(() => {
+                if (isGlobeModeActive()) this.resize();
+            });
+            this._resizeObserver.observe(this.canvas.parentElement);
+            if (this.canvas.parentElement.parentElement) {
+                this._resizeObserver.observe(this.canvas.parentElement.parentElement);
+            }
+        }
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            this.stopAnimation();
+            this.isDragging = true;
+            this.dragMoved = false;
+            this.dragStartX = e.clientX;
+            this.dragStartY = e.clientY;
+            this.dragStartLat = this.lat;
+            this.dragStartLon = this.lon;
+            isMapDragging = false;
+        });
+
+        let dragMoveRaf = null;
+        window.addEventListener('mousemove', (e) => {
+            if (!isGlobeModeActive()) return;
+            if (this.isDragging) {
+                const dx = e.clientX - this.dragStartX;
+                const dy = e.clientY - this.dragStartY;
+                if (Math.hypot(dx, dy) > 4) {
+                    this.dragMoved = true;
+                    isMapDragging = true;
+                }
+                const R = this.getGlobeRadius();
+                const degPerPx = (180 / Math.PI) / Math.max(60, R);
+                this.lon = canonicalLon(this.dragStartLon - dx * degPerPx);
+                this.lat = Math.max(-82, Math.min(82, this.dragStartLat + dy * degPerPx));
+
+                if (!dragMoveRaf) {
+                    dragMoveRaf = requestAnimationFrame(() => {
+                        dragMoveRaf = null;
+                        this.render();
+                        this._notifyMapMove(false);
+                    });
+                }
+                return;
+            }
+
+            if (this._hoverRaf) return;
+            const clientX = e.clientX;
+            const clientY = e.clientY;
+            this._hoverRaf = requestAnimationFrame(() => {
+                this._hoverRaf = null;
+                if (!isGlobeModeActive() || this.isDragging) return;
+                const rect = this.canvas.getBoundingClientRect();
+                const mx = clientX - rect.left;
+                const my = clientY - rect.top;
+                if (mx < 0 || my < 0 || mx > this.width || my > this.height) return;
+
+                const hitAp = this._findAirportAt(mx, my);
+                const hitCluster = !hitAp ? this._findClusterAt(mx, my) : null;
+                const maxCountryZoom = (typeof MAX_COUNTRY_INTERACTION_ZOOM !== 'undefined') ? MAX_COUNTRY_INTERACTION_ZOOM : 5.5;
+                const hitCountry = (!hitAp && !hitCluster && this.zoom <= maxCountryZoom && !currentRadialAirport && !selectedAirport)
+                    ? this._findCountryAt(mx, my)
+                    : null;
+                const hitCountryIso = hitCountry ? hitCountry.iso : null;
+
+                let needsRedraw = false;
+                if (hitAp !== this.hoveredAirport) {
+                    this.hoveredAirport = hitAp;
+                    this._updateHoverTooltip(hitAp, mx, my);
+                    needsRedraw = true;
+                } else if (hitAp) {
+                    this._updateHoverTooltip(hitAp, mx, my);
+                }
+                if (hitCountryIso !== this.hoveredCountryIso) {
+                    this.hoveredCountryIso = hitCountryIso;
+                    needsRedraw = true;
+                }
+                this.canvas.style.cursor = (hitAp || hitCluster || hitCountry) ? 'pointer' : 'grab';
+                if (needsRedraw) {
+                    this.requestRender();
+                }
+            });
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (this.isDragging) {
+                this.isDragging = false;
+                if (this.dragMoved) {
+                    this.requestRender();
+                    this._notifyMapMove(true);
+                    setTimeout(() => { isMapDragging = false; }, 80);
+                }
+            }
+        });
+
+        let wheelEndTimer = null;
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.stopAnimation();
+            const delta = -Math.sign(e.deltaY) * 0.14;
+            const nextZoom = Math.max(2.0, Math.min(13.0, this.zoom + delta));
+            if (nextZoom !== this.zoom) {
+                this.zoom = nextZoom;
+                if (typeof updateMapZoomTier === 'function') updateMapZoomTier();
+                this.requestRender();
+                this._notifyMapMove(false);
+                if (wheelEndTimer) clearTimeout(wheelEndTimer);
+                wheelEndTimer = setTimeout(() => {
+                    wheelEndTimer = null;
+                    this._notifyMapMove(true);
+                }, 140);
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('click', (e) => {
+            if (this.dragMoved) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // 1. Check Airport click
+            const ap = this._findAirportAt(mx, my);
+            if (ap) {
+                this._handleAirportClick(ap, e);
+                return;
+            }
+
+            // 2. Check Cluster click
+            const cl = this._findClusterAt(mx, my);
+            if (cl) {
+                this.animateTo(cl.lat, cl.lon, Math.min(9.5, this.zoom + 1.8), 0.55);
+                return;
+            }
+
+            // 3. Check Country click
+            const maxCountryZoom = (typeof MAX_COUNTRY_INTERACTION_ZOOM !== 'undefined') ? MAX_COUNTRY_INTERACTION_ZOOM : 5.5;
+            const sceneriesExt = document.getElementById('radial-sceneries-extension');
+            const isSceneriesOpen = sceneriesExt && !sceneriesExt.classList.contains('hidden');
+            if (!isDetailsModalOpen() && !isAirlinesModalOpen() && !isSceneriesOpen &&
+                !currentRadialAirport && !selectedAirport && !isFlightPlanningMode &&
+                this.zoom <= maxCountryZoom) {
+                const hitCountry = this._findCountryAt(mx, my);
+                if (hitCountry && hitCountry.iso && hitCountry.iso !== '-99') {
+                    if (isFilterRadialOpen && typeof closeFilterRadialMenu === 'function') {
+                        closeFilterRadialMenu();
+                        return;
+                    }
+                    if (countryClickTimeout) {
+                        clearTimeout(countryClickTimeout);
+                        countryClickTimeout = null;
+                    }
+                    countryClickTimeout = setTimeout(() => {
+                        countryClickTimeout = null;
+                        toggleCountrySelection(hitCountry.iso, hitCountry.name, null);
+                        this.requestRender();
+                    }, 220);
+                    return;
+                }
+            }
+
+            // 4. Neutral globe click
+            if (isFilterRadialOpen && typeof closeFilterRadialMenu === 'function') {
+                closeFilterRadialMenu();
+            }
+            if (isDetailsModalOpen() || isAirlinesModalOpen() || isSceneriesOpen) {
+                return;
+            }
+            if (isClassicNavMode() && typeof closeClassicAirportView === 'function') {
+                closeClassicAirportView();
+            }
+            if (isFlightPlanningMode) {
+                closeAirportRadialMenu();
+                return;
+            }
+            closeAirportRadialMenu();
+            if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
+                closeDrawerWithoutCameraChange();
+            }
+            selectedAirport = null;
+            this.requestRender();
+        });
+
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = this.canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            const ap = this._findAirportAt(mx, my);
+            if (ap) {
+                if (typeof closeFilterRadialMenu === 'function') closeFilterRadialMenu();
+                if (isClassicNavMode()) {
+                    panMapToAirport(ap);
+                    showClassicAirportView(ap);
+                } else {
+                    const marker = airportMarkerCache ? airportMarkerCache.get(ap.icao) : null;
+                    openAirportRadialMenu(ap, marker, { originalEvent: e });
+                }
+                this.requestRender();
+                return;
+            }
+
+            if (!isClassicNavMode() && typeof openFilterRadialMenu === 'function') {
+                openFilterRadialMenu(e.clientX, e.clientY);
+            }
+        });
+
+        this.canvas.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof triggerMapPanicReset === 'function') {
+                triggerMapPanicReset();
+            }
+        });
+
+        const arrowSet = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+        window.addEventListener('keydown', (e) => {
+            if (!arrowSet.has(e.key)) return;
+            if (!isGlobeModeActive()) return;
+            if (e.ctrlKey || e.altKey || e.metaKey) return;
+            const el = e.target || document.activeElement;
+            if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) {
+                return;
+            }
+            if ((typeof isSettingsModalOpen === 'function' && isSettingsModalOpen()) ||
+                (typeof isDetailsModalOpen === 'function' && isDetailsModalOpen()) ||
+                (typeof isAirlinesModalOpen === 'function' && isAirlinesModalOpen())) {
+                return;
+            }
+            e.preventDefault();
+            this.pressedArrowKeys.add(e.key);
+            this._startKeyRotationLoop();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (!arrowSet.has(e.key)) return;
+            if (this.pressedArrowKeys.has(e.key)) {
+                this.pressedArrowKeys.delete(e.key);
+                if (this.pressedArrowKeys.size === 0) {
+                    this._stopKeyRotationLoop(true);
+                }
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            if (this.pressedArrowKeys.size > 0) {
+                this.pressedArrowKeys.clear();
+                this._stopKeyRotationLoop(true);
+            }
+        });
+    }
+
+    _updateHoverTooltip(ap, mx, my) {
+        if (!this.hoverTooltipEl) return;
+        if (!ap) {
+            this.hoverTooltipEl.classList.add('hidden');
+            return;
+        }
+        const cat = (typeof getAirportCategory === 'function') ? getAirportCategory(ap) : 'DEFAULT';
+        let color = '#60a5fa';
+        if (cat === 'PAYWARE') color = '#c084fc';
+        else if (cat === 'ASOBO') color = '#fbbf24';
+        else if (cat === 'FREEWARE') color = '#22d3ee';
+        const cleanName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(ap.name, ap.city) : (ap.name || '');
+        this.hoverTooltipEl.innerHTML = `<span class="font-mono font-black mr-1.5" style="color:${color}">${ap.icao}</span><span class="font-semibold text-slate-200">${cleanName}</span>`;
+        this.hoverTooltipEl.style.left = `${Math.min(this.width - 220, Math.round(mx + 14))}px`;
+        this.hoverTooltipEl.style.top = `${Math.max(12, Math.round(my - 32))}px`;
+        this.hoverTooltipEl.classList.remove('hidden');
+    }
+
+    _findAirportAt(mx, my) {
+        for (let i = this.renderedAirportHits.length - 1; i >= 0; i--) {
+            const item = this.renderedAirportHits[i];
+            if (Math.hypot(mx - item.x, my - item.y) <= item.r) {
+                return item.ap;
+            }
+        }
+        return null;
+    }
+
+    _findClusterAt(mx, my) {
+        for (let i = this.renderedClusterHits.length - 1; i >= 0; i--) {
+            const item = this.renderedClusterHits[i];
+            if (Math.hypot(mx - item.x, my - item.y) <= item.r) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    _findCountryAt(mx, my) {
+        const ll = this.screenToLatLng(mx, my);
+        if (!ll || !this.countries || this.countries.length === 0) return null;
+        const lat = ll.lat;
+        const lon = ll.lng;
+        for (let c = 0; c < this.countries.length; c++) {
+            const country = this.countries[c];
+            for (let r = 0; r < country.rings.length; r++) {
+                const ringObj = country.rings[r];
+                if (lat < ringObj.minLat || lat > ringObj.maxLat || lon < ringObj.minLon || lon > ringObj.maxLon) {
+                    continue;
+                }
+                const pts = ringObj.rawLod || ringObj.raw;
+                if (!pts || pts.length < 3) continue;
+                let inside = false;
+                for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+                    const xi = pts[i][0], yi = pts[i][1];
+                    const xj = pts[j][0], yj = pts[j][1];
+                    const intersect = ((yi > lat) !== (yj > lat)) &&
+                        (lon < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi);
+                    if (intersect) inside = !inside;
+                }
+                if (inside) {
+                    return { iso: country.iso, name: country.name };
+                }
+            }
+        }
+        return null;
+    }
+
+    _handleAirportClick(ap, nativeEvent) {
+        if (typeof closeFilterRadialMenu === 'function') {
+            closeFilterRadialMenu();
+        }
+        if (typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive()) {
+            handleLoadoutBuilderMapAirportSelect(ap);
+            this.requestRender();
+            return;
+        }
+        const isAlt = nativeEvent && (nativeEvent.altKey || nativeEvent.metaKey);
+        const isOptOpen = typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen();
+
+        if (isAlt || isOptOpen || (isFlightPlanningMode && flightPlanningDeparture && !flightPlanningDestination)) {
+            if (typeof handleAirportRouteSelection === 'function') {
+                handleAirportRouteSelection(ap);
+            }
+        } else if (activeDrawerMode === 'COUNTRY') {
+            focusAirportInCountryMode(ap);
+        } else {
+            if (isClassicNavMode()) {
+                isCameraPanningToRadial = true;
+                panMapToAirport(ap);
+                showClassicAirportView(ap);
+            } else {
+                if (currentRadialAirport && currentRadialAirport.icao === ap.icao) {
+                    closeAirportRadialMenu(false);
+                } else {
+                    const marker = airportMarkerCache ? airportMarkerCache.get(ap.icao) : null;
+                    openAirportRadialMenu(ap, marker, { originalEvent: nativeEvent });
+                }
+            }
+        }
+        this.requestRender();
+    }
+
+    render() {
+        if (!this.ctx || !isGlobeModeActive()) return;
+        const ctx = this.ctx;
+        const dpr = this.dpr;
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        const W = this.width;
+        const H = this.height;
+        const basis = this.getBasisVectors();
+        const { cx, cy, R } = basis.meta;
+        const th = getActiveMapStyleTheme();
+
+        // 1. Deep Space Cockpit Background
+        ctx.fillStyle = th.spaceBg;
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. Subtle Outer Atmospheric Halo
+        const atmoGrad = ctx.createRadialGradient(cx, cy, R * 0.92, cx, cy, R * 1.12);
+        atmoGrad.addColorStop(0, th.atmoInner);
+        atmoGrad.addColorStop(0.5, th.atmoMid);
+        atmoGrad.addColorStop(1, 'rgba(7, 10, 16, 0)');
+        ctx.fillStyle = atmoGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. 3D Ocean Sphere Base
+        const oceanGrad = ctx.createRadialGradient(cx - R * 0.28, cy - R * 0.28, R * 0.08, cx, cy, R);
+        oceanGrad.addColorStop(0, th.oceanTop);
+        oceanGrad.addColorStop(0.65, th.oceanMid);
+        oceanGrad.addColorStop(1, th.oceanBot);
+        ctx.fillStyle = oceanGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Clip inside sphere for surface layers
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.clip();
+
+        // 4. Multi-Zoom Spherical Map Tiles (z = 2..13) -> displays country names, city names, rivers, roads & satellite/street imagery!
+        const rasterDrawn = this._renderMultiZoomSphericalTiles(ctx, basis, th);
+
+        // 5. Spherical Graticule (Lat/Lon Grid)
+        this._renderGraticule(ctx, basis, th);
+
+        // 6. 3D Country Borders & Selection/Hover Highlights (transparent fill when tiles are active so labels/rivers stay visible)
+        this._renderCountries(ctx, basis, th, rasterDrawn);
+
+        // 6b. 3D Astronomical Day / Night Solar Terminator & Twilight Shadow
+        if (typeof isDayNightTerminatorEnabled !== 'undefined' && isDayNightTerminatorEnabled) {
+            this._renderDayNightTerminator3D(ctx, basis);
+        }
+
+        // 7. Surface En-Route Corridor Swath
+        this._renderSurfaceCorridorSwath(ctx, basis);
+
+        ctx.restore(); // End sphere surface clip
+
+        // 8. Crisp Earth Horizon Limb Ring
+        ctx.strokeStyle = th.limbStroke;
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 9. 3D Geodesic Operating Airline Route Lines
+        this._renderAirlineRoutes3D(ctx, basis);
+
+        // 10. 3D Flight Route Isolation Trajectory & SimBrief Alternates
+        this._renderFlightIsolationRoutes3D(ctx, basis);
+
+        // 11. 3D Airport Markers, World-Space Seamless Clusters & Progressive Labels
+        this._renderAirports3D(ctx, basis);
+
+        ctx.restore();
+        this.syncDomRouteBadges(false);
+    }
+
+    _renderDayNightTerminator3D(ctx, basis) {
+        if (typeof getActiveSolarPosition !== 'function') return;
+        const sun = getActiveSolarPosition();
+        if (!sun || !sun.uSun) return;
+
+        const { E, N, F } = basis;
+        const { cx, cy, R } = basis.meta;
+        const uSun = sun.uSun;
+
+        // Sun unit vector in camera coordinates (Lx: Right, Ly: Up, Lz: Front toward viewer)
+        const Lx = uSun[0] * E[0] + uSun[1] * E[1] + uSun[2] * E[2];
+        const Ly = uSun[0] * N[0] + uSun[1] * N[1] + uSun[2] * N[2];
+        const Lz = uSun[0] * F[0] + uSun[1] * F[1] + uSun[2] * F[2];
+
+        // 1. Precomputed 96x96 Spherical Normal LUT + Uint32Array for 0.07ms Day/Night Shadow Map updates
+        const size = 96;
+        if (!this._solarShadeCanvas) {
+            this._solarShadeCanvas = document.createElement('canvas');
+            this._solarShadeCanvas.width = size;
+            this._solarShadeCanvas.height = size;
+            this._solarShadeCtx = this._solarShadeCanvas.getContext('2d');
+            this._solarShadeImgData = this._solarShadeCtx.createImageData(size, size);
+            this._solarShadeU32 = new Uint32Array(this._solarShadeImgData.data.buffer);
+            this._solarLutNx = new Float32Array(size * size);
+            this._solarLutNy = new Float32Array(size * size);
+            this._solarLutNz = new Float32Array(size * size);
+            this._solarLutValid = new Uint8Array(size * size);
+            const half = (size - 1) * 0.5;
+            const invR = 1.0 / (half - 1.0);
+            let p = 0;
+            for (let py = 0; py < size; py++) {
+                const ny = (half - py) * invR;
+                const ny2 = ny * ny;
+                for (let px = 0; px < size; px++) {
+                    const nx = (px - half) * invR;
+                    const rho2 = nx * nx + ny2;
+                    if (rho2 <= 1.05) {
+                        this._solarLutValid[p] = 1;
+                        this._solarLutNx[p] = nx;
+                        this._solarLutNy[p] = ny;
+                        this._solarLutNz[p] = rho2 < 1.0 ? Math.sqrt(1.0 - rho2) : 0.0;
+                    }
+                    p++;
+                }
+            }
+            this._lastSolarShadeKey = '';
+        }
+
+        const shadeKey = `${Lx.toFixed(2)}_${Ly.toFixed(2)}_${Lz.toFixed(2)}`;
+        if (this._lastSolarShadeKey !== shadeKey) {
+            const u32 = this._solarShadeU32;
+            const lutValid = this._solarLutValid;
+            const lutNx = this._solarLutNx;
+            const lutNy = this._solarLutNy;
+            const lutNz = this._solarLutNz;
+            const total = size * size;
+
+            for (let p = 0; p < total; p++) {
+                if (!lutValid[p]) {
+                    u32[p] = 0;
+                    continue;
+                }
+                const cosZenith = lutNx[p] * Lx + lutNy[p] * Ly + lutNz[p] * Lz;
+                if (cosZenith >= 0.08) {
+                    u32[p] = 0;
+                } else if (cosZenith > -0.18) {
+                    const t = (0.08 - cosZenith) / 0.26;
+                    const alpha = (t * t * (3.0 - 2.0 * t) * 150) | 0;
+                    u32[p] = (alpha << 24) | 0x130703;
+                } else {
+                    const deep = Math.min(1.0, (-0.18 - cosZenith) * 1.4);
+                    const alpha = (150 + deep * 26) | 0;
+                    u32[p] = (alpha << 24) | 0x0F0502;
+                }
+            }
+            this._solarShadeCtx.putImageData(this._solarShadeImgData, 0, 0);
+            this._lastSolarShadeKey = shadeKey;
+        }
+
+        const padScale = (48.0 / 46.8);
+        ctx.drawImage(
+            this._solarShadeCanvas,
+            cx - R * padScale,
+            cy - R * padScale,
+            R * 2.0 * padScale,
+            R * 2.0 * padScale
+        );
+    }
+
+    _renderGraticule(ctx, basis, th) {
+        ctx.strokeStyle = th ? th.graticule : 'rgba(51, 65, 85, 0.22)';
+        ctx.lineWidth = 0.7;
+
+        for (let lat = -60; lat <= 60; lat += 30) {
+            ctx.beginPath();
+            let penDown = false;
+            for (let lon = -180; lon <= 180; lon += 10) {
+                const u = latLonToUnitVec3(lat, lon);
+                const pt = this.projectUnitVec3(u, basis, 1.0);
+                if (pt.visible) {
+                    if (!penDown) {
+                        ctx.moveTo(pt.x, pt.y);
+                        penDown = true;
+                    } else {
+                        ctx.lineTo(pt.x, pt.y);
+                    }
+                } else {
+                    penDown = false;
+                }
+            }
+            ctx.stroke();
+        }
+
+        for (let lon = -180; lon < 180; lon += 30) {
+            ctx.beginPath();
+            let penDown = false;
+            for (let lat = -84; lat <= 84; lat += 10) {
+                const u = latLonToUnitVec3(lat, lon);
+                const pt = this.projectUnitVec3(u, basis, 1.0);
+                if (pt.visible) {
+                    if (!penDown) {
+                        ctx.moveTo(pt.x, pt.y);
+                        penDown = true;
+                    } else {
+                        ctx.lineTo(pt.x, pt.y);
+                    }
+                } else {
+                    penDown = false;
+                }
+            }
+            ctx.stroke();
+        }
+    }
+
+    _renderCountries(ctx, basis, th, rasterDrawn = false) {
+        if (!this.countries || this.countries.length === 0) return;
+        const { F } = basis;
+
+        for (let cIdx = 0; cIdx < this.countries.length; cIdx++) {
+            const country = this.countries[cIdx];
+            const isSelected = (typeof selectedCountryCode !== 'undefined' && selectedCountryCode && country.iso === selectedCountryCode);
+            const isHovered = (!isSelected && this.hoveredCountryIso && country.iso === this.hoveredCountryIso);
+
+            // When raster map tiles are drawn, they already contain crisp country borders & coastlines;
+            // only project and draw vector country polygons for the selected/hovered country (eliminating 100,000+ CPU vertex projections per frame!)
+            if (rasterDrawn && !isSelected && !isHovered) continue;
+
+            const shouldFill = isSelected || isHovered || !rasterDrawn;
+            ctx.fillStyle = isSelected
+                ? 'rgba(168, 85, 247, 0.28)'
+                : (isHovered ? 'rgba(6, 182, 212, 0.18)' : (th ? th.landFill : '#1B2333'));
+            ctx.strokeStyle = isSelected
+                ? '#a855f7'
+                : (isHovered ? '#06b6d4' : (th ? th.landStroke : 'rgba(71, 95, 130, 0.55)'));
+            ctx.lineWidth = isSelected ? 1.6 : (isHovered ? 1.3 : 0.65);
+
+            for (let rIdx = 0; rIdx < country.rings.length; rIdx++) {
+                const ringObj = country.rings[rIdx];
+                const centerDot = ringObj.center[0] * F[0] + ringObj.center[1] * F[1] + ringObj.center[2] * F[2];
+                if (centerDot < -(1.0 - ringObj.minDot + 0.18)) continue;
+
+                const pts = (this.isDragging || (!isSelected && !isHovered)) ? ringObj.lod : ringObj.full;
+                ctx.beginPath();
+                let started = false;
+                let anyVisible = false;
+                for (let i = 0; i < pts.length; i++) {
+                    const p = this.projectUnitVec3(pts[i], basis, 1.0);
+                    if (p.z >= -0.05) {
+                        anyVisible = true;
+                        if (!started) {
+                            ctx.moveTo(p.x, p.y);
+                            started = true;
+                        } else {
+                            ctx.lineTo(p.x, p.y);
+                        }
+                    } else {
+                        started = false;
+                    }
+                }
+                if (anyVisible) {
+                    if (shouldFill) ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    _buildGeodesicPoints3D(lat1, lon1, lat2, lon2, numSteps = 44) {
+        const u = latLonToUnitVec3(lat1, lon1);
+        const v = latLonToUnitVec3(lat2, lon2);
+        const dot = Math.max(-1, Math.min(1, u[0] * v[0] + u[1] * v[1] + u[2] * v[2]));
+        const omega = Math.acos(dot);
+        const maxLift = Math.min(0.13, 0.018 + (omega / Math.PI) * 0.12);
+        const pts = [];
+        for (let i = 0; i <= numSteps; i++) {
+            const t = i / numSteps;
+            const vec = slerpUnitVec3(u, v, t);
+            const alt = 1.0 + maxLift * Math.sin(Math.PI * t);
+            pts.push({ vec, alt, t });
+        }
+        return pts;
+    }
+
+    _renderSurfaceCorridorSwath(ctx, basis) {
+        const dep = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin) || (isFlightPlanningMode && flightPlanningDeparture ? flightPlanningDeparture : null);
+        const arr = (typeof optimizerDest !== 'undefined' && optimizerDest) || (isFlightPlanningMode && flightPlanningDestination ? flightPlanningDestination : flightCorridorArrivalAirport);
+        const effectiveProfile = optimizerMode || flightCorridorProfile || null;
+        if (!dep || !arr || (effectiveProfile !== 'CORRIDOR' && effectiveProfile !== 'SIMBRIEF')) return;
+
+        const waypoints = (typeof getCommercialFlightCorridorWaypoints === 'function')
+            ? getCommercialFlightCorridorWaypoints(dep, arr)
+            : [[dep.lat, dep.lon], [arr.lat, arr.lon]];
+        if (!waypoints || waypoints.length < 2) return;
+
+        const swathPx = Math.max(12, Math.min(68, basis.meta.R * (480 / 6371)));
+        ctx.save();
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.16)';
+        ctx.lineWidth = swathPx;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        let pen = false;
+        for (let i = 0; i < waypoints.length; i++) {
+            const u = latLonToUnitVec3(waypoints[i][0], waypoints[i][1]);
+            const p = this.projectUnitVec3(u, basis, 1.0);
+            if (p.visible) {
+                if (!pen) { ctx.moveTo(p.x, p.y); pen = true; }
+                else ctx.lineTo(p.x, p.y);
+            } else {
+                pen = false;
+            }
+        }
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    _renderAirlineRoutes3D(ctx, basis) {
+        if (typeof selectedAirlines === 'undefined' || selectedAirlines.size === 0 || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon) {
+            return;
+        }
+        const origLat = parseFloat(activeRouteOrigin.lat);
+        const origLon = canonicalLon(activeRouteOrigin.lon);
+
+        const allDestIcaos = new Set();
+        selectedAirlines.forEach(al => {
+            const dests = (activeRouteOrigin.routes && activeRouteOrigin.routes[al]) || [];
+            dests.forEach(d => allDestIcaos.add(d));
+        });
+
+        allDestIcaos.forEach(destIcao => {
+            if (destIcao === activeRouteOrigin.icao) return;
+            let ap = getAirportByIcao(destIcao);
+            if (!ap && window.worldAirportCoords && window.worldAirportCoords[destIcao]) {
+                const wInfo = window.worldAirportCoords[destIcao];
+                ap = {
+                    icao: destIcao,
+                    lat: wInfo.lat,
+                    lon: wInfo.lon,
+                    name: wInfo.name,
+                    country: wInfo.country,
+                    pricing_type: 'Default',
+                    is_default: true
+                };
+            }
+            if (!ap || ap.lat === undefined || ap.lon === undefined) return;
+
+            const cat = getAirportCategory(ap);
+            let lineColor = '#22d3ee';
+            let lineWeight = 2.4;
+            let lineOpacity = 0.92;
+            let isDashed = false;
+
+            if (cat === 'DEFAULT') {
+                lineColor = '#94a3b8';
+                lineWeight = 1.5;
+                lineOpacity = 0.68;
+                isDashed = true;
+            } else if (cat === 'PAYWARE') {
+                lineColor = '#c084fc';
+                lineWeight = 2.6;
+            } else if (cat === 'ASOBO') {
+                lineColor = '#fbbf24';
+                lineWeight = 2.6;
+            }
+
+            const cacheKey = `${activeRouteOrigin.icao}_${destIcao}`;
+            let arcPts = this.routeArcCache.get(cacheKey);
+            if (!arcPts) {
+                arcPts = this._buildGeodesicPoints3D(origLat, origLon, parseFloat(ap.lat), canonicalLon(ap.lon), 36);
+                if (this.routeArcCache.size > 1500) this.routeArcCache.clear();
+                this.routeArcCache.set(cacheKey, arcPts);
+            }
+
+            if (cat !== 'DEFAULT') {
+                ctx.save();
+                ctx.strokeStyle = lineColor;
+                ctx.globalAlpha = 0.22;
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([3, 5]);
+                ctx.beginPath();
+                let sPen = false;
+                for (let i = 0; i < arcPts.length; i++) {
+                    const p = this.projectUnitVec3(arcPts[i].vec, basis, 1.0);
+                    if (p.visible) {
+                        if (!sPen) { ctx.moveTo(p.x, p.y); sPen = true; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else {
+                        sPen = false;
+                    }
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.save();
+            ctx.strokeStyle = lineColor;
+            ctx.globalAlpha = lineOpacity;
+            ctx.lineWidth = lineWeight;
+            if (isDashed) ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            let pen = false;
+            for (let i = 0; i < arcPts.length; i++) {
+                const p = this.projectUnitVec3(arcPts[i].vec, basis, arcPts[i].alt);
+                if (p.visible) {
+                    if (!pen) { ctx.moveTo(p.x, p.y); pen = true; }
+                    else ctx.lineTo(p.x, p.y);
+                } else {
+                    pen = false;
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        });
+    }
+
+    _renderFlightIsolationRoutes3D(ctx, basis) {
+        const dep = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin) || (isFlightPlanningMode && flightPlanningDeparture ? flightPlanningDeparture : null);
+        const arr = (typeof optimizerDest !== 'undefined' && optimizerDest) || (isFlightPlanningMode && flightPlanningDestination ? flightPlanningDestination : flightCorridorArrivalAirport);
+        if (!dep || !arr || dep.lat === undefined || arr.lat === undefined) return;
+
+        const rawWps = (typeof getCommercialFlightCorridorWaypoints === 'function')
+            ? getCommercialFlightCorridorWaypoints(dep, arr)
+            : [[dep.lat, dep.lon], [arr.lat, arr.lon]];
+
+        const denseVecs = [];
+        for (let i = 0; i < rawWps.length - 1; i++) {
+            const u = latLonToUnitVec3(rawWps[i][0], rawWps[i][1]);
+            const v = latLonToUnitVec3(rawWps[i + 1][0], rawWps[i + 1][1]);
+            const subSteps = Math.max(2, Math.ceil(48 / Math.max(1, rawWps.length - 1)));
+            for (let s = 0; s < subSteps; s++) {
+                denseVecs.push(slerpUnitVec3(u, v, s / subSteps));
+            }
+        }
+        denseVecs.push(latLonToUnitVec3(rawWps[rawWps.length - 1][0], rawWps[rawWps.length - 1][1]));
+
+        const uDep = latLonToUnitVec3(dep.lat, dep.lon);
+        const uArr = latLonToUnitVec3(arr.lat, arr.lon);
+        const dot = Math.max(-1, Math.min(1, uDep[0] * uArr[0] + uDep[1] * uArr[1] + uDep[2] * uArr[2]));
+        const omega = Math.acos(dot);
+        const maxLift = Math.min(0.14, 0.025 + (omega / Math.PI) * 0.12);
+
+        // 1. Surface Shadow Track
+        ctx.save();
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.42)';
+        ctx.lineWidth = 2.0;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        let sPen = false;
+        for (let i = 0; i < denseVecs.length; i++) {
+            const p = this.projectUnitVec3(denseVecs[i], basis, 1.0);
+            if (p.visible) {
+                if (!sPen) { ctx.moveTo(p.x, p.y); sPen = true; }
+                else ctx.lineTo(p.x, p.y);
+            } else {
+                sPen = false;
+            }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 2. Vertical 3D Altitude Drop-Pillars
+        ctx.save();
+        ctx.strokeStyle = 'rgba(168, 85, 247, 0.30)';
+        ctx.lineWidth = 1.0;
+        const pillarStep = Math.max(4, Math.floor(denseVecs.length / 8));
+        for (let i = pillarStep; i < denseVecs.length - 1; i += pillarStep) {
+            const t = i / (denseVecs.length - 1);
+            const alt = 1.0 + maxLift * Math.sin(Math.PI * t);
+            const pSurf = this.projectUnitVec3(denseVecs[i], basis, 1.0);
+            const pAir = this.projectUnitVec3(denseVecs[i], basis, alt);
+            if (pSurf.visible && pAir.visible) {
+                ctx.beginPath();
+                ctx.moveTo(pSurf.x, pSurf.y);
+                ctx.lineTo(pAir.x, pAir.y);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+
+        // 3. Main 3D Elevated Flight Corridor Arc (#a855f7)
+        ctx.save();
+        ctx.strokeStyle = '#a855f7';
+        ctx.lineWidth = 3.8;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        let aPen = false;
+        for (let i = 0; i < denseVecs.length; i++) {
+            const t = i / Math.max(1, denseVecs.length - 1);
+            const alt = 1.0 + maxLift * Math.sin(Math.PI * t);
+            const p = this.projectUnitVec3(denseVecs[i], basis, alt);
+            if (p.visible) {
+                if (!aPen) { ctx.moveTo(p.x, p.y); aPen = true; }
+                else ctx.lineTo(p.x, p.y);
+            } else {
+                aPen = false;
+            }
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        // 4. SimBrief Alternate Routes (#6366f1)
+        if (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+            currentSimBriefAlternates.forEach(alt => {
+                if (!alt || alt.lat === undefined || alt.lon === undefined) return;
+                const altPts = this._buildGeodesicPoints3D(parseFloat(arr.lat), canonicalLon(arr.lon), parseFloat(alt.lat), canonicalLon(alt.lon), 24);
+                ctx.save();
+                ctx.strokeStyle = '#6366f1';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                let altPen = false;
+                for (let i = 0; i < altPts.length; i++) {
+                    const p = this.projectUnitVec3(altPts[i].vec, basis, altPts[i].alt);
+                    if (p.visible) {
+                        if (!altPen) { ctx.moveTo(p.x, p.y); altPen = true; }
+                        else ctx.lineTo(p.x, p.y);
+                    } else {
+                        altPen = false;
+                    }
+                }
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+    }
+
+    _drawStarPin(ctx, x, y, outerR, innerR, fill, stroke, lineWidth) {
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const r = (i % 2 === 0) ? outerR : innerR;
+            const angle = (i * Math.PI) / 5 - Math.PI / 2;
+            const px = x + Math.cos(angle) * r;
+            const py = y + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+    }
+
+    _drawPlantedPushpin(ctx, x, y, scale = 1.0) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((22 * Math.PI) / 180);
+        ctx.scale(scale, scale);
+        ctx.translate(-14, -30);
+
+        // 1. Flat metallic needle piercing into star center (14, 30)
+        ctx.beginPath();
+        ctx.moveTo(12.4, 18.5);
+        ctx.lineTo(15.6, 18.5);
+        ctx.lineTo(14.0, 30.0);
+        ctx.closePath();
+        ctx.fillStyle = '#E2E8F0';
+        ctx.fill();
+        ctx.strokeStyle = '#0B0E14';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        // 2. Flat tactical lower flange
+        ctx.beginPath();
+        ctx.moveTo(5.5, 15.5);
+        ctx.lineTo(22.5, 15.5);
+        ctx.lineTo(20.5, 19.0);
+        ctx.lineTo(7.5, 19.0);
+        ctx.closePath();
+        ctx.fillStyle = '#059669';
+        ctx.fill();
+        ctx.strokeStyle = '#0B0E14';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 3. Flat geometric body
+        ctx.beginPath();
+        ctx.moveTo(9.5, 7.5);
+        ctx.lineTo(18.5, 7.5);
+        ctx.lineTo(17.2, 15.5);
+        ctx.lineTo(10.8, 15.5);
+        ctx.closePath();
+        ctx.fillStyle = '#10B981';
+        ctx.fill();
+        ctx.strokeStyle = '#0B0E14';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 4. Flat top cap
+        ctx.fillStyle = '#34D399';
+        ctx.strokeStyle = '#0B0E14';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.rect(7.0, 3.0, 14.0, 4.5);
+        ctx.fill();
+        ctx.stroke();
+
+        // 5. Crisp flat avionics slot
+        ctx.fillStyle = '#0B0E14';
+        ctx.fillRect(11.5, 10.2, 5.0, 2.0);
+
+        ctx.restore();
+    }
+
+    _getOrBuildWorldClusterEntries(airports, depIcao, arrIcao, radialIcao, airlineOriginIcao, isIsolatedRouteView) {
+        const zoomStep = Math.floor(this.zoom * 2) / 2;
+        const shouldCluster = (zoomStep < 7.5) && !isIsolatedRouteView;
+        const firstIcao = airports.length > 0 && airports[0] ? airports[0].icao : '';
+        const lastIcao = airports.length > 0 && airports[airports.length - 1] ? airports[airports.length - 1].icao : '';
+        const isPinVis = (typeof isLoadoutPinVisualMode === 'function' && isLoadoutPinVisualMode());
+        const pinnedKey = (isPinVis && currentEditingLoadout && Array.isArray(currentEditingLoadout.manual_icaos))
+            ? currentEditingLoadout.manual_icaos.join(',')
+            : '';
+        const key = `${airports.length}_${firstIcao}_${lastIcao}_${zoomStep}_${shouldCluster}_${depIcao}_${arrIcao}_${radialIcao}_${airlineOriginIcao}_${isPinVis ? 1 : 0}_${pinnedKey}`;
+
+        if (this._cachedWorldClusterKey === key && this._cachedWorldEntries) {
+            return this._cachedWorldEntries;
+        }
+
+        const entries = [];
+        const clusterCandidates = [];
+
+        for (let i = 0; i < airports.length; i++) {
+            const ap = airports[i];
+            if (!ap || ap.lat === undefined || ap.lon === undefined) continue;
+            const u = ap._unitVec3 || (ap._unitVec3 = latLonToUnitVec3(ap.lat, ap.lon));
+            const isPinnedInEdit = Boolean(isPinVis && typeof isAirportPinnedInCurrentEditLoadout === 'function' && isAirportPinnedInCurrentEditLoadout(ap));
+            const isPriority = (isPinnedInEdit || ap.icao === depIcao || ap.icao === arrIcao || ap.icao === radialIcao || ap.icao === airlineOriginIcao ||
+                                (flightCorridorProfile === 'SIMBRIEF' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao)));
+            if (!shouldCluster || isPriority) {
+                entries.push({ isCluster: false, ap, u, isPriority });
+            } else {
+                clusterCandidates.push({ ap, u });
+            }
+        }
+
+        if (shouldCluster && clusterCandidates.length > 0) {
+            const refR = Math.max(180, Math.min(this.width, this.height) * 0.36 * Math.pow(2, zoomStep - 2.5));
+            const clusterPxRadius = zoomStep <= 3.0 ? 48 : (zoomStep <= 5.0 ? 40 : 32);
+            const thetaRad = Math.min(0.32, clusterPxRadius / refR);
+            const cosThresh = Math.cos(thetaRad);
+
+            const cellDeg = Math.max(0.35, (thetaRad * 180) / Math.PI);
+            const grid = new Map();
+            let clusters = [];
+
+            for (let i = 0; i < clusterCandidates.length; i++) {
+                const item = clusterCandidates[i];
+                const lat = parseFloat(item.ap.lat) || 0;
+                const lon = canonicalLon(item.ap.lon);
+                const gx = Math.floor((lon + 180) / cellDeg);
+                const gy = Math.floor((lat + 90) / cellDeg);
+
+                let bestCluster = null;
+                let bestDot = cosThresh;
+
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const cellList = grid.get(`${gx + dx}_${gy + dy}`);
+                        if (!cellList) continue;
+                        for (let c = 0; c < cellList.length; c++) {
+                            const cl = cellList[c];
+                            const dot = item.u[0] * cl.u[0] + item.u[1] * cl.u[1] + item.u[2] * cl.u[2];
+                            if (dot >= bestDot) {
+                                bestDot = dot;
+                                bestCluster = cl;
+                            }
+                        }
+                    }
+                }
+
+                const cat = getAirportCategory(item.ap);
+                if (bestCluster) {
+                    bestCluster.items.push(item);
+                    bestCluster.sumU[0] += item.u[0];
+                    bestCluster.sumU[1] += item.u[1];
+                    bestCluster.sumU[2] += item.u[2];
+                    const len = Math.hypot(bestCluster.sumU[0], bestCluster.sumU[1], bestCluster.sumU[2]) || 1;
+                    bestCluster.u[0] = bestCluster.sumU[0] / len;
+                    bestCluster.u[1] = bestCluster.sumU[1] / len;
+                    bestCluster.u[2] = bestCluster.sumU[2] / len;
+                    if (cat === 'PAYWARE') bestCluster.hasPayware = true;
+                    else if (cat === 'ASOBO') bestCluster.hasAsobo = true;
+                    else if (cat === 'FREEWARE') bestCluster.hasFreeware = true;
+                } else {
+                    const newCl = {
+                        items: [item],
+                        sumU: [item.u[0], item.u[1], item.u[2]],
+                        u: [item.u[0], item.u[1], item.u[2]],
+                        hasPayware: cat === 'PAYWARE',
+                        hasAsobo: cat === 'ASOBO',
+                        hasFreeware: cat === 'FREEWARE'
+                    };
+                    clusters.push(newCl);
+                    const cellKey = `${gx}_${gy}`;
+                    let cellList = grid.get(cellKey);
+                    if (!cellList) {
+                        cellList = [];
+                        grid.set(cellKey, cellList);
+                    }
+                    cellList.push(newCl);
+                }
+            }
+
+            for (let i = 0; i < clusters.length; i++) {
+                const cl = clusters[i];
+                if (cl.items.length === 1) {
+                    entries.push({ isCluster: false, ap: cl.items[0].ap, u: cl.items[0].u, isPriority: false });
+                } else {
+                    const ll = unitVec3ToLatLon(cl.u);
+                    let ringColor = '#60a5fa';
+                    if (isPinVis) ringColor = '#64748B';
+                    else if (cl.hasPayware) ringColor = '#c084fc';
+                    else if (cl.hasAsobo) ringColor = '#fbbf24';
+                    else if (cl.hasFreeware) ringColor = '#22d3ee';
+                    entries.push({
+                        isCluster: true,
+                        u: cl.u,
+                        lat: ll.lat,
+                        lon: ll.lon,
+                        count: cl.items.length,
+                        ringColor
+                    });
+                }
+            }
+        }
+
+        this._cachedWorldClusterKey = key;
+        this._cachedWorldEntries = entries;
+        return entries;
+    }
+
+    _renderAirports3D(ctx, basis) {
+        this.renderedAirportHits = [];
+        this.renderedClusterHits = [];
+        const airports = (typeof currentlyFilteredAirports !== 'undefined' && Array.isArray(currentlyFilteredAirports))
+            ? currentlyFilteredAirports
+            : [];
+        if (airports.length === 0) return;
+
+        const depIcao = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao) || (flightPlanningDeparture && flightPlanningDeparture.icao) || '';
+        const arrIcao = (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao) || (flightPlanningDestination && flightPlanningDestination.icao) || '';
+        const radialIcao = (currentRadialAirport && currentRadialAirport.icao) || (currentClassicAirport && currentClassicAirport.icao) || (selectedAirport && selectedAirport.icao) || '';
+        const airlineOriginIcao = (selectedAirlines && selectedAirlines.size > 0 && activeRouteOrigin && activeRouteOrigin.icao) ? activeRouteOrigin.icao : '';
+        const effectiveProfile = optimizerMode || flightCorridorProfile || null;
+        const isIsolatedRouteView = Boolean((depIcao && arrIcao && effectiveProfile) || airlineOriginIcao);
+        const isPinVis = (typeof isLoadoutPinVisualMode === 'function' && isLoadoutPinVisualMode());
+
+        const worldEntries = this._getOrBuildWorldClusterEntries(airports, depIcao, arrIcao, radialIcao, airlineOriginIcao, isIsolatedRouteView);
+
+        const visibleSingleAirports = [];
+        const visibleClusters = [];
+
+        for (let i = 0; i < worldEntries.length; i++) {
+            const entry = worldEntries[i];
+            const pt = this.projectUnitVec3(entry.u, basis, 1.0);
+            if (!pt.visible || pt.z < 0.015) continue;
+
+            if (entry.isCluster) {
+                visibleClusters.push({ entry, x: pt.x, y: pt.y, z: pt.z });
+            } else {
+                const isHovered = Boolean(this.hoveredAirport && this.hoveredAirport.icao === entry.ap.icao);
+                visibleSingleAirports.push({
+                    ap: entry.ap,
+                    x: pt.x,
+                    y: pt.y,
+                    z: pt.z,
+                    isPriority: entry.isPriority || isHovered
+                });
+            }
+        }
+
+        // 1. Render World-Space Clusters
+        for (let i = 0; i < visibleClusters.length; i++) {
+            const { entry, x, y, z } = visibleClusters[i];
+            const count = entry.count;
+            const ringColor = entry.ringColor;
+            const edgeFade = Math.min(1.0, (z - 0.015) / 0.10);
+            const radius = count >= 50 ? 18 : (count >= 10 ? 15 : 13);
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 3, 0, Math.PI * 2);
+            ctx.fillStyle = ringColor;
+            ctx.globalAlpha = 0.28 * edgeFade;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.globalAlpha = 0.95 * edgeFade;
+            ctx.fillStyle = '#0F172A';
+            ctx.fill();
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
+
+            ctx.fillStyle = '#F8FAFC';
+            ctx.font = '700 11px "JetBrains Mono", monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(count), x, y + 0.5);
+            ctx.restore();
+
+            this.renderedClusterHits.push({ x, y, r: radius + 3, lat: entry.lat, lon: entry.lon, count });
+        }
+
+        // 2. Sort single airports so priority & front-most draw on top
+        visibleSingleAirports.sort((a, b) => (a.isPriority === b.isPriority ? a.z - b.z : (a.isPriority ? 1 : -1)));
+
+        const showIcao = !currentSettings || currentSettings.show_label_icao !== false;
+        const showName = !currentSettings || currentSettings.show_label_name !== false;
+        const showCity = !currentSettings || currentSettings.show_label_city !== false;
+        const hasAnyLabel = showIcao || showName || showCity;
+        const occupiedLabelBoxes = [];
+
+        if (!this._textWidthCache) this._textWidthCache = new Map();
+        for (let i = 0; i < visibleSingleAirports.length; i++) {
+            const { ap, x, y, z, isPriority } = visibleSingleAirports[i];
+            const isPinnedInEdit = Boolean(isPinVis && typeof isAirportPinnedInCurrentEditLoadout === 'function' && isAirportPinnedInCurrentEditLoadout(ap));
+            const isUnpinnedEditGrey = Boolean(isPinVis && !isPinnedInEdit);
+
+            const rawCat = ap._cachedCategory || getAirportCategory(ap);
+            const addonCatUpper = (typeof getAirportInstalledAddonCategory === 'function')
+                ? String(getAirportInstalledAddonCategory(ap) || '').toUpperCase()
+                : rawCat;
+            const cat = (isPinVis && addonCatUpper && addonCatUpper !== 'DEFAULT') ? addonCatUpper : rawCat;
+
+            if (ap._cachedIsDisabled === undefined) {
+                const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+                ap._cachedIsDisabled = rawCat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
+            }
+            if (ap._cachedHasActiveFix === undefined) {
+                ap._cachedHasActiveFix = Boolean(ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled));
+            }
+            const isApDisabled = isPinVis ? false : ap._cachedIsDisabled;
+            const hasActiveFix = ap._cachedHasActiveFix;
+
+            let color = '#22d3ee';
+            if (cat === 'ASOBO') color = '#fbbf24';
+            else if (cat === 'PAYWARE') color = '#c084fc';
+            else if (cat === 'DEFAULT') color = '#60a5fa';
+            if (isApDisabled) color = '#475569';
+
+            let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
+            let strokeWidth = ap.has_conflict ? 2.0 : 1.2;
+            if (hasActiveFix) {
+                strokeColor = '#10b981';
+                strokeWidth = 2.2;
+            }
+
+            if (isUnpinnedEditGrey) {
+                color = '#475569';
+                strokeColor = '#94A3B8';
+                strokeWidth = 1.3;
+            }
+
+            const horizonScale = Math.min(1.0, 0.65 + z * 0.45);
+            const edgeFade = Math.min(1.0, (z - 0.015) / 0.08);
+            ctx.save();
+            ctx.globalAlpha = edgeFade;
+
+            if (cat === 'DEFAULT' && !isPinVis) {
+                const r = 6.5 * horizonScale;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = strokeWidth;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(x, y, 2.2 * horizonScale, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                this.renderedAirportHits.push({ ap, x, y, r: Math.max(10, r + 4) });
+            } else {
+                const outerR = 10.5 * horizonScale;
+                const innerR = 4.6 * horizonScale;
+                this._drawStarPin(ctx, x, y, outerR, innerR, color, strokeColor, strokeWidth);
+                this.renderedAirportHits.push({ ap, x, y, r: Math.max(12, outerR + 4) });
+            }
+
+            const isRouteBadgeActive = (ap.icao === depIcao && this.depBadgeWrapper && !this.depBadgeWrapper.classList.contains('hidden')) ||
+                                       (ap.icao === arrIcao && this.arrBadgeWrapper && !this.arrBadgeWrapper.classList.contains('hidden'));
+            const isRadialActive = (currentRadialAirport && currentRadialAirport.icao === ap.icao);
+
+            if ((hasAnyLabel || isPinVis) && !isRouteBadgeActive && !isRadialActive) {
+                const tier = (typeof getAirportLabelTier === 'function') ? getAirportLabelTier(ap) : 1;
+                const showAtZoom = isPinVis ||
+                                   isPriority ||
+                                   (this.zoom >= 7.5) ||
+                                   (this.zoom >= 5.2 && tier <= 2) ||
+                                   (this.zoom >= 3.8 && tier === 1 && visibleSingleAirports.length <= 60) ||
+                                   isIsolatedRouteView;
+
+                if (showAtZoom && z > 0.15) {
+                    const parts = [];
+                    if (isUnpinnedEditGrey) {
+                        if (ap.icao) parts.push(ap.icao);
+                    } else {
+                        if (showIcao && ap.icao) parts.push(ap.icao);
+                        if (showName && (this.zoom >= 5.5 || isPinnedInEdit)) {
+                            const cleanN = (typeof getCleanAirportName === 'function') ? getCleanAirportName(ap.name, ap.city) : '';
+                            if (cleanN) parts.push(cleanN.length > 18 ? cleanN.slice(0, 17) + '…' : cleanN);
+                        }
+                    }
+                    if (parts.length > 0) {
+                        const text = parts.join(' ');
+                        ctx.font = '700 10.5px "JetBrains Mono", monospace';
+                        let tw = this._textWidthCache.get(text);
+                        if (tw === undefined) {
+                            tw = ctx.measureText(text).width;
+                            if (this._textWidthCache.size > 15000) this._textWidthCache.clear();
+                            this._textWidthCache.set(text, tw);
+                        }
+                        const bw = tw + 12;
+                        const bh = 18;
+                        const bx = x + 13;
+                        const by = y - bh / 2;
+
+                        let collides = false;
+                        if (!isPriority && !isPinnedInEdit) {
+                            for (let b = 0; b < occupiedLabelBoxes.length; b++) {
+                                const box = occupiedLabelBoxes[b];
+                                if (bx < box.x + box.w + 4 && bx + bw + 4 > box.x && by < box.y + box.h + 2 && by + bh + 2 > box.y) {
+                                    collides = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!collides) {
+                            occupiedLabelBoxes.push({ x: bx, y: by, w: bw, h: bh });
+                            if (isUnpinnedEditGrey) {
+                                let icaoHex = '#22D3EE';
+                                if (cat === 'PAYWARE') icaoHex = '#C084FC';
+                                else if (cat === 'ASOBO') icaoHex = '#FBBF24';
+
+                                ctx.fillStyle = '#1E2532';
+                                ctx.beginPath();
+                                ctx.roundRect(bx, by, bw, bh, 2);
+                                ctx.fill();
+                                ctx.strokeStyle = '#334155';
+                                ctx.lineWidth = 1.0;
+                                ctx.stroke();
+
+                                ctx.fillStyle = icaoHex;
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, bx + 6, y + 0.5);
+                            } else {
+                                let bgFill = '#0891b2';
+                                let txtFill = '#ffffff';
+                                if (ap.has_conflict && !isPinnedInEdit) bgFill = '#dc2626';
+                                else if (isApDisabled) bgFill = '#475569';
+                                else if (cat === 'PAYWARE') bgFill = '#9333ea';
+                                else if (cat === 'ASOBO') { bgFill = '#f59e0b'; txtFill = '#020617'; }
+                                else if (cat === 'DEFAULT') bgFill = '#2563eb';
+
+                                ctx.fillStyle = bgFill;
+                                ctx.beginPath();
+                                ctx.roundRect(bx, by, bw, bh, 4);
+                                ctx.fill();
+
+                                ctx.fillStyle = txtFill;
+                                ctx.textAlign = 'left';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(text, bx + 6, y + 0.5);
+                            }
+                        }
+                    }
+                }
+            }
+            ctx.restore();
+        }
+    }
+}
+
+function initGlobe3DEngine() {
+    const canvasEl = document.getElementById('globe-canvas');
+    const overlayEl = document.getElementById('globe-dom-overlay');
+    if (!canvasEl || !map) return;
+
+    window.globeEngine = new Globe3DEngine(canvasEl, overlayEl);
+    if (window.sceneryxGeoJsonData) {
+        window.globeEngine.setCountriesGeoJson(window.sceneryxGeoJsonData);
+    }
+
+    if (!map._origGetZoom) {
+        map._origGetZoom = map.getZoom.bind(map);
+        map._origGetCenter = map.getCenter.bind(map);
+        map._origLatLngToContainerPoint = map.latLngToContainerPoint.bind(map);
+        map._origFlyTo = map.flyTo.bind(map);
+        map._origPanTo = map.panTo.bind(map);
+        map._origFitBounds = map.fitBounds.bind(map);
+        map._origSetView = map.setView.bind(map);
+        map._origSetZoom = map.setZoom.bind(map);
+        map._origStop = map.stop.bind(map);
+
+        map.getZoom = function () {
+            if (isGlobeModeActive() && window.globeEngine) {
+                return window.globeEngine.zoom;
+            }
+            return map._origGetZoom();
+        };
+
+        map.getCenter = function () {
+            if (isGlobeModeActive() && window.globeEngine) {
+                return L.latLng(window.globeEngine.lat, window.globeEngine.lon);
+            }
+            return map._origGetCenter();
+        };
+
+        map.latLngToContainerPoint = function (latLng) {
+            if (isGlobeModeActive() && window.globeEngine && latLng) {
+                const lat = Array.isArray(latLng) ? latLng[0] : latLng.lat;
+                const lng = Array.isArray(latLng) ? latLng[1] : (latLng.lng !== undefined ? latLng.lng : latLng.lon);
+                const pt = window.globeEngine.projectLatLng(lat, lng, 1.0);
+                return L.point(pt.x, pt.y);
+            }
+            return map._origLatLngToContainerPoint(latLng);
+        };
+
+        map.flyTo = function (targetCenter, targetZoom, options = {}) {
+            if (isGlobeModeActive() && window.globeEngine && targetCenter) {
+                const lat = Array.isArray(targetCenter) ? targetCenter[0] : targetCenter.lat;
+                const lng = Array.isArray(targetCenter) ? targetCenter[1] : (targetCenter.lng !== undefined ? targetCenter.lng : targetCenter.lon);
+                const dur = (options && options.duration !== undefined) ? options.duration : 1.0;
+                window.globeEngine.animateTo(lat, lng, targetZoom, dur);
+                return map;
+            }
+            return map._origFlyTo(targetCenter, targetZoom, options);
+        };
+
+        map.panTo = function (targetCenter, options = {}) {
+            if (isGlobeModeActive() && window.globeEngine && targetCenter) {
+                const lat = Array.isArray(targetCenter) ? targetCenter[0] : targetCenter.lat;
+                const lng = Array.isArray(targetCenter) ? targetCenter[1] : (targetCenter.lng !== undefined ? targetCenter.lng : targetCenter.lon);
+                const dur = (options && options.duration !== undefined) ? options.duration : 0.8;
+                window.globeEngine.animateTo(lat, lng, window.globeEngine.zoom, dur);
+                return map;
+            }
+            return map._origPanTo(targetCenter, options);
+        };
+
+        map.fitBounds = function (bounds, options = {}) {
+            if (isGlobeModeActive() && window.globeEngine && bounds) {
+                try {
+                    const b = (typeof bounds.getCenter === 'function') ? bounds : L.latLngBounds(bounds);
+                    const c = b.getCenter();
+                    const ne = b.getNorthEast();
+                    const sw = b.getSouthWest();
+                    const span = Math.max(Math.abs(ne.lat - sw.lat), Math.abs(canonicalLon(ne.lng) - canonicalLon(sw.lng)));
+                    let targetZoom = 4.2;
+                    if (span > 90) targetZoom = 2.6;
+                    else if (span > 45) targetZoom = 3.2;
+                    else if (span > 20) targetZoom = 4.2;
+                    else if (span > 8) targetZoom = 5.4;
+                    else targetZoom = 6.5;
+                    if (options && options.maxZoom) targetZoom = Math.min(targetZoom, options.maxZoom);
+                    window.globeEngine.animateTo(c.lat, c.lng, targetZoom, options.duration || 0.75);
+                } catch (e) {}
+                return map;
+            }
+            return map._origFitBounds(bounds, options);
+        };
+
+        map.setView = function (center, zoom, options = {}) {
+            if (isGlobeModeActive() && window.globeEngine && center) {
+                const lat = Array.isArray(center) ? center[0] : center.lat;
+                const lng = Array.isArray(center) ? center[1] : (center.lng !== undefined ? center.lng : center.lon);
+                window.globeEngine.animateTo(lat, lng, zoom, 0);
+                return map;
+            }
+            return map._origSetView(center, zoom, options);
+        };
+
+        map.setZoom = function (zoom, options = {}) {
+            if (isGlobeModeActive() && window.globeEngine) {
+                window.globeEngine.animateTo(window.globeEngine.lat, window.globeEngine.lon, zoom, 0.25);
+                return map;
+            }
+            return map._origSetZoom(zoom, options);
+        };
+
+        map.stop = function () {
+            if (window.globeEngine) {
+                window.globeEngine.stopAnimation();
+            }
+            return map._origStop();
+        };
+    }
+
+    const switcherEl = document.getElementById('map-projection-switcher');
+    if (switcherEl && typeof L !== 'undefined' && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(switcherEl);
+        L.DomEvent.disableScrollPropagation(switcherEl);
+    }
+    const solarPanelEl = document.getElementById('day-night-time-panel');
+    if (solarPanelEl && typeof L !== 'undefined' && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(solarPanelEl);
+        L.DomEvent.disableScrollPropagation(solarPanelEl);
+    }
+
+    const savedTheme = (currentSettings && currentSettings.map_theme) ? currentSettings.map_theme : 'avionics_blue';
+    setMapStyleTheme(savedTheme, false);
+
+    if (currentSettings && currentSettings.map_projection === 'globe') {
+        setMapProjectionMode('globe', false);
+    }
+
+    if (currentSettings && currentSettings.day_night_enabled) {
+        toggleDayNightTerminator(true);
+    } else {
+        updateDayNightUIAndRender();
+    }
+}
+
+
+// =========================================================================
+// DAY / NIGHT SOLAR TERMINATOR & UTC / LOCAL TIME ENGINE (2D & 3D GLOBE)
+// =========================================================================
+let isDayNightTerminatorEnabled = false;
+let isSolarTimeLive = true;
+let solarCustomUtcMinutes = null; // 0..1439 when scrubbing manually
+let solarSliderReference = 'utc'; // 'utc' | 'local'
+let dayNight2DLayerGroup = null;
+let solarLiveIntervalId = null;
+
+function getSystemTimezoneOffsetHours() {
+    // Date.getTimezoneOffset() returns minutes BEHIND UTC (e.g. -120 for UTC+2)
+    return -new Date().getTimezoneOffset() / 60;
+}
+
+function getEffectiveLocalTimezoneOffsetHours() {
+    const raw = (currentSettings && currentSettings.local_tz_offset !== undefined && currentSettings.local_tz_offset !== null)
+        ? String(currentSettings.local_tz_offset)
+        : 'auto';
+    if (raw === 'auto' || raw === '') {
+        return getSystemTimezoneOffsetHours();
+    }
+    const parsed = parseFloat(raw);
+    return isNaN(parsed) ? getSystemTimezoneOffsetHours() : Math.max(-12, Math.min(14, parsed));
+}
+
+function formatUtcOffsetBadge(offsetHours, isAuto = false) {
+    const sign = offsetHours >= 0 ? '+' : '-';
+    const absVal = Math.abs(offsetHours);
+    const hrs = Math.floor(absVal);
+    const mins = Math.round((absVal - hrs) * 60);
+    const minPart = mins > 0 ? `:${String(mins).padStart(2, '0')}` : '';
+    return `UTC${sign}${hrs}${minPart}`;
+}
+
+function formatMinutesAsHHMM(totalMinutes) {
+    let m = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
+    const hh = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function getActiveSolarUtcMinutes() {
+    if (isSolarTimeLive || solarCustomUtcMinutes === null) {
+        const now = new Date();
+        return now.getUTCHours() * 60 + now.getUTCMinutes() + now.getUTCSeconds() / 60;
+    }
+    return ((solarCustomUtcMinutes % 1440) + 1440) % 1440;
+}
+
+function getActiveSolarPosition() {
+    const now = new Date();
+    const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 0);
+    const diffDays = (now.getTime() - startOfYear) / 86400000;
+    const dayOfYear = Math.floor(diffDays);
+    const utcMins = getActiveSolarUtcMinutes();
+    const utcHours = utcMins / 60.0;
+
+    // Fractional year gamma (radians)
+    const gamma = ((2.0 * Math.PI) / 365.0) * (dayOfYear - 1 + (utcHours - 12.0) / 24.0);
+
+    // NOAA Equation of Time (minutes) & Solar Declination (radians)
+    const eqTime = 229.18 * (
+        0.000075 +
+        0.001868 * Math.cos(gamma) -
+        0.032077 * Math.sin(gamma) -
+        0.014615 * Math.cos(2 * gamma) -
+        0.040849 * Math.sin(2 * gamma)
+    );
+    const declRad =
+        0.006918 -
+        0.399912 * Math.cos(gamma) +
+        0.070257 * Math.sin(gamma) -
+        0.006758 * Math.cos(2 * gamma) +
+        0.000907 * Math.sin(2 * gamma) -
+        0.002697 * Math.cos(3 * gamma) +
+        0.00148 * Math.sin(3 * gamma);
+
+    const sunLat = (declRad * 180.0) / Math.PI;
+    const trueSolarTimeHours = utcHours + eqTime / 60.0;
+    const sunLon = canonicalLon((12.0 - trueSolarTimeHours) * 15.0);
+    const uSun = latLonToUnitVec3(sunLat, sunLon);
+
+    return {
+        lat: sunLat,
+        lon: sunLon,
+        uSun,
+        utcMinutes: utcMins
+    };
+}
+
+function updateDayNightTerminator2D() {
+    if (!map) return;
+    if (!isDayNightTerminatorEnabled) {
+        if (dayNight2DLayerGroup) {
+            dayNight2DLayerGroup.clearLayers();
+        }
+        return;
+    }
+
+    if (!map.getPane('dayNightPane')) {
+        const pane = map.createPane('dayNightPane');
+        pane.style.zIndex = '340';
+        pane.style.pointerEvents = 'none';
+    }
+    if (!dayNight2DLayerGroup) {
+        dayNight2DLayerGroup = L.layerGroup([], { pane: 'dayNightPane', interactive: false }).addTo(map);
+    } else {
+        dayNight2DLayerGroup.clearLayers();
+    }
+
+    const sun = getActiveSolarPosition();
+    const sunLatRad = (sun.lat * Math.PI) / 180.0;
+    let tanDecl = Math.tan(sunLatRad);
+    if (Math.abs(tanDecl) < 0.002) {
+        tanDecl = (tanDecl >= 0 ? 1 : -1) * 0.002;
+    }
+
+    // Dark pole: if Sun is in Northern hemisphere (sun.lat >= 0), South Pole (-89.9) is dark; otherwise North Pole (+89.9) is dark
+    const darkPoleLat = sun.lat >= 0 ? -89.9 : 89.9;
+    const shiftSign = sun.lat >= 0 ? -1 : 1;
+
+    const baseCurve = [];
+    for (let lon = -540; lon <= 540; lon += 3) {
+        const dLonRad = ((lon - sun.lon) * Math.PI) / 180.0;
+        const termLat = (Math.atan(-Math.cos(dLonRad) / tanDecl) * 180.0) / Math.PI;
+        baseCurve.push([termLat, lon]);
+    }
+
+    // 4 stacked twilight-to-night bands for a smooth atmospheric gradient on the 2D Map
+    const twilightShifts = [-2.0, 2.5, 7.0, 12.0];
+    const bandOpacities = [0.11, 0.12, 0.13, 0.14];
+
+    for (let b = 0; b < twilightShifts.length; b++) {
+        const shiftDeg = twilightShifts[b] * shiftSign;
+        const polyPts = [];
+        polyPts.push([darkPoleLat, -540]);
+        for (let i = 0; i < baseCurve.length; i++) {
+            const clampedLat = Math.max(-89.5, Math.min(89.5, baseCurve[i][0] + shiftDeg));
+            polyPts.push([clampedLat, baseCurve[i][1]]);
+        }
+        polyPts.push([darkPoleLat, 540]);
+
+        L.polygon(polyPts, {
+            pane: 'dayNightPane',
+            stroke: false,
+            fill: true,
+            fillColor: '#020617',
+            fillOpacity: bandOpacities[b],
+            interactive: false
+        }).addTo(dayNight2DLayerGroup);
+    }
+
+
+}
+
+function updateDayNightUIAndRender() {
+    const btnToggle = document.getElementById('btn-toggle-day-night');
+    const panel = document.getElementById('day-night-time-panel');
+    if (btnToggle) {
+        if (isDayNightTerminatorEnabled) {
+            btnToggle.className = 'h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0B0D11] font-sans font-bold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]';
+        } else {
+            btnToggle.className = 'h-7 px-2.5 rounded-md bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-sans font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-colors border border-[#00A8FF]/40';
+        }
+    }
+    if (panel) {
+        if (isDayNightTerminatorEnabled) {
+            panel.classList.remove('hidden');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+
+    const utcMins = getActiveSolarUtcMinutes();
+    const tzOffsetHrs = getEffectiveLocalTimezoneOffsetHours();
+    const localMins = ((utcMins + tzOffsetHrs * 60) % 1440 + 1440) % 1440;
+
+    const utcDisplay = document.getElementById('solar-utc-display');
+    if (utcDisplay) {
+        utcDisplay.textContent = `${formatMinutesAsHHMM(utcMins)} UTC`;
+    }
+    const localDisplay = document.getElementById('solar-local-display');
+    if (localDisplay) {
+        localDisplay.textContent = `${formatMinutesAsHHMM(localMins)} LOC`;
+    }
+
+    const tzBadge = document.getElementById('solar-tz-offset-badge');
+    const isAutoTz = !currentSettings || !currentSettings.local_tz_offset || currentSettings.local_tz_offset === 'auto';
+    if (tzBadge) {
+        tzBadge.textContent = formatUtcOffsetBadge(tzOffsetHrs, isAutoTz);
+    }
+
+    const tzPreviewSettings = document.getElementById('cfg-local-tz-preview');
+    if (tzPreviewSettings) {
+        tzPreviewSettings.textContent = `${formatUtcOffsetBadge(tzOffsetHrs)} (${formatMinutesAsHHMM(localMins)} LOC)`;
+    }
+
+    const btnUtc = document.getElementById('btn-solar-ref-utc');
+    const btnLocal = document.getElementById('btn-solar-ref-local');
+    if (btnUtc && btnLocal) {
+        if (solarSliderReference === 'local') {
+            btnLocal.className = 'h-6 px-2 rounded bg-[#00A8FF] text-[#0B0D11] font-mono font-bold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]';
+            btnUtc.className = 'h-6 px-2 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-semibold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]/40';
+        } else {
+            btnUtc.className = 'h-6 px-2 rounded bg-[#00A8FF] text-[#0B0D11] font-mono font-bold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]';
+            btnLocal.className = 'h-6 px-2 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-semibold text-[10px] uppercase tracking-wider cursor-pointer transition-colors border border-[#00A8FF]/40';
+        }
+    }
+
+    const slider = document.getElementById('solar-time-slider');
+    if (slider) {
+        const refMins = solarSliderReference === 'local' ? localMins : utcMins;
+        slider.value = Math.min(1435, Math.round(refMins / 5) * 5);
+    }
+
+    const btnLive = document.getElementById('btn-solar-live');
+    if (btnLive) {
+        if (isSolarTimeLive) {
+            btnLive.className = 'h-6 px-2 rounded bg-[#10B981] text-[#0B0D11] font-mono font-bold text-[10px] uppercase tracking-wider border border-[#10B981] cursor-pointer shrink-0';
+        } else {
+            btnLive.className = 'h-6 px-2 rounded bg-[#121824] hover:bg-[#182030] text-[#94A3B8] hover:text-[#F1F5F9] font-mono font-semibold text-[10px] uppercase tracking-wider border border-[#253046] cursor-pointer shrink-0';
+        }
+    }
+
+    updateDayNightTerminator2D();
+    if (window.globeEngine) {
+        window.globeEngine.requestRender();
+    }
+}
+
+function toggleDayNightTerminator(forceState = undefined) {
+    if (window.IS_LITE && forceState !== false && !isTourDemoAllowingProPreview()) {
+        isDayNightTerminatorEnabled = false;
+        updateDayNightUIAndRender();
+        if (forceState === undefined) {
+            showUnlockProModal();
+        }
+        return;
+    }
+    isDayNightTerminatorEnabled = (typeof forceState === 'boolean') ? forceState : !isDayNightTerminatorEnabled;
+    if (currentSettings && typeof currentSettings === 'object') {
+        currentSettings.day_night_enabled = isDayNightTerminatorEnabled;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+            window.pywebview.api.save_settings(JSON.stringify(currentSettings)).catch(() => {});
+        }
+    }
+    if (isDayNightTerminatorEnabled && !solarLiveIntervalId) {
+        solarLiveIntervalId = setInterval(() => {
+            if (isDayNightTerminatorEnabled && isSolarTimeLive) {
+                updateDayNightUIAndRender();
+            }
+        }, 30000);
+    }
+    updateDayNightUIAndRender();
+}
+
+function setSolarTimeSliderReference(refMode) {
+    solarSliderReference = (refMode === 'local') ? 'local' : 'utc';
+    updateDayNightUIAndRender();
+}
+
+function onSolarTimeSliderInput(val) {
+    const mins = parseFloat(val) || 0;
+    isSolarTimeLive = false;
+    const tzOffsetHrs = getEffectiveLocalTimezoneOffsetHours();
+    if (solarSliderReference === 'local') {
+        solarCustomUtcMinutes = ((mins - tzOffsetHrs * 60) % 1440 + 1440) % 1440;
+    } else {
+        solarCustomUtcMinutes = ((mins % 1440) + 1440) % 1440;
+    }
+    updateDayNightUIAndRender();
+}
+
+function adjustSolarTimeMinutes(deltaMins) {
+    const currentUtc = getActiveSolarUtcMinutes();
+    isSolarTimeLive = false;
+    solarCustomUtcMinutes = ((currentUtc + deltaMins) % 1440 + 1440) % 1440;
+    updateDayNightUIAndRender();
+}
+
+function resetSolarTimeToLive() {
+    isSolarTimeLive = true;
+    solarCustomUtcMinutes = null;
+    updateDayNightUIAndRender();
+}
+
+function setLocalTimezoneOffsetSetting(val, persist = true) {
+    if (window.IS_LITE && persist && !isTourDemoAllowingProPreview()) {
+        showUnlockProModal();
+        return;
+    }
+    const normalized = (val === 'auto' || val === '' || val === null || val === undefined) ? 'auto' : String(val);
+    if (currentSettings && typeof currentSettings === 'object') {
+        currentSettings.local_tz_offset = normalized;
+        if (persist && window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+            window.pywebview.api.save_settings(JSON.stringify(currentSettings)).catch(() => {});
+        }
+    }
+    const sel = document.getElementById('cfg-local-tz-offset');
+    if (sel && sel.value !== normalized) {
+        sel.value = normalized;
+    }
+    updateDayNightUIAndRender();
+}
+
+function previewLocalTimezoneOffset(val, persist = false) {
+    setLocalTimezoneOffsetSetting(val, persist);
+}
+
+function stepLocalTimezoneOffset(stepHours) {
+    const currentHrs = getEffectiveLocalTimezoneOffsetHours();
+    const nextHrs = Math.max(-12, Math.min(14, Math.round((currentHrs + stepHours) * 2) / 2));
+    setLocalTimezoneOffsetSetting(String(nextHrs), true);
+}
+
+window.toggleDayNightTerminator = toggleDayNightTerminator;
+window.setSolarTimeSliderReference = setSolarTimeSliderReference;
+window.onSolarTimeSliderInput = onSolarTimeSliderInput;
+window.adjustSolarTimeMinutes = adjustSolarTimeMinutes;
+window.resetSolarTimeToLive = resetSolarTimeToLive;
+window.setLocalTimezoneOffsetSetting = setLocalTimezoneOffsetSetting;
+window.previewLocalTimezoneOffset = previewLocalTimezoneOffset;
+window.stepLocalTimezoneOffset = stepLocalTimezoneOffset;
+
+
+/* ============================================================================
+   SCENERY X v1.2.0 — SIMBRIEF PRE-FLIGHT CROSS-AUDIT & LOADOUT PROFILES ENGINE
+   STRICT COMPLIANCE: NO ICONS, NO GRADIENTS, NO GLASSMORPHISM, NO SHADOWS
+   ============================================================================ */
+
+let isSimbriefAuditMatrixExpanded = false;
+let latestSimbriefCrossAuditData = null;
+
+async function saveAndFetchSimbriefInline() {
+    const inputEl = document.getElementById('simbrief-inline-id-input');
+    const val = inputEl ? inputEl.value.trim() : '';
+    if (!val) {
+        if (typeof showToast === 'function') {
+            showToast('PLEASE ENTER A VALID SIMBRIEF PILOT ID OR USERNAME', 'warning');
+        }
+        return;
+    }
+    if (!currentSettings) currentSettings = {};
+    if (/^\d+$/.test(val)) {
+        currentSettings.simbrief_userid = val;
+    } else {
+        currentSettings.simbrief_username = val;
+    }
+    const cfgInput = document.getElementById('cfg-simbrief-id');
+    if (cfgInput) cfgInput.value = val;
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+        try {
+            await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
+        } catch (e) {
+            console.warn('[SimBrief Inline] Error saving settings:', e);
+        }
+    }
+    const inlineSetup = document.getElementById('simbrief-inline-setup');
+    if (inlineSetup) inlineSetup.classList.add('hidden');
+    await syncSimBriefFlightPlan();
+}
+
+function buildClientSideSimBriefAudit() {
+    const targets = [];
+    const dep = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin) || (typeof flightPlanningDeparture !== 'undefined' && flightPlanningDeparture);
+    const arr = (typeof optimizerDest !== 'undefined' && optimizerDest) || (typeof flightPlanningDestination !== 'undefined' && flightPlanningDestination);
+    if (dep && dep.icao) targets.push({ role: 'DEP', icao: dep.icao.toUpperCase(), name: dep.city || dep.name || dep.icao });
+    if (arr && arr.icao) targets.push({ role: 'ARR', icao: arr.icao.toUpperCase(), name: arr.city || arr.name || arr.icao });
+    if (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+        currentSimBriefAlternates.forEach((alt, idx) => {
+            if (alt && alt.icao) {
+                const roleLbl = currentSimBriefAlternates.length === 1 ? 'ALTN' : `ALTN ${idx + 1}`;
+                targets.push({ role: roleLbl, icao: alt.icao.toUpperCase(), name: alt.city || alt.name || alt.icao });
+            }
+        });
+    }
+
+    let errorCount = 0;
+    let warningCount = 0;
+    const rows = [];
+
+    targets.forEach(tgt => {
+        const icao = tgt.icao;
+        const ap = (typeof getAirportByIcao === 'function' ? getAirportByIcao(icao) : null) ||
+                   (Array.isArray(allAirportsData) ? allAirportsData.find(a => a && a.icao === icao) : null);
+        const apName = (ap && (ap.city || ap.name)) || tgt.name || icao;
+
+        let category = 'DEFAULT';
+        let sceneryStatus = 'DEFAULT';
+        let sceneryLabel = 'DEFAULT MSFS';
+        let scenerySeverity = 'ok';
+
+        if (ap) {
+            const rawPt = String((typeof getAirportPricingType === 'function' ? getAirportPricingType(ap) : ap.pricing_type) || 'Default').toLowerCase();
+            if (rawPt === 'payware') category = 'PAYWARE';
+            else if (rawPt === 'freeware') category = 'FREEWARE';
+            else if (rawPt === 'asobo') category = 'ASOBO';
+            else category = 'DEFAULT';
+
+            const sources = Array.isArray(ap.all_sources) ? ap.all_sources : [];
+            const activeCustom = sources.filter(s => s && !s.is_disabled && !s.is_fix_patch && !['default', 'asobo', 'msfs default'].includes(String(s.type || '').toLowerCase()));
+            const hasConflict = Boolean(ap.has_conflict) || activeCustom.length > 1;
+            const isDisabled = Boolean(ap.is_disabled);
+
+            if (hasConflict) {
+                sceneryStatus = 'CONFLICT';
+                sceneryLabel = 'SCENERY CONFLICT';
+                scenerySeverity = 'error';
+                errorCount++;
+            } else if (isDisabled) {
+                sceneryStatus = 'DISABLED';
+                sceneryLabel = 'SCENERY DISABLED';
+                scenerySeverity = 'warn';
+                warningCount++;
+            } else if (category === 'DEFAULT') {
+                sceneryStatus = 'DEFAULT';
+                sceneryLabel = 'DEFAULT ACTIVE';
+                scenerySeverity = 'ok';
+            } else {
+                sceneryStatus = 'ACTIVE';
+                sceneryLabel = 'SCENERY ACTIVE';
+                scenerySeverity = 'ok';
+            }
+        }
+
+        const gsxEntry = (window.gsxAuditData && window.gsxAuditData.by_icao) ? window.gsxAuditData.by_icao[icao] : null;
+        const hasBundled = Boolean((gsxEntry && gsxEntry.bundled_gsx_profile) || (ap && ap.bundled_gsx_profile));
+        let gsxStatus = 'NONE';
+        let gsxLabel = 'NO GSX PROFILE';
+        let gsxSeverity = 'neutral';
+
+        if (gsxEntry) {
+            const rawGsx = String(gsxEntry.status || 'NONE').toUpperCase();
+            const files = Array.isArray(gsxEntry.files) ? gsxEntry.files : [];
+            const activeFile = files.find(f => !f.is_disabled);
+            const studio = activeFile ? String(activeFile.studio || activeFile.author || '').trim().toUpperCase() : '';
+
+            if (rawGsx === 'MATCHED') {
+                gsxStatus = 'VALID';
+                gsxLabel = studio ? `GSX VALID (${studio})` : 'GSX VALID';
+                gsxSeverity = 'ok';
+            } else if (rawGsx === 'DUPLICATE') {
+                const actCnt = files.filter(f => !f.is_disabled).length;
+                gsxStatus = 'DUPLICATE';
+                gsxLabel = `GSX DUPLICATE (${actCnt} INI)`;
+                gsxSeverity = 'error';
+                errorCount++;
+            } else if (['MISMATCH_STUDIO', 'MISMATCH_VERSION', 'MISMATCH_DEFAULT'].includes(rawGsx)) {
+                gsxStatus = 'MISMATCH';
+                gsxLabel = 'GSX MISMATCH';
+                gsxSeverity = 'warn';
+                warningCount++;
+            } else if (rawGsx === 'DISABLED') {
+                gsxStatus = 'DISABLED';
+                gsxLabel = 'GSX DISABLED';
+                gsxSeverity = 'warn';
+                warningCount++;
+            } else if (rawGsx === 'ORPHAN') {
+                gsxStatus = 'ORPHAN';
+                gsxLabel = 'GSX ORPHAN';
+                gsxSeverity = 'warn';
+                warningCount++;
+            } else {
+                if (category === 'PAYWARE' || category === 'FREEWARE') {
+                    gsxStatus = 'MISSING_CUSTOM';
+                    gsxLabel = hasBundled ? 'BUNDLED GSX UNLINKED' : 'NO GSX PROFILE';
+                    gsxSeverity = 'warn';
+                    warningCount++;
+                }
+            }
+        } else if (ap && ap.has_gsx_profile) {
+            gsxStatus = 'VALID';
+            gsxLabel = 'GSX VALID';
+            gsxSeverity = 'ok';
+        } else if (category === 'PAYWARE' || category === 'FREEWARE') {
+            gsxStatus = 'MISSING_CUSTOM';
+            gsxLabel = hasBundled ? 'BUNDLED GSX UNLINKED' : 'NO GSX PROFILE';
+            gsxSeverity = 'warn';
+            warningCount++;
+        }
+
+        rows.push({
+            role: tgt.role,
+            icao: icao,
+            name: String(apName).toUpperCase(),
+            category: category,
+            scenery_status: sceneryStatus,
+            scenery_label: sceneryLabel,
+            scenery_severity: scenerySeverity,
+            gsx_status: gsxStatus,
+            gsx_label: gsxLabel,
+            gsx_severity: gsxSeverity,
+            has_bundled_gsx: hasBundled,
+            has_issue: (scenerySeverity === 'warn' || scenerySeverity === 'error' || gsxSeverity === 'warn' || gsxSeverity === 'error')
+        });
+    });
+
+    const issueCount = errorCount + warningCount;
+    return {
+        all_clear: issueCount === 0,
+        issue_count: issueCount,
+        error_count: errorCount,
+        warning_count: warningCount,
+        rows: rows
+    };
+}
+
+function renderSimBriefCrossAuditUI(auditData = null, isInitialLoad = false) {
+    const panelEl = document.getElementById('simbrief-cross-audit-panel');
+    if (!panelEl) return;
+
+    const audit = (auditData && Array.isArray(auditData.rows) && auditData.rows.length > 0)
+        ? auditData
+        : buildClientSideSimBriefAudit();
+
+    latestSimbriefCrossAuditData = audit;
+
+    if (!audit.rows || audit.rows.length === 0) {
+        panelEl.classList.add('hidden');
+        return;
+    }
+
+    panelEl.classList.remove('hidden');
+
+    // 1. Populate OFP Telemetry Metadata
+    const sb = (typeof currentSimBriefFlight !== 'undefined' && currentSimBriefFlight) ? currentSimBriefFlight : {};
+    const flightEl = document.getElementById('sb-audit-flight');
+    const acftEl = document.getElementById('sb-audit-acft');
+    const flEl = document.getElementById('sb-audit-fl');
+    const distEl = document.getElementById('sb-audit-dist');
+
+    if (flightEl) flightEl.textContent = sb.flight_number || 'DIRECT';
+    if (acftEl) acftEl.textContent = sb.aircraft_icao || sb.aircraft || '--';
+    if (flEl) flEl.textContent = sb.cruise_fl || '--';
+    if (distEl) distEl.textContent = sb.route_distance ? `${sb.route_distance} NM` : '--';
+
+    // 2. Conditional Compact Status Bar vs Auto-Expanded Matrix Logic
+    const globalBadge = document.getElementById('sb-audit-global-badge');
+    const matrixEl = document.getElementById('simbrief-cross-audit-matrix');
+    const toggleBtn = document.getElementById('sb-audit-toggle-details-btn');
+
+    if (audit.all_clear) {
+        if (globalBadge) {
+            globalBadge.className = 'px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase sx-status-ok';
+            globalBadge.textContent = 'ALL CLEAR: ROUTE SCENERIES & GSX READY';
+        }
+        if (isInitialLoad) {
+            isSimbriefAuditMatrixExpanded = false;
+        }
+    } else {
+        const badgeStyle = audit.error_count > 0 ? 'sx-status-err' : 'sx-status-warn';
+        const issueWord = audit.issue_count === 1 ? 'ISSUE DETECTED' : 'ISSUES DETECTED';
+        if (globalBadge) {
+            globalBadge.className = `px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${badgeStyle}`;
+            globalBadge.textContent = `AUDIT ALERT: ${audit.issue_count} ${issueWord}`;
+        }
+        if (isInitialLoad) {
+            isSimbriefAuditMatrixExpanded = true;
+        }
+    }
+
+    if (matrixEl) {
+        if (isSimbriefAuditMatrixExpanded) {
+            matrixEl.classList.remove('hidden');
+        } else {
+            matrixEl.classList.add('hidden');
+        }
+    }
+    if (toggleBtn) {
+        toggleBtn.textContent = isSimbriefAuditMatrixExpanded ? 'HIDE DETAILS' : 'VIEW DETAILS';
+    }
+
+    // 3. Render 3-Row Cross-Audit Matrix (DEP / ARR / ALTN) — Strict Flat, Zero Icons
+    const rowsContainer = document.getElementById('simbrief-cross-audit-rows');
+    if (rowsContainer) {
+        rowsContainer.innerHTML = audit.rows.map(row => {
+            let catClass = 'sx-cat-default';
+            if (row.category === 'PAYWARE') catClass = 'sx-cat-payware';
+            else if (row.category === 'FREEWARE') catClass = 'sx-cat-freeware';
+            else if (row.category === 'ASOBO') catClass = 'sx-cat-asobo';
+
+            let scenClass = 'sx-status-ok';
+            if (row.scenery_severity === 'error') scenClass = 'sx-status-err';
+            else if (row.scenery_severity === 'warn') scenClass = 'sx-status-warn';
+            else if (row.category === 'DEFAULT') scenClass = 'sx-cat-default';
+
+            let gsxClass = 'sx-cat-default';
+            if (row.gsx_severity === 'ok') gsxClass = 'sx-status-ok';
+            else if (row.gsx_severity === 'warn') gsxClass = 'sx-status-warn';
+            else if (row.gsx_severity === 'error') gsxClass = 'sx-status-err';
+
+            const roleStyle = row.role.startsWith('ALTN')
+                ? 'bg-[#0E121A] text-[#F59E0B] border-[#D97706]'
+                : 'bg-[#0E121A] text-[#94A3B8] border-[#2D3A54]';
+
+            const actionBtns = [];
+            if (row.scenery_status === 'DISABLED') {
+                actionBtns.push(`<button type="button" onclick="enableSceneryFromSimbriefAudit('${escapeHtml(row.icao)}')" class="sx-btn-flat sx-btn-flat-primary py-1 px-2 text-[10px]">ENABLE</button>`);
+            } else if (row.scenery_status === 'CONFLICT') {
+                actionBtns.push(`<button type="button" onclick="resolveConflictFromSimbriefAudit('${escapeHtml(row.icao)}')" class="sx-btn-flat sx-status-err py-1 px-2 text-[10px]">RESOLVE</button>`);
+            }
+
+            if (row.gsx_severity === 'warn' || row.gsx_severity === 'error') {
+                const gsxBtnLbl = row.has_bundled_gsx && row.gsx_status === 'MISSING_CUSTOM' ? 'LINK GSX' : 'FIX GSX';
+                actionBtns.push(`<button type="button" onclick="fixGsxFromSimbriefAudit('${escapeHtml(row.icao)}', ${Boolean(row.has_bundled_gsx)})" class="sx-btn-flat py-1 px-2 text-[10px]">${gsxBtnLbl}</button>`);
+            }
+
+            const actionHtml = actionBtns.length > 0
+                ? actionBtns.join('')
+                : `<span class="text-[10px] font-mono font-bold uppercase text-[#10B981]">READY</span>`;
+
+            return `
+                <div class="sx-flat-card px-3 py-2 grid grid-cols-12 items-center gap-2 text-xs">
+                    <div class="col-span-3 flex items-center gap-2 min-w-0">
+                        <span class="px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase border ${roleStyle} w-14 text-center shrink-0">${escapeHtml(row.role)}</span>
+                        <button type="button" onclick="focusSimbriefAuditAirport('${escapeHtml(row.icao)}')" class="font-mono text-sm font-black text-[#F1F5F9] hover:text-[#00A8FF] cursor-pointer bg-transparent border-0 p-0 shrink-0">${escapeHtml(row.icao)}</button>
+                        <span class="text-[11px] text-[#94A3B8] truncate">${escapeHtml(row.name)}</span>
+                    </div>
+                    <div class="col-span-2">
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${catClass} inline-block">${escapeHtml(row.category)}</span>
+                    </div>
+                    <div class="col-span-2">
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${scenClass} inline-block truncate max-w-full">${escapeHtml(row.scenery_label)}</span>
+                    </div>
+                    <div class="col-span-3">
+                        <span class="px-2 py-0.5 text-[10px] font-mono font-bold uppercase ${gsxClass} inline-block truncate max-w-full">${escapeHtml(row.gsx_label)}</span>
+                    </div>
+                    <div class="col-span-2 flex items-center justify-end gap-1.5">
+                        ${actionHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+function toggleSimbriefAuditMatrix() {
+    isSimbriefAuditMatrixExpanded = !isSimbriefAuditMatrixExpanded;
+    const matrixEl = document.getElementById('simbrief-cross-audit-matrix');
+    const toggleBtn = document.getElementById('sb-audit-toggle-details-btn');
+    if (matrixEl) {
+        if (isSimbriefAuditMatrixExpanded) {
+            matrixEl.classList.remove('hidden');
+        } else {
+            matrixEl.classList.add('hidden');
+        }
+    }
+    if (toggleBtn) {
+        toggleBtn.textContent = isSimbriefAuditMatrixExpanded ? 'HIDE DETAILS' : 'VIEW DETAILS';
+    }
+}
+
+async function refreshSimBriefCrossAudit(isInitialLoad = false) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.audit_simbrief_route) {
+        try {
+            const raw = await window.pywebview.api.audit_simbrief_route();
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (res && res.status === 'ok' && res.cross_audit) {
+                renderSimBriefCrossAuditUI(res.cross_audit, isInitialLoad);
+                return;
+            }
+        } catch (e) {
+            console.warn('[SimBrief Audit] Fallback to client-side audit:', e);
+        }
+    }
+    renderSimBriefCrossAuditUI(null, isInitialLoad);
+}
+
+function focusSimbriefAuditAirport(icao) {
+    const ap = (typeof getAirportByIcao === 'function' ? getAirportByIcao(icao) : null) ||
+               (Array.isArray(allAirportsData) ? allAirportsData.find(a => a && a.icao === icao) : null);
+    if (ap && typeof panMapToAirport === 'function') {
+        panMapToAirport(ap);
+    }
+}
+
+async function enableSceneryFromSimbriefAudit(icao) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.toggle_airport_disabled) return;
+    try {
+        const raw = await window.pywebview.api.toggle_airport_disabled(icao);
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.status === 'success') {
+            if (Array.isArray(res.airports)) {
+                allAirportsData = res.airports;
+                if (typeof rebuildAirportsByIcaoIndex === 'function') rebuildAirportsByIcaoIndex();
+                if (typeof updateStats === 'function') updateStats(allAirportsData);
+                if (typeof filterAirports === 'function') filterAirports();
+            }
+            if (typeof showToast === 'function') {
+                showToast(`SCENERY ENABLED FOR ${icao}`, 'success');
+            }
+            await refreshSimBriefCrossAudit(false);
+        }
+    } catch (e) {
+        console.error('[SimBrief Audit] Error enabling scenery:', e);
+    }
+}
+
+window.onBackendSimbriefConflictResolved = function(payload) {
+    try {
+        const res = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        if (!res || res.status !== 'ok') return;
+        if (Array.isArray(res.airports) && res.airports.length > 0) {
+            allAirportsData = res.airports;
+            if (typeof rebuildAirportsByIcaoIndex === 'function') rebuildAirportsByIcaoIndex();
+            if (typeof updateStats === 'function') updateStats(allAirportsData);
+        }
+        if (res.gsx_audit) {
+            window.gsxAuditData = res.gsx_audit;
+        }
+        if (airportMarkerCache) airportMarkerCache.clear();
+        if (customDivIconCache) customDivIconCache.clear();
+        if (typeof filterAirports === 'function') filterAirports();
+        if (res.cross_audit) {
+            renderSimBriefCrossAuditUI(res.cross_audit, false);
+        } else {
+            refreshSimBriefCrossAudit(false);
+        }
+    } catch (e) {
+        console.warn('[SimBrief Audit] Error in onBackendSimbriefConflictResolved:', e);
+    }
+};
+
+async function resolveConflictFromSimbriefAudit(icao) {
+    if (!icao) return;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.resolve_simbrief_conflict) {
+        try {
+            const raw = await window.pywebview.api.resolve_simbrief_conflict(icao);
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (res && res.status === 'ok') {
+                window.onBackendSimbriefConflictResolved(res);
+                if (typeof showToast === 'function') {
+                    showToast(`CONFLICT RESOLVED FOR ${icao.toUpperCase()}`, 'success');
+                }
+                return;
+            }
+        } catch (e) {
+            console.error('[SimBrief Audit] Error resolving conflict via backend:', e);
+        }
+    }
+    if (typeof openConflictModal === 'function') {
+        openConflictModal();
+    } else {
+        focusSimbriefAuditAirport(icao);
+    }
+}
+
+async function fixGsxFromSimbriefAudit(icao, hasBundled) {
+    if (hasBundled && window.pywebview && window.pywebview.api && window.pywebview.api.install_bundled_gsx_profile) {
+        try {
+            const raw = await window.pywebview.api.install_bundled_gsx_profile(icao);
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (res && res.status === 'ok') {
+                if (res.audit) window.gsxAuditData = res.audit;
+                if (typeof showToast === 'function') {
+                    showToast(`BUNDLED GSX PROFILE LINKED FOR ${icao}`, 'success');
+                }
+                await refreshSimBriefCrossAudit(false);
+                return;
+            }
+        } catch (e) {
+            console.warn('[SimBrief Audit] Bundled GSX link fallback:', e);
+        }
+    }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.resolve_simbrief_conflict) {
+        try {
+            const raw = await window.pywebview.api.resolve_simbrief_conflict(icao);
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (res && res.status === 'ok' && Array.isArray(res.actions_taken) && res.actions_taken.some(a => String(a).startsWith('gsx_'))) {
+                window.onBackendSimbriefConflictResolved(res);
+                if (typeof showToast === 'function') {
+                    showToast(`GSX DUPLICATE RESOLVED FOR ${icao}`, 'success');
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn('[SimBrief Audit] GSX auto-resolve fallback:', e);
+        }
+    }
+    if (typeof openGsxAuditModal === 'function') {
+        openGsxAuditModal('ALL');
+        setTimeout(() => {
+            const searchEl = document.getElementById('gsx-audit-search-input');
+            if (searchEl) {
+                searchEl.value = icao;
+                if (typeof handleGsxAuditSearch === 'function') {
+                    handleGsxAuditSearch({ target: searchEl });
+                }
+            }
+        }, 120);
+    }
+}
+
+// ============================================================================
+// UNIFIED SCENERY & ROUTE OPTIMIZER + LOADOUT PROFILES CONTROLLER (v1.2.0)
+// ============================================================================
+
+// Point 6: Exact 11 Regions from the main SceneryX Region Filter (ALL_REGIONS_LIST & REGION_COUNTRY_MAP)
+const FILTER_REGION_DEFINITIONS = [
+    { zoneKey: 'weurope',            zoneTitle: 'WESTERN EUROPE' },
+    { zoneKey: 'eeurope',            zoneTitle: 'EASTERN EUROPE' },
+    { zoneKey: 'namerica',           zoneTitle: 'NORTH AMERICA' },
+    { zoneKey: 'camerica_caribbean', zoneTitle: 'CENTRAL AMERICA' },
+    { zoneKey: 'samerica',           zoneTitle: 'SOUTH AMERICA' },
+    { zoneKey: 'asia',               zoneTitle: 'ASIA' },
+    { zoneKey: 'middleeast',         zoneTitle: 'MIDDLE EAST' },
+    { zoneKey: 'nafrica',            zoneTitle: 'NORTH AFRICA' },
+    { zoneKey: 'ssafrica',           zoneTitle: 'SUB-SAHARAN AFRICA' },
+    { zoneKey: 'oceania',            zoneTitle: 'OCEANIA' },
+    { zoneKey: 'pacific',            zoneTitle: 'PACIFIC OCEAN' }
+];
+
+function getLoadoutFilterRegionGroups() {
+    return FILTER_REGION_DEFINITIONS.map(def => {
+        const isos = (typeof REGION_COUNTRY_MAP !== 'undefined' && Array.isArray(REGION_COUNTRY_MAP[def.zoneKey]))
+            ? REGION_COUNTRY_MAP[def.zoneKey]
+            : [];
+        const countries = isos.map(iso => {
+            const cName = (typeof ISO_TO_COUNTRY_NAME !== 'undefined' && ISO_TO_COUNTRY_NAME[iso])
+                ? ISO_TO_COUNTRY_NAME[iso].toUpperCase()
+                : iso;
+            return {
+                code: iso,
+                label: `${iso} - ${cName}`
+            };
+        });
+        return {
+            zoneKey: def.zoneKey,
+            zoneTitle: def.zoneTitle,
+            countries: countries
+        };
+    });
+}
+
+function normalizeLoadoutPrefixCode(rawVal) {
+    if (!rawVal) return '';
+    let token = String(rawVal).trim().toUpperCase().replace(/\*/g, '');
+    if (token.includes('-')) token = token.split('-', 1)[0].trim();
+    if (token.includes(' ')) token = token.split(/\s+/, 1)[0].trim();
+    return token.replace(/[^A-Z0-9]/g, '');
+}
+
+// Point 6: Resolve an airport's ISO country code using the exact same logic as filterAirports()
+function getAirportResolvedIsoCountry(ap) {
+    if (!ap) return '';
+    const apIso = String(ap.country || ap.iso_country || '').toUpperCase().trim();
+    const rawCountry = String(ap.country || '').toLowerCase().trim();
+    const resolvedIso = (typeof COUNTRY_NAME_TO_ISO !== 'undefined' && COUNTRY_NAME_TO_ISO[rawCountry])
+        ? COUNTRY_NAME_TO_ISO[rawCountry]
+        : apIso;
+    return resolvedIso || apIso;
+}
+
+// Point 6: Resolve an airport's installed addon category ('Payware', 'Freeware', 'Asobo', or 'Default')
+// even when its custom source is currently parked (.disabled) on disk by an active Loadout!
+function getAirportInstalledAddonCategory(ap) {
+    if (!ap) return 'Default';
+    const sources = Array.isArray(ap.all_sources) ? ap.all_sources : [];
+    const customSources = sources.filter(s => s && !s.is_fix_patch && !(s.is_default || s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    if (customSources.length > 0) {
+        const primary = customSources.find(s => !s.is_disabled) || customSources[0];
+        if (primary.is_payware || primary.pricing_type === 'Payware' || ap.pricing_type === 'Payware' || ap.is_payware) {
+            return 'Payware';
+        }
+        if (primary.is_asobo_official || primary.pricing_type === 'Asobo' || ap.pricing_type === 'Asobo' || ap.is_asobo_official || (primary.vendor && String(primary.vendor).toLowerCase().includes('asobo'))) {
+            return 'Asobo';
+        }
+        return 'Freeware';
+    }
+    const rawPt = String(ap.pricing_type || 'Default');
+    if (rawPt === 'Default' || ap.is_default || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
+        return 'Default';
+    }
+    if (rawPt === 'Payware' || ap.is_payware) return 'Payware';
+    if (rawPt === 'Asobo' || ap.is_asobo_official) return 'Asobo';
+    return 'Freeware';
+}
+
+let currentLoadoutRegionZoneFilter = 'ALL';
+
+let savedLoadoutProfiles = [
+    {
+        id: 'ALL',
+        name: 'ALL SCENERIES ACTIVE',
+        is_builtin: true,
+        categories: ['Payware', 'Freeware', 'Asobo'],
+        prefixes: [],
+        manual_icaos: [],
+        keep_libraries: true
+    },
+    {
+        id: 'NONE_ROUTE_ONLY',
+        name: 'NONE (STRICT ROUTE ISOLATION ONLY)',
+        is_builtin: true,
+        categories: [],
+        prefixes: [],
+        manual_icaos: [],
+        keep_libraries: true
+    }
+];
+let isDirectRouteMode = false;
+let currentActiveLoadoutId = 'ALL';
+let selectedBaseLoadoutId = 'ALL';
+let pendingActiveLoadoutId = 'ALL';
+let currentEditingLoadout = null;
+let isLoadoutSimRunningLocked = false;
+let currentUnifiedOptimizerView = 'MAIN';
+
+let isLoadoutProfileEditUnlocked = false;
+let isLoadoutPinMapModeActive = false;
+let isLoadoutLeftPanelCollapsed = false;
+let loadoutPinnedMarkersLayerGroup = null;
+
+let _savedRouteStateBeforeBuilder = null;
+let loadoutBuilderSelectedMapAirport = null;
+
+function isLoadoutBuilderModeActive() {
+    const winEl = document.getElementById('float-win-unified-optimizer');
+    const isWinVisible = winEl && !winEl.classList.contains('hidden');
+    const builderEl = document.getElementById('unified-opt-builder-view');
+    const isBuilderVisible = builderEl ? !builderEl.classList.contains('hidden') : (currentUnifiedOptimizerView === 'BUILDER');
+    return Boolean(isWinVisible && (currentUnifiedOptimizerView === 'BUILDER' && isBuilderVisible));
+}
+
+function isCurrentLoadoutEditableAndUnlocked() {
+    if (!currentEditingLoadout) return false;
+    if (currentEditingLoadout.id === 'ALL' || currentEditingLoadout.is_builtin) return false;
+    return Boolean(isLoadoutProfileEditUnlocked);
+}
+
+function isAirportPinnedInCurrentEditLoadout(ap) {
+    if (!ap || !ap.icao || !currentEditingLoadout || !Array.isArray(currentEditingLoadout.manual_icaos)) return false;
+    const icao = String(ap.icao).trim().toUpperCase();
+    if (!icao) return false;
+    return currentEditingLoadout.manual_icaos.some(ic => String(ic).trim().toUpperCase() === icao);
+}
+
+function isLoadoutPinVisualMode() {
+    return Boolean(
+        typeof isLoadoutBuilderModeActive === 'function' &&
+        isLoadoutBuilderModeActive() &&
+        isCurrentLoadoutEditableAndUnlocked() &&
+        isLoadoutPinMapModeActive
+    );
+}
+
+function clearLoadoutPinnedMarkersOnMap() {
+    if (loadoutPinnedMarkersLayerGroup && typeof map !== 'undefined' && map) {
+        try {
+            loadoutPinnedMarkersLayerGroup.clearLayers();
+        } catch (e) {}
+    }
+}
+
+function renderLoadoutPinnedMarkersOnMap() {
+    // Visual contrast between grey unpinned stars and normal colored pinned stars is sufficient; no extra pushpin icons needed
+    clearLoadoutPinnedMarkersOnMap();
+}
+
+function updateLoadoutPinModeButtonsUI() {
+    const pinBtn = document.getElementById('loadout-btn-pin-mode');
+    const savePinsBtn = document.getElementById('loadout-btn-save-pins');
+    const canEdit = isCurrentLoadoutEditableAndUnlocked();
+
+    if (pinBtn) {
+        pinBtn.disabled = !canEdit;
+        if (isLoadoutPinMapModeActive && canEdit) {
+            pinBtn.className = 'sx-btn-flat sx-status-ok py-0.5 px-2.5 text-[10px]';
+            pinBtn.textContent = 'PIN MODE: ACTIVE (CLICK MAP STARS)';
+        } else {
+            pinBtn.className = 'sx-btn-flat py-0.5 px-2.5 text-[10px]';
+            pinBtn.textContent = 'PIN AIRPORTS ON MAP';
+        }
+    }
+    if (savePinsBtn) {
+        if (isLoadoutPinMapModeActive && canEdit) {
+            savePinsBtn.classList.remove('hidden');
+            savePinsBtn.disabled = false;
+        } else {
+            savePinsBtn.classList.add('hidden');
+        }
+    }
+}
+
+function setLoadoutPinAirportsMode(active) {
+    const prevState = isLoadoutPinMapModeActive;
+    isLoadoutPinMapModeActive = Boolean(active && isCurrentLoadoutEditableAndUnlocked());
+    selectedAirport = null;
+    currentClassicAirport = null;
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
+    updateLoadoutPinModeButtonsUI();
+    if (isLoadoutPinMapModeActive) {
+        // Ensure any country/region overlay on the main map is cleared so all 345 world airports are visible
+        if (typeof selectedCountryCode !== 'undefined' && selectedCountryCode) {
+            selectedCountryCode = null;
+            selectedCountryName = '';
+            if (typeof exitCountryMode === 'function') {
+                try { exitCountryMode(false); } catch (e) {}
+            }
+        }
+        if (typeof selectedRegions !== 'undefined' && selectedRegions && selectedRegions.size > 0) {
+            selectedRegions.clear();
+            selectedRegion = null;
+            if (typeof updateRegionPillUI === 'function') updateRegionPillUI();
+        }
+        previewLoadoutProfileOnMap('ALL');
+        renderLoadoutPinnedMarkersOnMap();
+    } else {
+        clearLoadoutPinnedMarkersOnMap();
+        if (prevState && typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive() && currentEditingLoadout && (isLoadoutProfileEditUnlocked || currentEditingLoadout.id === pendingActiveLoadoutId)) {
+            previewLoadoutProfileOnMap(currentEditingLoadout.id);
+        }
+    }
+}
+
+function toggleLoadoutPinAirportsMode() {
+    if (!currentEditingLoadout || currentEditingLoadout.id === 'ALL' || currentEditingLoadout.is_builtin) return;
+    if (!isLoadoutProfileEditUnlocked) {
+        if (typeof showToast === 'function') {
+            showToast('CLICK THE PENCIL ICON ON THIS PROFILE FIRST TO UNLOCK EDITING', 'warning');
+        }
+        return;
+    }
+    // Always enter/refresh Pin Mode when clicking PIN AIRPORTS ON MAP (SAVE PINS / SAVE PROFILE exits and validates)
+    setLoadoutPinAirportsMode(true);
+    if (typeof showToast === 'function') {
+        showToast('PIN AIRPORTS MODE ACTIVE — CLICK ANY GREY AIRPORT STAR TO PLANT OR REMOVE A PIN', 'info');
+    }
+}
+
+async function savePinnedAirportsAndExitPinMode() {
+    await saveCurrentLoadoutRuleset(false);
+}
+
+function suspendRouteStateForBuilder() {
+    if (!_savedRouteStateBeforeBuilder) {
+        _savedRouteStateBeforeBuilder = {
+            optimizerOrigin,
+            optimizerDest,
+            optimizerActiveAnchorAirport,
+            flightPlanningDeparture,
+            flightPlanningDestination,
+            flightOriginAirport,
+            flightDestAirport,
+            flightDestinationAirport,
+            flightCorridorArrivalAirport,
+            isFlightPlanningMode,
+            flightCorridorProfile,
+            isDirectRouteMode: (typeof isDirectRouteMode !== 'undefined') ? isDirectRouteMode : false,
+            optimizerMode,
+            currentSimBriefFlight,
+            currentSimBriefAlternates: Array.isArray(currentSimBriefAlternates) ? [...currentSimBriefAlternates] : [],
+            selectedAirport
+        };
+    }
+    loadoutBuilderSelectedMapAirport = null;
+    selectedAirport = null;
+    currentClassicAirport = null;
+    optimizerOrigin = null;
+    optimizerDest = null;
+    optimizerActiveAnchorAirport = null;
+    flightPlanningDeparture = null;
+    flightPlanningDestination = null;
+    flightOriginAirport = null;
+    flightDestAirport = null;
+    flightDestinationAirport = null;
+    flightCorridorArrivalAirport = null;
+    isFlightPlanningMode = false;
+
+    if (typeof flightCorridorLayerGroup !== 'undefined' && flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+}
+
+function restoreRouteStateAfterBuilder() {
+    loadoutBuilderSelectedMapAirport = null;
+    isLoadoutProfileEditUnlocked = false;
+    setLoadoutPinAirportsMode(false);
+    clearLoadoutPinnedMarkersOnMap();
+    if (typeof closeLoadoutCategoriesInfoModal === 'function') {
+        closeLoadoutCategoriesInfoModal();
+    }
+    if (!_savedRouteStateBeforeBuilder) {
+        if (typeof clearRouteAirportBadges === 'function') clearRouteAirportBadges();
+        return;
+    }
+    const st = _savedRouteStateBeforeBuilder;
+    _savedRouteStateBeforeBuilder = null;
+
+    optimizerOrigin = st.optimizerOrigin;
+    optimizerDest = st.optimizerDest;
+    optimizerActiveAnchorAirport = st.optimizerActiveAnchorAirport;
+    flightPlanningDeparture = st.flightPlanningDeparture;
+    flightPlanningDestination = st.flightPlanningDestination;
+    flightOriginAirport = st.flightOriginAirport;
+    flightDestAirport = st.flightDestAirport;
+    flightDestinationAirport = st.flightDestinationAirport;
+    flightCorridorArrivalAirport = st.flightCorridorArrivalAirport;
+    isFlightPlanningMode = st.isFlightPlanningMode;
+    flightCorridorProfile = st.flightCorridorProfile;
+    isDirectRouteMode = Boolean(st.isDirectRouteMode);
+    optimizerMode = st.optimizerMode;
+    currentSimBriefFlight = st.currentSimBriefFlight;
+    currentSimBriefAlternates = st.currentSimBriefAlternates || [];
+    selectedAirport = st.selectedAirport;
+
+    if (optimizerOrigin && optimizerDest && typeof renderFlightCorridor === 'function') {
+        renderFlightCorridor();
+    } else if (typeof flightCorridorLayerGroup !== 'undefined' && flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    if (typeof updateRouteAirportBadges === 'function') {
+        updateRouteAirportBadges();
+    }
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+    if (typeof updateOptimizerRouteUI === 'function') {
+        updateOptimizerRouteUI();
+    }
+}
+
+function handleLoadoutBuilderMapAirportSelect(ap) {
+    if (!ap || !ap.icao) return;
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu(false);
+    }
+    // Always keep only the base star on the map (never draw the large round SELECTED/DEPARTURE badge)
+    loadoutBuilderSelectedMapAirport = null;
+    selectedAirport = null;
+    currentClassicAirport = null;
+    if (typeof flightCorridorLayerGroup !== 'undefined' && flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
+
+    if (!isCurrentLoadoutEditableAndUnlocked()) {
+        if (typeof showToast === 'function') {
+            showToast('UNLOCK PROFILE WITH THE PENCIL ICON THEN CLICK "PIN AIRPORTS ON MAP"', 'info');
+        }
+        return;
+    }
+
+    if (!isLoadoutPinMapModeActive) {
+        setLoadoutPinAirportsMode(true);
+    }
+
+    const icao = String(ap.icao).trim().toUpperCase();
+    const currentList = (currentEditingLoadout.manual_icaos || [])
+        .map(i => String(i).trim().toUpperCase())
+        .filter(Boolean);
+    const set = new Set(currentList);
+    let wasAdded = false;
+    if (set.has(icao)) {
+        set.delete(icao);
+    } else {
+        set.add(icao);
+        wasAdded = true;
+    }
+    currentEditingLoadout.manual_icaos = Array.from(set);
+    const manualEl = document.getElementById('loadout-edit-manual-icaos');
+    if (manualEl) {
+        manualEl.value = currentEditingLoadout.manual_icaos.join(', ');
+    }
+    updateLoadoutImpactPreviewUI();
+    renderLoadoutPinnedMarkersOnMap();
+    // Immediately refresh this airport's marker icon so it toggles between grey star and base color star
+    const targetAp = (typeof getAirportByIcao === 'function' && getAirportByIcao(icao)) || ap;
+    if (targetAp && typeof airportMarkerCache !== 'undefined' && airportMarkerCache) {
+        const marker = airportMarkerCache.get(targetAp.id || icao);
+        if (marker && typeof createCustomIcon === 'function' && typeof getCustomIconKey === 'function') {
+            marker.setIcon(createCustomIcon(targetAp));
+            marker._iconKey = getCustomIconKey(targetAp);
+            if (typeof markerClusterGroup !== 'undefined' && markerClusterGroup && typeof markerClusterGroup.refreshClusters === 'function') {
+                try { markerClusterGroup.refreshClusters(marker); } catch (e) {}
+            }
+        }
+    }
+    if (window.globeEngine) {
+        window.globeEngine._cachedWorldClusterKey = '';
+        if (typeof window.globeEngine.requestRender === 'function') window.globeEngine.requestRender();
+    }
+    if (typeof showToast === 'function') {
+        showToast(wasAdded ? `PIN PLANTED ON ${icao}` : `PIN REMOVED FROM ${icao}`, 'success');
+    }
+}
+
+function showLoadoutCategoriesInfoModal() {
+    const modal = document.getElementById('loadout-default-airports-info-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeLoadoutCategoriesInfoModal() {
+    const modal = document.getElementById('loadout-default-airports-info-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function applyLoadoutLeftPanelCollapseUI() {
+    const leftPanel = document.getElementById('loadout-left-panel');
+    const expandedContent = document.getElementById('loadout-left-expanded-content');
+    const collapsedRail = document.getElementById('loadout-left-collapsed-rail');
+    const winEl = document.getElementById('float-win-unified-optimizer');
+
+    if (leftPanel) {
+        if (isLoadoutLeftPanelCollapsed) {
+            leftPanel.classList.remove('w-[410px]', 'p-3');
+            leftPanel.classList.add('w-[42px]', 'p-2');
+        } else {
+            leftPanel.classList.remove('w-[42px]', 'p-2');
+            leftPanel.classList.add('w-[410px]', 'p-3');
+        }
+    }
+    if (expandedContent) {
+        if (isLoadoutLeftPanelCollapsed) {
+            expandedContent.classList.add('hidden');
+        } else {
+            expandedContent.classList.remove('hidden');
+        }
+    }
+    if (collapsedRail) {
+        if (isLoadoutLeftPanelCollapsed) {
+            collapsedRail.classList.remove('hidden');
+            collapsedRail.classList.add('flex');
+        } else {
+            collapsedRail.classList.add('hidden');
+            collapsedRail.classList.remove('flex');
+        }
+    }
+    if (winEl && currentUnifiedOptimizerView === 'BUILDER') {
+        const desiredW = isLoadoutLeftPanelCollapsed ? 680 : 1060;
+        const targetW = Math.min(desiredW, window.innerWidth - 32);
+        winEl.style.width = `${targetW}px`;
+        if (!winEl._hasBeenDragged) {
+            const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassic ? 304 : 16;
+            const targetLeft = Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+            winEl.style.left = `${targetLeft}px`;
+        }
+    }
+}
+
+function toggleLoadoutLeftPanel(forceState) {
+    if (typeof forceState === 'boolean') {
+        isLoadoutLeftPanelCollapsed = forceState;
+    } else {
+        isLoadoutLeftPanelCollapsed = !isLoadoutLeftPanelCollapsed;
+    }
+    applyLoadoutLeftPanelCollapseUI();
+}
+
+function switchUnifiedOptimizerView(viewMode) {
+    const mainView = document.getElementById('unified-opt-main-view');
+    const builderView = document.getElementById('unified-opt-builder-view');
+    const titleEl = document.getElementById('unified-opt-window-title') || document.getElementById('unified-opt-header-title');
+    const backBtn = document.getElementById('unified-opt-btn-back') || document.getElementById('unified-opt-back-btn');
+    const winEl = document.getElementById('float-win-unified-optimizer');
+
+    currentUnifiedOptimizerView = (viewMode === 'BUILDER') ? 'BUILDER' : 'MAIN';
+
+    if (currentUnifiedOptimizerView === 'BUILDER') {
+        if (mainView) mainView.classList.add('hidden');
+        if (builderView) builderView.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = 'SCENERY & ROUTE OPTIMIZER / EDIT LOADOUT RULES';
+        if (backBtn) backBtn.classList.remove('hidden');
+        applyLoadoutLeftPanelCollapseUI();
+        if (winEl) {
+            const isTourActive = !!(window.onboardingTour && window.onboardingTour.isOpen);
+            const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassic ? 304 : 16;
+            const desiredW = isLoadoutLeftPanelCollapsed ? 680 : 1060;
+            const maxAllowedW = isTourActive ? Math.max(680, window.innerWidth - minLeft - 390) : (window.innerWidth - 32);
+            const targetW = Math.min(desiredW, maxAllowedW);
+            winEl.style.width = `${targetW}px`;
+            if (!winEl._hasBeenDragged || isTourActive) {
+                const targetLeft = isTourActive ? minLeft : Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+                winEl.style.left = `${targetLeft}px`;
+            }
+        }
+        suspendRouteStateForBuilder();
+        const targetId = (selectedBaseLoadoutId && selectedBaseLoadoutId !== 'NONE_ROUTE_ONLY') ? selectedBaseLoadoutId : 'ALL';
+        pendingActiveLoadoutId = (currentActiveLoadoutId && currentActiveLoadoutId !== 'NONE_ROUTE_ONLY') ? currentActiveLoadoutId : targetId;
+        selectLoadoutForEdit(targetId);
+    } else {
+        if (builderView) builderView.classList.add('hidden');
+        if (mainView) mainView.classList.remove('hidden');
+        if (titleEl) titleEl.textContent = 'SCENERY & ROUTE OPTIMIZER';
+        if (backBtn) backBtn.classList.add('hidden');
+        if (winEl) {
+            const isTourActive = !!(window.onboardingTour && window.onboardingTour.isOpen);
+            const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassic ? 304 : 16;
+            const maxAllowedW = isTourActive ? Math.max(680, window.innerWidth - minLeft - 390) : (window.innerWidth - 32);
+            const targetW = Math.min(920, maxAllowedW);
+            winEl.style.width = `${targetW}px`;
+            if (!winEl._hasBeenDragged || isTourActive) {
+                const targetLeft = isTourActive ? minLeft : Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+                winEl.style.left = `${targetLeft}px`;
+            }
+        }
+        restoreRouteStateAfterBuilder();
+        syncUnifiedBaseLoadoutSummaryUI();
+        updateOptimizerSavings();
+    }
+}
+
+async function loadLoadoutProfilesState() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_loadout_profiles) return;
+    try {
+        const raw = await window.pywebview.api.get_loadout_profiles();
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.status === 'ok') {
+            if (Array.isArray(res.profiles) && res.profiles.length > 0) {
+                savedLoadoutProfiles = res.profiles;
+            }
+            currentActiveLoadoutId = res.active_loadout_id || 'ALL';
+            pendingActiveLoadoutId = currentActiveLoadoutId;
+            if (!selectedBaseLoadoutId || !savedLoadoutProfiles.some(p => p.id === selectedBaseLoadoutId)) {
+                selectedBaseLoadoutId = currentActiveLoadoutId;
+            }
+            isLoadoutSimRunningLocked = Boolean(res.is_sim_running);
+            syncHeaderAndClassicLoadoutUI();
+            syncUnifiedBaseLoadoutSummaryUI();
+            updateOptimizerSavings();
+        }
+    } catch (e) {
+        console.warn('[Loadout Profiles] Error loading state:', e);
+    }
+}
+
+function syncHeaderAndClassicLoadoutUI() {
+    const winLock = document.getElementById('unified-opt-sim-lock-badge');
+    const mainApplyBtn = document.getElementById('opt-btn-apply-sceneries');
+    const mainApplyLbl = document.getElementById('opt-btn-apply-label');
+    const builderApplyBtn = document.getElementById('loadout-btn-apply');
+
+    if (winLock) {
+        if (isLoadoutSimRunningLocked) winLock.classList.remove('hidden');
+        else winLock.classList.add('hidden');
+    }
+    if (mainApplyBtn) {
+        mainApplyBtn.disabled = isLoadoutSimRunningLocked;
+        if (mainApplyLbl) {
+            mainApplyLbl.textContent = isLoadoutSimRunningLocked ? 'SIM RUNNING - LOCKED' : 'OPTIMIZE & APPLY';
+        }
+    }
+    if (builderApplyBtn) {
+        builderApplyBtn.disabled = isLoadoutSimRunningLocked;
+    }
+
+    if (typeof updateClassicSidebarRouteBadge === 'function') {
+        updateClassicSidebarRouteBadge();
+    }
+}
+
+function summarizeSelectedRegionsForTags(prefixesList) {
+    const pxs = (prefixesList || []).map(normalizeLoadoutPrefixCode).filter(Boolean);
+    if (pxs.length === 0) return 'GLOBAL (ALL REGIONS)';
+    const pxSet = new Set(pxs);
+    const matchedRegions = [];
+    const groups = getLoadoutFilterRegionGroups();
+    groups.forEach(g => {
+        const codes = g.countries.map(c => c.code);
+        if (codes.length > 0 && codes.every(c => pxSet.has(c))) {
+            matchedRegions.push(g.zoneTitle);
+        }
+    });
+    if (matchedRegions.length > 0) {
+        return matchedRegions.length <= 2 ? matchedRegions.join(' + ') : `${matchedRegions.slice(0, 2).join(' + ')} +${matchedRegions.length - 2}`;
+    }
+    return pxs.length <= 5 ? pxs.join(', ') : `${pxs.slice(0, 4).join(', ')} +${pxs.length - 4}`;
+}
+
+function syncUnifiedBaseLoadoutSummaryUI() {
+    const baseSelect = document.getElementById('unified-base-loadout-select');
+    const matchCountEl = document.getElementById('unified-base-match-count');
+    const tagsEl = document.getElementById('unified-base-rules-tags');
+
+    if (baseSelect) {
+        baseSelect.innerHTML = savedLoadoutProfiles.map(p =>
+            `<option value="${escapeHtml(p.id)}" ${p.id === selectedBaseLoadoutId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+        ).join('');
+        baseSelect.value = selectedBaseLoadoutId;
+    }
+
+    const prof = savedLoadoutProfiles.find(p => p.id === selectedBaseLoadoutId) || savedLoadoutProfiles[0];
+    const baseSet = getUnifiedBaseLoadoutIcaosSet(selectedBaseLoadoutId);
+
+    if (matchCountEl) {
+        matchCountEl.textContent = `${baseSet.size} SCENERIES`;
+    }
+    if (tagsEl && prof) {
+        if (prof.id === 'ALL') {
+            tagsEl.textContent = 'PAYWARE, FREEWARE, ASOBO | GLOBAL (ALL)';
+        } else if (prof.id === 'NONE_ROUTE_ONLY') {
+            tagsEl.textContent = '0 BASE SCENERIES (ROUTE OVERLAY ONLY)';
+        } else {
+            const cats = (prof.categories || []).map(c => String(c).toUpperCase()).join(', ') || 'NONE';
+            const hasPrefixes = Array.isArray(prof.prefixes) && prof.prefixes.length > 0;
+            const pinCount = Array.isArray(prof.manual_icaos) ? prof.manual_icaos.filter(Boolean).length : 0;
+            const regText = (!hasPrefixes && pinCount > 0)
+                ? `PINNED AIRPORTS ONLY (${pinCount})`
+                : summarizeSelectedRegionsForTags(prof.prefixes);
+            tagsEl.textContent = `${cats} | ${regText}`;
+        }
+    }
+}
+
+function onUnifiedBaseLoadoutChange(profileId) {
+    selectedBaseLoadoutId = profileId || 'ALL';
+    pendingActiveLoadoutId = selectedBaseLoadoutId;
+    window._userExplicitlyChoseAllWithRoute = (selectedBaseLoadoutId === 'ALL' && !!(optimizerOrigin && optimizerDest));
+    syncUnifiedBaseLoadoutSummaryUI();
+    updateOptimizerSavings();
+}
+
+function getAllCustomThirdPartyAirports() {
+    return (typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData))
+        ? allAirportsData.filter(ap => {
+            if (!ap) return false;
+            return getAirportInstalledAddonCategory(ap) !== 'Default';
+        })
+        : [];
+}
+
+function airportMatchesLoadoutRuleset(ap, allowedCatsSet, prefixesSet, manualSet) {
+    if (!ap) return false;
+    const icao = String(ap.icao || '').toUpperCase();
+    if (!icao) return false;
+    if (manualSet.has(icao)) return true;
+
+    const cat = getAirportInstalledAddonCategory(ap).toLowerCase();
+    if (cat === 'default' || !allowedCatsSet.has(cat)) return false;
+
+    if (prefixesSet.size > 0) {
+        const resolvedIso = getAirportResolvedIsoCountry(ap);
+        const rawIso = String(ap.country || ap.iso_country || '').toUpperCase().trim();
+        const matched = Boolean((resolvedIso && prefixesSet.has(resolvedIso)) || (rawIso && prefixesSet.has(rawIso)));
+        if (!matched) return false;
+    } else if (manualSet.size > 0) {
+        // When no region/country is selected (Global base) and pins are placed, strictly keep ONLY the pinned airports!
+        return false;
+    }
+    return true;
+}
+
+function getUnifiedBaseLoadoutIcaosSet(profileId) {
+    const customAirports = getAllCustomThirdPartyAirports();
+    const resSet = new Set();
+    const targetId = profileId || selectedBaseLoadoutId || 'ALL';
+
+    if (targetId === 'NONE_ROUTE_ONLY') {
+        return resSet;
+    }
+    const prof = (currentEditingLoadout && currentEditingLoadout.id === targetId)
+        ? currentEditingLoadout
+        : savedLoadoutProfiles.find(p => p.id === targetId);
+    if (!prof || targetId === 'ALL') {
+        customAirports.forEach(ap => {
+            if (ap && ap.icao) resSet.add(String(ap.icao).toUpperCase());
+        });
+        return resSet;
+    }
+
+    const allowedCats = new Set((prof.categories || ['Payware', 'Freeware', 'Asobo']).map(c => String(c).toLowerCase()));
+    const prefixesSet = new Set((prof.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    const manualSet = new Set((prof.manual_icaos || []).map(ic => String(ic).trim().toUpperCase()).filter(Boolean));
+
+    customAirports.forEach(ap => {
+        if (airportMatchesLoadoutRuleset(ap, allowedCats, prefixesSet, manualSet)) {
+            resSet.add(String(ap.icao).toUpperCase());
+        }
+    });
+    return resSet;
+}
+
+function getUnifiedRouteOverlayIcaosSet() {
+    const routeSet = new Set();
+    if (!optimizerOrigin || !optimizerDest || optimizerMode === 'NONE') {
+        return routeSet;
+    }
+    if (optimizerOrigin.icao) routeSet.add(String(optimizerOrigin.icao).toUpperCase());
+    if (optimizerDest.icao) routeSet.add(String(optimizerDest.icao).toUpperCase());
+
+    if (optimizerMode === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+        currentSimBriefAlternates.forEach(alt => {
+            if (alt && alt.icao) routeSet.add(String(alt.icao).toUpperCase());
+        });
+    }
+    if ((optimizerMode === 'CORRIDOR' || optimizerMode === 'SIMBRIEF') && typeof getCorridorAddonsList === 'function') {
+        const corridorAddons = getCorridorAddonsList() || [];
+        corridorAddons.forEach(a => {
+            if (a && a.icao) routeSet.add(String(a.icao).toUpperCase());
+        });
+    }
+    return routeSet;
+}
+
+function computeUnifiedCombinedSets() {
+    const customAirports = getAllCustomThirdPartyAirports();
+    const customIcaosSet = new Set(customAirports.map(ap => String(ap.icao || '').toUpperCase()).filter(Boolean));
+
+    const baseSet = getUnifiedBaseLoadoutIcaosSet(selectedBaseLoadoutId);
+    const routeSet = getUnifiedRouteOverlayIcaosSet();
+
+    const unionCustomSet = new Set(baseSet);
+    let routeAddedToBaseCount = 0;
+
+    routeSet.forEach(icao => {
+        if (customIcaosSet.has(icao)) {
+            if (!baseSet.has(icao)) {
+                routeAddedToBaseCount++;
+            }
+            unionCustomSet.add(icao);
+        }
+    });
+
+    const finalActiveCount = unionCustomSet.size;
+    const parkedCount = Math.max(0, customAirports.length - finalActiveCount);
+    const ramSavedGb = (parkedCount * 0.0053).toFixed(2);
+    const vramSavedMb = Math.round(parkedCount * 1.25);
+
+    const allKeepSet = new Set(unionCustomSet);
+    routeSet.forEach(icao => allKeepSet.add(icao));
+
+    return {
+        totalCustomCount: customAirports.length,
+        baseCount: baseSet.size,
+        routeAddedToBaseCount,
+        finalActiveCount,
+        parkedCount,
+        ramSavedGb,
+        vramSavedMb,
+        keepIcaos: Array.from(allKeepSet)
+    };
+}
+
+async function applyUnifiedOptimization() {
+    if (_isSceneryMutationInProgress) return;
+    if (window.IS_LITE) {
+        if (typeof showUnlockProModal === 'function') showUnlockProModal();
+        return;
+    }
+    if (isLoadoutSimRunningLocked) {
+        if (typeof showToast === 'function') {
+            showToast('MSFS IS RUNNING - SCENERY OPTIMIZATION LOCKED FOR SAFETY', 'error');
+        }
+        return;
+    }
+
+    const hasRouteOverlay = Boolean(optimizerOrigin && optimizerDest && optimizerMode !== 'NONE');
+
+    if (selectedBaseLoadoutId === 'ALL' && !hasRouteOverlay) {
+        await executeApplyLoadoutProfile('ALL');
+        return;
+    }
+
+    if (selectedBaseLoadoutId === 'NONE_ROUTE_ONLY' && !hasRouteOverlay) {
+        if (typeof showToast === 'function') {
+            showToast('SELECT A DEPARTURE & ARRIVAL ROUTE (OR CHOOSE A BASE LOADOUT)', 'warning');
+        }
+        return;
+    }
+
+    if (!hasRouteOverlay) {
+        await executeApplyLoadoutProfile(selectedBaseLoadoutId);
+        return;
+    }
+
+    _isSceneryMutationInProgress = true;
+    const calc = computeUnifiedCombinedSets();
+    const dep = optimizerOrigin;
+    const arr = optimizerDest;
+    const effectiveMode = optimizerMode || 'DIRECT';
+
+    const applyBtn = document.getElementById('opt-btn-apply-sceneries');
+    const applyLbl = document.getElementById('opt-btn-apply-label');
+    const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
+    if (applyBtn) applyBtn.disabled = true;
+    if (applyLbl) applyLbl.textContent = 'OPTIMIZING...';
+    if (restoreBtn) restoreBtn.disabled = true;
+
+    try {
+        if (window.pywebview && window.pywebview.api) {
+            const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
+            const optPayload = {
+                keep_icaos: calc.keepIcaos,
+                dep_icao: dep.icao,
+                arr_icao: arr.icao,
+                profile: effectiveMode,
+                base_loadout_id: selectedBaseLoadoutId,
+                alternates: (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) ? currentSimBriefAlternates : [],
+                simbrief_flight: (typeof currentSimBriefFlight !== 'undefined' && currentSimBriefFlight) ? currentSimBriefFlight : null
+            };
+            const resRaw = await apiFn.call(window.pywebview.api, JSON.stringify(optPayload));
+            const res = typeof resRaw === 'string' ? JSON.parse(resRaw) : resRaw;
+
+            if (res && res.status === 'locked_sim_running') {
+                isLoadoutSimRunningLocked = true;
+                syncHeaderAndClassicLoadoutUI();
+                if (typeof showToast === 'function') {
+                    showToast(res.message || 'MSFS IS RUNNING - LOCKED', 'error');
+                }
+                return;
+            }
+
+            if (res && (res.status === 'ok' || res.status === 'success')) {
+                isFlightCorridorOptimized = true;
+                currentActiveLoadoutId = selectedBaseLoadoutId;
+                pendingActiveLoadoutId = currentActiveLoadoutId;
+                flightCorridorDisabledCount = res.disabled_count !== undefined ? res.disabled_count : calc.parkedCount;
+
+                if (Array.isArray(res.airports) && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                    if (typeof rebuildAirportsByIcaoIndex === 'function') rebuildAirportsByIcaoIndex();
+                    if (typeof updateStats === 'function') updateStats(allAirportsData);
+                }
+
+                currentFlightMode = {
+                    active: true,
+                    icaos: calc.keepIcaos,
+                    dep_icao: dep.icao,
+                    arr_icao: arr.icao,
+                    profile: effectiveMode,
+                    base_loadout_id: selectedBaseLoadoutId,
+                    disabled_count: flightCorridorDisabledCount
+                };
+
+                if (airportMarkerCache) airportMarkerCache.clear();
+                if (customDivIconCache) customDivIconCache.clear();
+                if (window.globeEngine) window.globeEngine._cachedWorldClusterKey = '';
+
+                if (typeof updateFlightModeBannerUI === 'function') updateFlightModeBannerUI(currentFlightMode);
+                if (typeof updateFlightPlanningBannerUI === 'function') updateFlightPlanningBannerUI();
+                syncHeaderAndClassicLoadoutUI();
+                updateOptimizerRouteUI();
+                if (typeof filterAirports === 'function') filterAirports();
+                if (typeof updateRouteAirportBadges === 'function') updateRouteAirportBadges();
+
+                const sbPanel = document.getElementById('simbrief-cross-audit-panel');
+                if (sbPanel && !sbPanel.classList.contains('hidden')) {
+                    await refreshSimBriefCrossAudit(false);
+                }
+
+                if (typeof showToast === 'function') {
+                    showToast(`OPTIMIZATION APPLIED: ${calc.finalActiveCount} ACTIVE / ${flightCorridorDisabledCount} PARKED (${dep.icao} TO ${arr.icao})`, 'success');
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast((res && res.message) || 'FAILED TO APPLY OPTIMIZATION', 'error');
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Unified Optimizer] Error:', err);
+    } finally {
+        _isSceneryMutationInProgress = false;
+        if (applyBtn) applyBtn.disabled = isLoadoutSimRunningLocked;
+        if (applyLbl) applyLbl.textContent = isLoadoutSimRunningLocked ? 'SIM RUNNING - LOCKED' : 'OPTIMIZE & APPLY';
+        if (restoreBtn) restoreBtn.disabled = isLoadoutSimRunningLocked;
+    }
+}
+
+async function openLoadoutProfilesManager() {
+    await loadLoadoutProfilesState();
+    if (isLoadoutProfileEditUnlocked && currentEditingLoadout) {
+        return;
+    }
+    const editableList = savedLoadoutProfiles.filter(p => p.id !== 'NONE_ROUTE_ONLY');
+    const targetToEdit = editableList.find(p => p.id === selectedBaseLoadoutId) || editableList[0];
+    selectLoadoutForEdit(targetToEdit ? targetToEdit.id : 'ALL');
+}
+
+function computeLoadoutRulesetCounts(prof) {
+    const customAirports = getAllCustomThirdPartyAirports();
+    if (!prof || prof.id === 'ALL') {
+        return {
+            activeCount: customAirports.length,
+            parkedCount: 0,
+            ramSavedGb: '0.00'
+        };
+    }
+    if (prof.id === 'NONE_ROUTE_ONLY') {
+        return {
+            activeCount: 0,
+            parkedCount: customAirports.length,
+            ramSavedGb: (customAirports.length * 0.0053).toFixed(2)
+        };
+    }
+
+    const allowedCats = new Set((prof.categories || ['Payware', 'Freeware', 'Asobo']).map(c => String(c).toLowerCase()));
+    const prefixesSet = new Set((prof.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    const manualSet = new Set((prof.manual_icaos || []).map(ic => String(ic).trim().toUpperCase()).filter(Boolean));
+
+    let activeCount = 0;
+    customAirports.forEach(ap => {
+        if (airportMatchesLoadoutRuleset(ap, allowedCats, prefixesSet, manualSet)) {
+            activeCount++;
+        }
+    });
+
+    const parkedCount = Math.max(0, customAirports.length - activeCount);
+    const ramSavedGb = (parkedCount * 0.0053).toFixed(2);
+    return { activeCount, parkedCount, ramSavedGb };
+}
+
+function onInlineLoadoutNameInput(profileId, rawValue) {
+    if (!currentEditingLoadout || currentEditingLoadout.id !== profileId || !isCurrentLoadoutEditableAndUnlocked()) return;
+    currentEditingLoadout.name = String(rawValue || '').toUpperCase();
+    const idx = savedLoadoutProfiles.findIndex(p => p.id === profileId);
+    if (idx >= 0) {
+        savedLoadoutProfiles[idx].name = currentEditingLoadout.name.trim() || 'CUSTOM LOADOUT';
+    }
+}
+
+async function saveLoadoutProfileFromList(profileId) {
+    if (!profileId || profileId === 'ALL' || profileId === 'NONE_ROUTE_ONLY') return;
+    if (!currentEditingLoadout || currentEditingLoadout.id !== profileId) {
+        selectLoadoutForEdit(profileId, false);
+    }
+    await saveCurrentLoadoutRuleset(false);
+}
+
+// Per-profile inline editable name input + "ACTIVATE"/"ACTIVE" + Pencil (unlock) + Floppy Disk (save) + Trash (delete)
+function renderLoadoutProfilesListUI() {
+    const listEl = document.getElementById('loadout-profiles-list');
+    if (!listEl) return;
+
+    const editableProfiles = savedLoadoutProfiles.filter(p => p.id !== 'NONE_ROUTE_ONLY');
+    listEl.innerHTML = editableProfiles.map(prof => {
+        const isSelected = Boolean(currentEditingLoadout && currentEditingLoadout.id === prof.id);
+        const isActivated = (pendingActiveLoadoutId === prof.id);
+        const isEditableProfile = Boolean(!prof.is_builtin && prof.id !== 'ALL');
+        const isUnlockedThis = Boolean(isSelected && isEditableProfile && isLoadoutProfileEditUnlocked);
+        const effectiveProf = (isSelected && currentEditingLoadout) ? currentEditingLoadout : prof;
+        const stats = computeLoadoutRulesetCounts(effectiveProf);
+        const cardBorder = isSelected ? 'border-[#00A8FF] bg-[#181E2B]' : 'border-[#253046] bg-[#12161F] hover:border-[#2D3A54]';
+
+        let btnClass = 'sx-btn-flat py-1 px-2.5 text-[10px] shrink-0';
+        let btnLabel = 'ACTIVATE';
+
+        if (isActivated) {
+            btnClass = 'sx-btn-flat sx-status-ok py-1 px-2.5 text-[10px] shrink-0';
+            btnLabel = 'ACTIVE';
+        }
+
+        const editBtnClass = isUnlockedThis
+            ? 'sx-btn-flat sx-btn-flat-primary py-1 px-2 text-[10px] shrink-0'
+            : 'sx-btn-flat py-1 px-2 text-[10px] text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#253046] border-[#2D3A54] shrink-0';
+
+        const editBtnHtml = isEditableProfile
+            ? `<button type="button"
+                       title="${isUnlockedThis ? 'Profile unlocked for editing (click to lock)' : 'Unlock profile to edit name, rules & pinned airports'}"
+                       onclick="event.stopPropagation(); unlockLoadoutProfileForEdit('${escapeHtml(prof.id)}')"
+                       class="${editBtnClass}">
+                   <i class="fa-solid fa-pen text-[10px]"></i>
+               </button>`
+            : '';
+
+        const saveBtnClass = isUnlockedThis
+            ? 'sx-btn-flat sx-btn-flat-primary py-1 px-2 text-[10px] shrink-0'
+            : 'sx-btn-flat py-1 px-2 text-[10px] text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#253046] border-[#2D3A54] shrink-0';
+
+        const saveBtnHtml = isEditableProfile
+            ? `<button type="button"
+                       id="${isSelected ? 'loadout-btn-save-profile' : `loadout-btn-save-profile-${escapeHtml(prof.id)}`}"
+                       title="Save profile"
+                       onclick="event.stopPropagation(); saveLoadoutProfileFromList('${escapeHtml(prof.id)}')"
+                       class="${saveBtnClass}">
+                   <i class="fa-solid fa-floppy-disk text-[10px]"></i>
+               </button>`
+            : '';
+
+        const trashBtnHtml = isEditableProfile
+            ? `<button type="button"
+                       title="Delete profile"
+                       onclick="event.stopPropagation(); deleteLoadoutProfileById('${escapeHtml(prof.id)}')"
+                       class="sx-btn-flat py-1 px-2 text-[10px] text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#253046] border-[#2D3A54] shrink-0">
+                   <i class="fa-solid fa-trash-can text-[10px]"></i>
+               </button>`
+            : '';
+
+        const displayName = (isSelected && currentEditingLoadout) ? (currentEditingLoadout.name || '') : (prof.name || '');
+        const nameFieldHtml = isEditableProfile
+            ? (isUnlockedThis
+                ? `<input type="text"
+                          id="loadout-edit-name"
+                          value="${escapeHtml(displayName)}"
+                          placeholder="PROFILE NAME..."
+                          onclick="event.stopPropagation()"
+                          oninput="onInlineLoadoutNameInput('${escapeHtml(prof.id)}', this.value)"
+                          onkeydown="if(event.key==='Enter'){event.preventDefault(); saveLoadoutProfileFromList('${escapeHtml(prof.id)}');}"
+                          class="w-full h-6 bg-[#0E121A] border border-[#00A8FF] rounded-[3px] px-2 text-xs font-mono font-bold uppercase text-[#F1F5F9] focus:outline-none focus:border-[#38BDF8]">`
+                : `<input type="text"
+                          ${isSelected ? 'id="loadout-edit-name"' : ''}
+                          value="${escapeHtml(displayName)}"
+                          readonly
+                          title="Click the pencil icon to unlock & rename this profile"
+                          class="w-full h-6 bg-[#0E121A] border border-[#253046] rounded-[3px] px-2 text-xs font-mono font-bold uppercase text-[#F1F5F9] truncate cursor-pointer pointer-events-none focus:outline-none">`)
+            : `<div class="text-xs font-bold uppercase text-[#F1F5F9] leading-tight truncate">${escapeHtml(prof.name)}</div>`;
+
+        return `
+            <div onclick="selectLoadoutForEdit('${escapeHtml(prof.id)}')" class="p-2.5 border ${cardBorder} cursor-pointer flex items-center justify-between gap-2 transition-colors">
+                <div class="min-w-0 flex-1">
+                    ${nameFieldHtml}
+                    <div data-loadout-stats-id="${escapeHtml(prof.id)}" class="text-[10px] font-mono text-[#94A3B8] mt-1">${stats.activeCount} ACTIVE / ${stats.parkedCount} PARKED</div>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                    <button type="button"
+                            onclick="event.stopPropagation(); activateLoadoutProfileInBuilder('${escapeHtml(prof.id)}')"
+                            class="${btnClass}">
+                        ${btnLabel}
+                    </button>
+                    ${editBtnHtml}
+                    ${saveBtnHtml}
+                    ${trashBtnHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function autoSelectRegionZoneTabForProfile(prof) {
+    if (!prof || prof.id === 'ALL' || prof.is_builtin) {
+        currentLoadoutRegionZoneFilter = 'ALL';
+        return;
+    }
+    const pxSet = new Set((prof.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    if (pxSet.size === 0) {
+        currentLoadoutRegionZoneFilter = 'ALL';
+        return;
+    }
+    const groups = getLoadoutFilterRegionGroups();
+    const matchedGroup = groups.find(g => g.countries.some(c => pxSet.has(c.code)));
+    currentLoadoutRegionZoneFilter = matchedGroup ? matchedGroup.zoneKey : 'ALL';
+}
+
+function updateLoadoutZoneTabsUI() {
+    const isBuiltinAll = Boolean(currentEditingLoadout && (currentEditingLoadout.is_builtin || currentEditingLoadout.id === 'ALL'));
+    const selectedSet = new Set(((currentEditingLoadout && currentEditingLoadout.prefixes) || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    const groups = getLoadoutFilterRegionGroups();
+
+    const zoneKeys = ['ALL', ...FILTER_REGION_DEFINITIONS.map(d => d.zoneKey)];
+    zoneKeys.forEach(k => {
+        const btn = document.getElementById(`loadout-zone-tab-${k}`);
+        if (!btn) return;
+        let hasActiveInZone = false;
+        if (k === 'ALL') {
+            hasActiveInZone = isBuiltinAll || selectedSet.size === 0;
+        } else {
+            const grp = groups.find(g => g.zoneKey === k);
+            if (grp) {
+                hasActiveInZone = isBuiltinAll || grp.countries.some(c => selectedSet.has(c.code));
+            }
+        }
+        if (k === currentLoadoutRegionZoneFilter) {
+            btn.className = 'sx-btn-flat sx-btn-flat-primary py-1 px-2 text-[10px]';
+        } else if (hasActiveInZone) {
+            btn.className = 'sx-btn-flat py-1 px-2 text-[10px] border-[#00A8FF] text-[#00A8FF]';
+        } else {
+            btn.className = 'sx-btn-flat py-1 px-2 text-[10px]';
+        }
+    });
+}
+
+let _isApplyingLoadoutProfile = false;
+let _isSceneryMutationInProgress = false;
+
+function previewLoadoutProfileOnMap(profileId) {
+    const targetId = profileId || 'ALL';
+    const keepSet = getUnifiedBaseLoadoutIcaosSet(targetId);
+    const keepArr = Array.from(keepSet);
+    const customAirports = getAllCustomThirdPartyAirports();
+    const parkedCount = Math.max(0, customAirports.length - keepSet.size);
+
+    if (Array.isArray(allAirportsData)) {
+        for (let i = 0; i < allAirportsData.length; i++) {
+            const ap = allAirportsData[i];
+            if (!ap) continue;
+            if (getAirportInstalledAddonCategory(ap) !== 'Default') {
+                const shouldDisable = (targetId === 'ALL') ? false : !keepSet.has(String(ap.icao || '').toUpperCase());
+                ap.is_disabled = shouldDisable;
+                if (Array.isArray(ap.all_sources)) {
+                    for (let j = 0; j < ap.all_sources.length; j++) {
+                        const src = ap.all_sources[j];
+                        if (src && !src.is_fix_patch && !(src.is_default || src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')))) {
+                            src.is_disabled = shouldDisable;
+                        }
+                    }
+                }
+                delete ap._cachedActiveSrc;
+                delete ap._cachedPricingType;
+                delete ap._cachedCategory;
+                delete ap._cachedLabelTier;
+            }
+        }
+    }
+
+    if (targetId === 'ALL') {
+        currentFlightMode = { active: false, icaos: [], _icaoSet: new Set() };
+    } else {
+        currentFlightMode = {
+            active: true,
+            icaos: keepArr,
+            _icaoSet: keepSet,
+            profile: 'LOADOUT',
+            base_loadout_id: targetId,
+            disabled_count: parkedCount
+        };
+    }
+
+    if (airportMarkerCache) airportMarkerCache.clear();
+    if (customDivIconCache) customDivIconCache.clear();
+    if (markerClusterGroup) markerClusterGroup.clearLayers();
+    if (window.globeEngine) window.globeEngine._cachedWorldClusterKey = '';
+
+    if (typeof updateStats === 'function' && Array.isArray(allAirportsData)) {
+        updateStats(allAirportsData);
+    }
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+}
+
+function activateLoadoutProfileInBuilder(profileId) {
+    if (!profileId) return;
+    pendingActiveLoadoutId = profileId;
+    selectedBaseLoadoutId = profileId;
+    if (!currentEditingLoadout || currentEditingLoadout.id !== profileId) {
+        selectLoadoutForEdit(profileId);
+    } else {
+        renderLoadoutProfilesListUI();
+    }
+    previewLoadoutProfileOnMap(profileId);
+    syncUnifiedBaseLoadoutSummaryUI();
+    updateOptimizerSavings();
+}
+
+function selectLoadoutForEdit(profileId, unlockForEdit = false) {
+    if (currentEditingLoadout && currentEditingLoadout.id === profileId && isLoadoutProfileEditUnlocked && !unlockForEdit) {
+        // Keep current unlocked editing session and Pin Mode active if user clicks the already-selected card background
+        return;
+    }
+    setLoadoutPinAirportsMode(false);
+    clearLoadoutPinnedMarkersOnMap();
+    const editableProfiles = savedLoadoutProfiles.filter(p => p.id !== 'NONE_ROUTE_ONLY');
+    const found = editableProfiles.find(p => p.id === profileId) || editableProfiles[0];
+    currentEditingLoadout = JSON.parse(JSON.stringify(found));
+    if (Array.isArray(currentEditingLoadout.prefixes)) {
+        currentEditingLoadout.prefixes = currentEditingLoadout.prefixes.map(normalizeLoadoutPrefixCode).filter(Boolean);
+    } else {
+        currentEditingLoadout.prefixes = [];
+    }
+    if (!Array.isArray(currentEditingLoadout.categories) || currentEditingLoadout.categories.length === 0) {
+        currentEditingLoadout.categories = ['Payware', 'Freeware', 'Asobo'];
+    }
+    const isEditable = Boolean(currentEditingLoadout.id !== 'ALL' && !currentEditingLoadout.is_builtin);
+    isLoadoutProfileEditUnlocked = Boolean(unlockForEdit && isEditable);
+    autoSelectRegionZoneTabForProfile(currentEditingLoadout);
+    populateLoadoutEditorFields();
+    renderLoadoutProfilesListUI();
+}
+
+function unlockLoadoutProfileForEdit(profileId) {
+    if (!profileId || profileId === 'ALL' || profileId === 'NONE_ROUTE_ONLY') return;
+    if (currentEditingLoadout && currentEditingLoadout.id === profileId) {
+        isLoadoutProfileEditUnlocked = !isLoadoutProfileEditUnlocked;
+        if (!isLoadoutProfileEditUnlocked) {
+            setLoadoutPinAirportsMode(false);
+            clearLoadoutPinnedMarkersOnMap();
+        }
+        populateLoadoutEditorFields();
+        renderLoadoutProfilesListUI();
+    } else {
+        selectLoadoutForEdit(profileId, true);
+    }
+    if (isLoadoutProfileEditUnlocked && currentEditingLoadout) {
+        // Unlocking a profile for editing automatically activates Pin Mode:
+        // restores all world airports as grey stars + colored ICAO tags and replants existing SVG pins
+        setLoadoutPinAirportsMode(true);
+    }
+    if (typeof showToast === 'function') {
+        if (isLoadoutProfileEditUnlocked && currentEditingLoadout) {
+            showToast(`EDIT MODE UNLOCKED: ${currentEditingLoadout.name}`, 'info');
+        } else if (currentEditingLoadout) {
+            showToast(`PROFILE LOCKED: ${currentEditingLoadout.name}`, 'info');
+        }
+    }
+}
+
+function createNewLoadoutDraft() {
+    setLoadoutPinAirportsMode(false);
+    clearLoadoutPinnedMarkersOnMap();
+    const newId = 'LOADOUT_' + Date.now();
+    const newDraft = {
+        id: newId,
+        name: 'NEW CUSTOM LOADOUT',
+        is_builtin: false,
+        categories: ['Payware', 'Freeware', 'Asobo'],
+        prefixes: [],
+        manual_icaos: [],
+        keep_libraries: true
+    };
+    savedLoadoutProfiles.push(newDraft);
+    currentEditingLoadout = JSON.parse(JSON.stringify(newDraft));
+    isLoadoutProfileEditUnlocked = true;
+    currentLoadoutRegionZoneFilter = 'ALL';
+    populateLoadoutEditorFields();
+    renderLoadoutProfilesListUI();
+    setLoadoutPinAirportsMode(true);
+    const nameInput = document.getElementById('loadout-edit-name');
+    if (nameInput) {
+        nameInput.focus();
+        nameInput.select();
+    }
+}
+
+function populateLoadoutEditorFields() {
+    if (!currentEditingLoadout) return;
+    const canEdit = isCurrentLoadoutEditableAndUnlocked();
+
+    const nameEl = document.getElementById('loadout-edit-name');
+    const manualEl = document.getElementById('loadout-edit-manual-icaos');
+    const saveProfBtn = document.getElementById('loadout-btn-save-profile');
+    const clearRegBtn = document.getElementById('loadout-btn-clear-regions');
+
+    if (nameEl) {
+        nameEl.value = currentEditingLoadout.name || '';
+        nameEl.disabled = !canEdit;
+    }
+    if (manualEl) {
+        manualEl.value = (currentEditingLoadout.manual_icaos || []).join(', ');
+        manualEl.disabled = !canEdit;
+    }
+    if (saveProfBtn) saveProfBtn.disabled = !canEdit;
+    if (clearRegBtn) clearRegBtn.disabled = !canEdit;
+
+    updateLoadoutPinModeButtonsUI();
+    updateLoadoutCategoryButtonsUI();
+    updateLoadoutZoneTabsUI();
+    renderLoadoutRegionSelectorUI();
+    updateLoadoutImpactPreviewUI();
+}
+
+function setLoadoutRegionZoneFilter(zoneKey) {
+    currentLoadoutRegionZoneFilter = zoneKey || 'ALL';
+    updateLoadoutZoneTabsUI();
+    renderLoadoutRegionSelectorUI();
+}
+
+function toggleLoadoutCountryPrefix(prefixCode) {
+    if (!isCurrentLoadoutEditableAndUnlocked()) {
+        if (currentEditingLoadout && currentEditingLoadout.id !== 'ALL' && typeof showToast === 'function') {
+            showToast('CLICK THE PENCIL ICON ON THIS PROFILE TO UNLOCK EDITING', 'info');
+        }
+        return;
+    }
+    const cleanCode = normalizeLoadoutPrefixCode(prefixCode);
+    if (!cleanCode) return;
+
+    const currentSet = new Set((currentEditingLoadout.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    if (currentSet.has(cleanCode)) {
+        currentSet.delete(cleanCode);
+    } else {
+        currentSet.add(cleanCode);
+    }
+    if (isLoadoutPinMapModeActive) {
+        setLoadoutPinAirportsMode(false);
+    }
+    currentEditingLoadout.prefixes = Array.from(currentSet);
+    updateLoadoutZoneTabsUI();
+    renderLoadoutRegionSelectorUI();
+    updateLoadoutImpactPreviewUI();
+}
+
+function toggleLoadoutEntireZone(zoneKey) {
+    if (!isCurrentLoadoutEditableAndUnlocked()) {
+        if (currentEditingLoadout && currentEditingLoadout.id !== 'ALL' && typeof showToast === 'function') {
+            showToast('CLICK THE PENCIL ICON ON THIS PROFILE TO UNLOCK EDITING', 'info');
+        }
+        return;
+    }
+    const groups = getLoadoutFilterRegionGroups();
+    const group = groups.find(g => g.zoneKey === zoneKey);
+    if (!group) return;
+
+    const currentSet = new Set((currentEditingLoadout.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    const zoneCodes = group.countries.map(c => c.code);
+    const allSelected = zoneCodes.length > 0 && zoneCodes.every(code => currentSet.has(code));
+
+    if (allSelected) {
+        zoneCodes.forEach(code => currentSet.delete(code));
+    } else {
+        zoneCodes.forEach(code => currentSet.add(code));
+    }
+    if (isLoadoutPinMapModeActive) {
+        setLoadoutPinAirportsMode(false);
+    }
+    currentEditingLoadout.prefixes = Array.from(currentSet);
+    updateLoadoutZoneTabsUI();
+    renderLoadoutRegionSelectorUI();
+    updateLoadoutImpactPreviewUI();
+}
+
+function renderLoadoutRegionSelectorUI() {
+    const container = document.getElementById('loadout-region-zones-container');
+    if (!container || !currentEditingLoadout) return;
+
+    const isBuiltinAll = Boolean(currentEditingLoadout.is_builtin || currentEditingLoadout.id === 'ALL');
+    const canEdit = isCurrentLoadoutEditableAndUnlocked();
+    const selectedSet = new Set((currentEditingLoadout.prefixes || []).map(normalizeLoadoutPrefixCode).filter(Boolean));
+    const allGroups = getLoadoutFilterRegionGroups();
+
+    const groupsToShow = currentLoadoutRegionZoneFilter === 'ALL'
+        ? allGroups
+        : allGroups.filter(g => g.zoneKey === currentLoadoutRegionZoneFilter);
+
+    container.innerHTML = groupsToShow.map(group => {
+        const zoneCodes = group.countries.map(c => c.code);
+        const selInZone = isBuiltinAll ? zoneCodes.length : zoneCodes.filter(c => selectedSet.has(c)).length;
+        const allInZone = selInZone === zoneCodes.length && zoneCodes.length > 0;
+        const toggleLabel = isBuiltinAll ? 'ALL ACTIVE' : (allInZone ? 'DESELECT REGION' : 'SELECT ALL IN REGION');
+        const toggleBtnClass = allInZone
+            ? 'sx-btn-flat sx-status-ok py-0.5 px-2 text-[9px]'
+            : 'sx-btn-flat py-0.5 px-2 text-[9px]';
+
+        const countriesHtml = group.countries.map(country => {
+            const isSel = isBuiltinAll ? true : selectedSet.has(country.code);
+            const stateTag = isSel ? '[ON]' : '[OFF]';
+            const disabledAttr = !canEdit ? 'disabled' : '';
+            return `
+                <button type="button"
+                        ${disabledAttr}
+                        title="${escapeHtml(country.label)}"
+                        onclick="toggleLoadoutCountryPrefix('${escapeHtml(country.code)}')"
+                        class="sx-region-country-item ${isSel ? 'is-selected' : ''} w-full text-left">
+                    <span class="truncate pr-1">${escapeHtml(country.label)}</span>
+                    <span class="shrink-0 font-bold">${stateTag}</span>
+                </button>
+            `;
+        }).join('');
+
+        return `
+            <div class="sx-region-zone-group">
+                <div class="sx-region-zone-header">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">${escapeHtml(group.zoneTitle)}</span>
+                        <span class="text-[10px] font-mono text-[#00A8FF]">(${selInZone}/${zoneCodes.length})</span>
+                    </div>
+                    <button type="button"
+                            ${!canEdit ? 'disabled' : ''}
+                            onclick="toggleLoadoutEntireZone('${escapeHtml(group.zoneKey)}')"
+                            class="${toggleBtnClass}">
+                        ${toggleLabel}
+                    </button>
+                </div>
+                <div class="p-2 grid grid-cols-3 gap-1.5 bg-[#0E121A]">
+                    ${countriesHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateLoadoutCategoryButtonsUI() {
+    if (!currentEditingLoadout) return;
+    const canEdit = isCurrentLoadoutEditableAndUnlocked();
+    const cats = new Set((currentEditingLoadout.categories || []).map(c => String(c).toLowerCase()));
+
+    const payBtn = document.getElementById('loadout-rule-cat-payware');
+    const freeBtn = document.getElementById('loadout-rule-cat-freeware');
+    const asoBtn = document.getElementById('loadout-rule-cat-asobo');
+
+    const cursorClass = canEdit ? 'cursor-pointer' : 'opacity-80 cursor-not-allowed';
+
+    if (payBtn) {
+        const on = cats.has('payware');
+        payBtn.className = `py-2 px-2.5 text-xs font-mono font-bold uppercase ${on ? 'sx-cat-payware' : 'sx-cat-default'} ${cursorClass} text-center`;
+        payBtn.textContent = `PAYWARE: ${on ? 'ON' : 'OFF'}`;
+    }
+    if (freeBtn) {
+        const on = cats.has('freeware');
+        freeBtn.className = `py-2 px-2.5 text-xs font-mono font-bold uppercase ${on ? 'sx-cat-freeware' : 'sx-cat-default'} ${cursorClass} text-center`;
+        freeBtn.textContent = `FREEWARE: ${on ? 'ON' : 'OFF'}`;
+    }
+    if (asoBtn) {
+        const on = cats.has('asobo');
+        asoBtn.className = `py-2 px-2.5 text-xs font-mono font-bold uppercase ${on ? 'sx-cat-asobo' : 'sx-cat-default'} ${cursorClass} text-center`;
+        asoBtn.textContent = `ASOBO: ${on ? 'ON' : 'OFF'}`;
+    }
+}
+
+function toggleLoadoutCategoryRule(catName) {
+    if (!isCurrentLoadoutEditableAndUnlocked()) {
+        if (currentEditingLoadout && currentEditingLoadout.id !== 'ALL' && typeof showToast === 'function') {
+            showToast('CLICK THE PENCIL ICON ON THIS PROFILE TO UNLOCK EDITING', 'info');
+        }
+        return;
+    }
+    const current = Array.isArray(currentEditingLoadout.categories) ? [...currentEditingLoadout.categories] : [];
+    const idx = current.findIndex(c => String(c).toLowerCase() === String(catName).toLowerCase());
+    if (idx >= 0) {
+        if (current.length > 1) {
+            current.splice(idx, 1);
+        } else {
+            showLoadoutCategoriesInfoModal();
+            return;
+        }
+    } else {
+        current.push(catName);
+    }
+    currentEditingLoadout.categories = current;
+    updateLoadoutCategoryButtonsUI();
+    updateLoadoutImpactPreviewUI();
+}
+
+function clearLoadoutRegionPrefixes() {
+    if (!isCurrentLoadoutEditableAndUnlocked()) return;
+    currentEditingLoadout.prefixes = [];
+    currentLoadoutRegionZoneFilter = 'ALL';
+    updateLoadoutZoneTabsUI();
+    renderLoadoutRegionSelectorUI();
+    updateLoadoutImpactPreviewUI();
+    if (!isLoadoutPinMapModeActive) {
+        setLoadoutPinAirportsMode(true);
+    }
+}
+
+function addSelectedMapAirportToLoadout() {
+    toggleLoadoutPinAirportsMode();
+}
+
+function onLoadoutDraftRuleChange() {
+    if (!isCurrentLoadoutEditableAndUnlocked()) return;
+    const nameEl = document.getElementById('loadout-edit-name');
+    const manualEl = document.getElementById('loadout-edit-manual-icaos');
+
+    if (nameEl) currentEditingLoadout.name = nameEl.value.trim().toUpperCase() || 'CUSTOM LOADOUT';
+    if (manualEl) {
+        currentEditingLoadout.manual_icaos = manualEl.value
+            .split(/[\s,;]+/)
+            .map(s => s.trim().toUpperCase())
+            .filter(Boolean);
+    }
+    if (isLoadoutPinMapModeActive) {
+        renderLoadoutPinnedMarkersOnMap();
+        if (typeof filterAirports === 'function') filterAirports();
+        if (window.globeEngine) {
+            window.globeEngine._cachedWorldClusterKey = '';
+            if (typeof window.globeEngine.requestRender === 'function') window.globeEngine.requestRender();
+        }
+    }
+    updateLoadoutImpactPreviewUI();
+}
+
+function updateLoadoutImpactPreviewUI() {
+    const stats = computeLoadoutRulesetCounts(currentEditingLoadout);
+    const actEl = document.getElementById('loadout-preview-active');
+    const prkEl = document.getElementById('loadout-preview-parked');
+    const ramEl = document.getElementById('loadout-preview-ram');
+
+    if (actEl) actEl.textContent = String(stats.activeCount);
+    if (prkEl) prkEl.textContent = String(stats.parkedCount);
+    if (ramEl) ramEl.textContent = `EST. RAM SAVED: ${stats.ramSavedGb} GB`;
+
+    if (currentEditingLoadout && isLoadoutProfileEditUnlocked) {
+        const idx = savedLoadoutProfiles.findIndex(p => p.id === currentEditingLoadout.id);
+        if (idx >= 0) {
+            savedLoadoutProfiles[idx] = JSON.parse(JSON.stringify(currentEditingLoadout));
+        }
+        const isTypingName = Boolean(document.activeElement && document.activeElement.id === 'loadout-edit-name');
+        const statsNode = document.querySelector(`[data-loadout-stats-id="${currentEditingLoadout.id}"]`);
+        if (isTypingName && statsNode) {
+            statsNode.textContent = `${stats.activeCount} ACTIVE / ${stats.parkedCount} PARKED`;
+        } else {
+            renderLoadoutProfilesListUI();
+        }
+    }
+
+    if (!isLoadoutPinMapModeActive && currentEditingLoadout && (isLoadoutProfileEditUnlocked || currentEditingLoadout.id === pendingActiveLoadoutId) && typeof isLoadoutBuilderModeActive === 'function' && isLoadoutBuilderModeActive()) {
+        previewLoadoutProfileOnMap(currentEditingLoadout.id);
+    }
+}
+
+async function saveCurrentLoadoutRuleset(silent = false) {
+    if (!currentEditingLoadout || currentEditingLoadout.id === 'ALL' || currentEditingLoadout.is_builtin) return;
+    if (isLoadoutProfileEditUnlocked) {
+        onLoadoutDraftRuleChange();
+    }
+    // Exit Pin Mode and remove all planted SVG pins from the map so only the base airport stars remain
+    setLoadoutPinAirportsMode(false);
+    clearLoadoutPinnedMarkersOnMap();
+    isLoadoutProfileEditUnlocked = false;
+
+    const idx = savedLoadoutProfiles.findIndex(p => p.id === currentEditingLoadout.id);
+    if (idx >= 0) {
+        savedLoadoutProfiles[idx] = JSON.parse(JSON.stringify(currentEditingLoadout));
+    }
+    pendingActiveLoadoutId = currentEditingLoadout.id;
+    selectedBaseLoadoutId = currentEditingLoadout.id;
+    previewLoadoutProfileOnMap(currentEditingLoadout.id);
+    populateLoadoutEditorFields();
+    renderLoadoutProfilesListUI();
+
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_loadout_profile) return;
+    try {
+        const raw = await window.pywebview.api.save_loadout_profile(JSON.stringify(currentEditingLoadout));
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.status === 'ok') {
+            savedLoadoutProfiles = res.profiles || savedLoadoutProfiles;
+            currentEditingLoadout = res.profile || currentEditingLoadout;
+            syncHeaderAndClassicLoadoutUI();
+            syncUnifiedBaseLoadoutSummaryUI();
+            populateLoadoutEditorFields();
+            renderLoadoutProfilesListUI();
+            if (!silent && typeof showToast === 'function') {
+                showToast(`PROFILE SAVED: ${currentEditingLoadout.name}`, 'success');
+            }
+        }
+    } catch (e) {
+        console.error('[Loadout Profiles] Error saving ruleset:', e);
+    }
+}
+
+// APPLY PROFILE button: instantly updates map & closes window, while committing ruleset & NTFS state in background
+async function saveAndApplyActivatedLoadout() {
+    if (_isSceneryMutationInProgress) return;
+    _isApplyingLoadoutProfile = true;
+    try {
+        const targetId = pendingActiveLoadoutId || (currentEditingLoadout ? currentEditingLoadout.id : 'ALL');
+        currentActiveLoadoutId = targetId;
+        selectedBaseLoadoutId = targetId;
+        pendingActiveLoadoutId = targetId;
+
+        if (currentEditingLoadout && currentEditingLoadout.id !== 'ALL' && !currentEditingLoadout.is_builtin) {
+            onLoadoutDraftRuleChange();
+            const idx = savedLoadoutProfiles.findIndex(p => p.id === currentEditingLoadout.id);
+            if (idx >= 0) {
+                savedLoadoutProfiles[idx] = JSON.parse(JSON.stringify(currentEditingLoadout));
+            }
+        }
+
+        previewLoadoutProfileOnMap(targetId);
+        renderLoadoutProfilesListUI();
+        switchUnifiedOptimizerView('MAIN');
+        if (typeof closeFloatingWindow === 'function') {
+            closeFloatingWindow('route');
+        }
+
+        if (currentEditingLoadout && currentEditingLoadout.id !== 'ALL' && !currentEditingLoadout.is_builtin) {
+            await saveCurrentLoadoutRuleset(true);
+        }
+        await executeApplyLoadoutProfile(targetId);
+    } finally {
+        _isApplyingLoadoutProfile = false;
+    }
+}
+
+async function saveAndSelectLoadoutInOptimizer() {
+    await saveAndApplyActivatedLoadout();
+}
+
+async function deleteLoadoutProfileById(profileId) {
+    if (!profileId || profileId === 'ALL' || profileId === 'NONE_ROUTE_ONLY') return;
+    const targetProf = savedLoadoutProfiles.find(p => p.id === profileId);
+    const deletedName = targetProf ? targetProf.name : profileId;
+
+    // If it was an unsaved local draft, remove it directly
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_loadout_profile) {
+        savedLoadoutProfiles = savedLoadoutProfiles.filter(p => p.id !== profileId);
+        selectLoadoutForEdit('ALL');
+        return;
+    }
+    try {
+        const raw = await window.pywebview.api.delete_loadout_profile(profileId);
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.status === 'ok') {
+            savedLoadoutProfiles = (res.profiles || savedLoadoutProfiles).filter(p => p.id !== profileId);
+            currentActiveLoadoutId = res.active_loadout_id || 'ALL';
+            if (selectedBaseLoadoutId === profileId) {
+                selectedBaseLoadoutId = currentActiveLoadoutId;
+            }
+            if (pendingActiveLoadoutId === profileId) {
+                pendingActiveLoadoutId = currentActiveLoadoutId;
+            }
+            syncHeaderAndClassicLoadoutUI();
+            syncUnifiedBaseLoadoutSummaryUI();
+            if (currentEditingLoadout && currentEditingLoadout.id === profileId) {
+                selectLoadoutForEdit(pendingActiveLoadoutId || 'ALL');
+            } else {
+                renderLoadoutProfilesListUI();
+            }
+            if (typeof showToast === 'function') {
+                showToast(`LOADOUT DELETED: ${deletedName}`, 'info');
+            }
+        }
+    } catch (e) {
+        console.error('[Loadout Profiles] Error deleting profile:', e);
+    }
+}
+
+async function deleteCurrentLoadoutProfile() {
+    if (!currentEditingLoadout) return;
+    await deleteLoadoutProfileById(currentEditingLoadout.id);
+}
+
+async function onHeaderLoadoutChange(profileId) {
+    selectedBaseLoadoutId = profileId;
+    pendingActiveLoadoutId = profileId;
+    await executeApplyLoadoutProfile(profileId);
+}
+
+window.onBackendLoadoutApplied = function(payload) {
+    try {
+        const res = typeof payload === 'string' ? JSON.parse(payload) : payload;
+        if (!res || res.status !== 'ok') return;
+
+        currentActiveLoadoutId = res.active_loadout_id || 'ALL';
+        selectedBaseLoadoutId = currentActiveLoadoutId;
+        pendingActiveLoadoutId = currentActiveLoadoutId;
+        isFlightCorridorOptimized = (currentActiveLoadoutId !== 'ALL');
+        flightCorridorDisabledCount = res.parked_count || 0;
+
+        const keepIcaos = Array.isArray(res.keep_icaos)
+            ? res.keep_icaos
+            : Array.from(getUnifiedBaseLoadoutIcaosSet(currentActiveLoadoutId));
+
+        if (currentActiveLoadoutId === 'ALL') {
+            currentFlightMode = { active: false, icaos: [] };
+        } else {
+            currentFlightMode = {
+                active: true,
+                icaos: keepIcaos,
+                profile: 'LOADOUT',
+                base_loadout_id: currentActiveLoadoutId,
+                disabled_count: flightCorridorDisabledCount
+            };
+        }
+
+        if (airportMarkerCache) airportMarkerCache.clear();
+        if (customDivIconCache) customDivIconCache.clear();
+        if (markerClusterGroup) markerClusterGroup.clearLayers();
+        if (window.globeEngine) window.globeEngine._cachedWorldClusterKey = '';
+
+        if (typeof filterAirports === 'function') filterAirports();
+        if (map && typeof map.invalidateSize === 'function') map.invalidateSize();
+    } catch (e) {
+        console.warn('[Loadout Profiles] Error in onBackendLoadoutApplied:', e);
+    }
+};
+
+async function executeApplyLoadoutProfile(profileId) {
+    if (_isSceneryMutationInProgress) return;
+    if (window.IS_LITE) {
+        if (typeof showUnlockProModal === 'function') showUnlockProModal();
+        return;
+    }
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_loadout_profile) return;
+
+    _isSceneryMutationInProgress = true;
+    const mainApplyBtn = document.getElementById('opt-btn-apply-sceneries');
+    const mainApplyLbl = document.getElementById('opt-btn-apply-label');
+    const builderSaveBtn = document.getElementById('loadout-btn-apply');
+    const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
+    if (mainApplyBtn) mainApplyBtn.disabled = true;
+    if (mainApplyLbl) mainApplyLbl.textContent = 'APPLYING...';
+    if (restoreBtn) restoreBtn.disabled = true;
+    if (builderSaveBtn) {
+        builderSaveBtn.disabled = true;
+        builderSaveBtn.textContent = 'LOADING...';
+    }
+
+    try {
+        const raw = await window.pywebview.api.apply_loadout_profile(profileId);
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+        if (res && res.status === 'locked_sim_running') {
+            isLoadoutSimRunningLocked = true;
+            syncHeaderAndClassicLoadoutUI();
+            if (typeof showToast === 'function') {
+                showToast(res.message || 'MSFS IS RUNNING - LOADOUT SWITCHING LOCKED', 'error');
+            }
+            return;
+        }
+
+        if (res && res.status === 'ok') {
+            currentActiveLoadoutId = res.active_loadout_id || profileId;
+            selectedBaseLoadoutId = currentActiveLoadoutId;
+            pendingActiveLoadoutId = currentActiveLoadoutId;
+            isFlightCorridorOptimized = (currentActiveLoadoutId !== 'ALL');
+            flightCorridorDisabledCount = res.parked_count || 0;
+
+            if (Array.isArray(res.airports) && res.airports.length > 0) {
+                allAirportsData = res.airports;
+                if (typeof rebuildAirportsByIcaoIndex === 'function') rebuildAirportsByIcaoIndex();
+            }
+            previewLoadoutProfileOnMap(currentActiveLoadoutId);
+            if (typeof updateFlightModeBannerUI === 'function') updateFlightModeBannerUI(currentFlightMode);
+            syncHeaderAndClassicLoadoutUI();
+            syncUnifiedBaseLoadoutSummaryUI();
+            renderLoadoutProfilesListUI();
+            updateOptimizerRouteUI();
+
+            if (typeof refreshSimBriefCrossAudit === 'function') {
+                const sbPanel = document.getElementById('simbrief-cross-audit-panel');
+                if (sbPanel && !sbPanel.classList.contains('hidden')) {
+                    refreshSimBriefCrossAudit(false);
+                }
+            }
+            const profObj = savedLoadoutProfiles.find(p => p.id === currentActiveLoadoutId);
+            const profTitle = profObj ? profObj.name : currentActiveLoadoutId;
+            if (typeof showToast === 'function') {
+                if (currentActiveLoadoutId === 'ALL') {
+                    showToast('LOADOUT APPLIED: ALL SCENERIES ACTIVE', 'success');
+                } else {
+                    showToast(`LOADOUT APPLIED: ${profTitle} (${res.active_count || 0} ACTIVE / ${res.parked_count || 0} PARKED)`, 'success');
+                }
+            }
+        }
+    } catch (e) {
+        console.error('[Loadout Profiles] Error applying profile:', e);
+    } finally {
+        _isSceneryMutationInProgress = false;
+        if (mainApplyBtn) mainApplyBtn.disabled = isLoadoutSimRunningLocked;
+        if (mainApplyLbl) mainApplyLbl.textContent = isLoadoutSimRunningLocked ? 'SIM RUNNING - LOCKED' : 'OPTIMIZE & APPLY';
+        if (restoreBtn) restoreBtn.disabled = isLoadoutSimRunningLocked;
+        if (builderSaveBtn) {
+            builderSaveBtn.disabled = isLoadoutSimRunningLocked;
+            builderSaveBtn.textContent = 'APPLY PROFILE';
+        }
+    }
+}
+
+window.addEventListener('pywebviewready', () => {
+    setTimeout(() => {
+        if (typeof loadLoadoutProfilesState === 'function') {
+            loadLoadoutProfilesState();
+        }
+    }, 600);
 });

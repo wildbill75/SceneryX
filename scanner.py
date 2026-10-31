@@ -5,7 +5,7 @@ import re
 
 # Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
 IS_LITE = False
-APP_VERSION = "LITE_1.1.8" if IS_LITE else "PRO_1.1.8"
+APP_VERSION = "LITE_1.2.0" if IS_LITE else "PRO_1.2.0"
 
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -369,9 +369,9 @@ NON_AIRPORT_KEYWORDS = [
     'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker', 'fenix', 'fnx',
     'pmdg', 'a220', 'a320', 'a319', 'a321', 'a350', 'b737', 'b747', 'b777', 'b787', 'crj', 'blackbox', 'maddog', 'tfdi',
     'fleet', 'fleetpack', 'repaint', 'texturepack', 'soundpack',
-    'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
-    'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx',
-    'landmarks', 'landmark', 'aerial', 'cityscape', 'photogrammetry', 'seasons', 'biomes',
+    'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'navigraph', 'fsltl', 'airrace', 'redbull',
+    'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx', 'sayintentions',
+    'landmarks', 'landmark', 'cityscape', 'photogrammetry', 'seasons', 'biomes',
     'sightseeing', 'citytimes', 'city-times', 'city_times', 'citywow', 'city-wow', 'city_wow',
     'moderncities', 'modern-cities', 'modern_cities', 'citypack', 'city-pack', 'city_pack',
     'cityupdate', 'city-update', 'city_update', 'city-landmarks', 'city_landmarks', 'skyline', 'skylines',
@@ -379,7 +379,7 @@ NON_AIRPORT_KEYWORDS = [
     'asobo-scenery-', 'microsoft-scenery-', 'asobo-mission', 'mission-templates', 'fs-freeflight', 'freeflight',
     'microsoft-pgg', '-pgg-', 'pgg-', 'helipad-worldwide', 'monument-valley',
     '-rbr1', '-rbr2', '-rbr3', '-rbr4', '-rbr5', '-rbr6',
-    'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport', 'vessels', 'vessel', 'ferries', 'ferry', 'boats', 'gaist', 'seafront',
+    'vessels', 'vessel', 'ferries', 'ferry', 'boats', 'gaist', 'seafront',
     'obstacles', 'obstacle', 'powerlines', 'powerline', 'windfarms', 'windfarm', 'windturbines', 'solarfarms',
     'cooling-towers', 'coolingtowers', 'we-love-vfr', 'welovevfr', 'mamudesign', 'puffinflight',
     'nightlighting', 'night-lighting', 'night_lighting', 'night-enhanced', 'nightenhanced', '3d-night',
@@ -394,7 +394,7 @@ NON_AIRPORT_KEYWORDS = [
 ]
 
 ADDON_LIBRARY_KEYWORDS = [
-    'models', 'model', 'library', 'libraries', 'interior', 'extension', 'mesh', 'aerial',
+    'interior', 'extension', 'mesh', 'aerial',
     'ortho', 'vdgs', 'lights', 'trees', 'vegetation', 'gsx', 'enhancement', 'optional'
 ]
 
@@ -2323,6 +2323,8 @@ def get_settings():
         save_settings(settings)
         return settings
 
+load_settings = get_settings
+
 def save_settings(settings_data):
     global _LAST_VALID_SETTINGS
     with _SETTINGS_LOCK:
@@ -2406,6 +2408,40 @@ def load_airport_database():
             'type': 'large_airport',
             'iata': 'TXL'
         }
+
+    msfs_bespoke_airports = {
+        'VHHX': ('Kai Tak International Airport', 'Hong Kong', 'HK', 22.3169, 114.2026, 28, 'large_airport', 'HKG'),
+        'KCGX': ('Merrill C. Meigs Field', 'Chicago', 'US', 41.8588, -87.6079, 593, 'medium_airport', 'CGX'),
+        'EGZM': ('Aboyne Airfield', 'Aboyne', 'GB', 57.0764, -2.8414, 460, 'small_airport', ''),
+        'LJZA': ('Zagorje ob Savi Airfield', 'Zagorje ob Savi', 'SI', 46.1286, 14.9781, 820, 'small_airport', ''),
+        'C53': ('Lower Loon Creek Airport', 'Challis', 'US', 44.8085, -114.8083, 4120, 'small_airport', ''),
+        'EG78': ('Out Skerries Airfield', 'Out Skerries', 'GB', 60.4256, -0.7478, 70, 'small_airport', ''),
+        'FXME': ('Matekane Air Strip', 'Matekane', 'LS', -29.6992, 28.1494, 7545, 'small_airport', ''),
+        'RJX7': ('Satsuma Iojima Airport', 'Mishima', 'JP', 30.7844, 130.2708, 495, 'small_airport', ''),
+        'RJX8': ('Suwanosejima Airport', 'Toshima', 'JP', 29.6072, 129.7011, 219, 'small_airport', ''),
+        'WX53': ('Bugalaga Airstrip', 'Bugalaga', 'ID', -3.6281, 136.8553, 5600, 'small_airport', ''),
+        'AT07': ('Davis Plateau Skiway', 'Davis Plateau', 'AQ', -68.5760, 77.9690, 200, 'small_airport', ''),
+        'AYLK': ('Kokoda Airfield', 'Kokoda', 'PG', -8.8878, 147.7311, 1260, 'small_airport', ''),
+        'JP0052': ('Hokkaido Spaceport / Taiki Airfield', 'Taiki', 'JP', 42.5019, 143.4569, 98, 'small_airport', ''),
+        'NZQE': ('Gorge River Airstrip', 'Haast', 'NZ', -44.1983, 168.1969, 15, 'small_airport', ''),
+        'PTMO': ('Mokil Airfield', 'Mokil', 'FM', 6.6817, 159.7600, 5, 'small_airport', ''),
+        'PTNG': ('Sapwuahfik Airfield', 'Sapwuahfik', 'FM', 5.7878, 157.1681, 5, 'small_airport', ''),
+        'PTPI': ('Pingelap Airfield', 'Pingelap', 'FM', 6.2089, 160.7031, 5, 'small_airport', ''),
+        'T004': ('Quintin Lodge Airstrip', 'Milford Track', 'NZ', -44.8014, 167.7758, 1200, 'small_airport', ''),
+    }
+    for b_code, (b_name, b_city, b_ctry, b_lat, b_lon, b_elev, b_type, b_iata) in msfs_bespoke_airports.items():
+        if b_code not in airports:
+            airports[b_code] = {
+                'ident': b_code,
+                'name': b_name,
+                'city': b_city,
+                'country': b_ctry,
+                'lat': b_lat,
+                'lon': b_lon,
+                'elevation': b_elev,
+                'type': b_type,
+                'iata': b_iata
+            }
 
     for icao, ap in airports.items():
         city = ap.get('city')
@@ -2689,6 +2725,8 @@ def run_scan():
                     if folder_norm not in disabled_in_xml:
                         content_xml_status[folder_norm] = True
 
+                if act == 'SystemDisabled':
+                    continue
                 seen_xml_pkg_entries[clean_lower] = (pkg_name, clean_folder, clean_lower in disabled_in_xml or folder_norm in disabled_in_xml)
         except Exception:
             pass
@@ -2715,11 +2753,6 @@ def run_scan():
                     if item == 'OneStore' or 'projectairports' in item.lower():
                         continue
                     is_valid_pkg_dir = os.path.isdir(ipath)
-                    if not is_valid_pkg_dir and ((hasattr(os.path, 'isjunction') and os.path.isjunction(ipath)) or os.path.islink(ipath)):
-                        clean_no_dis = ipath[:-9] if ipath.lower().endswith('.disabled') else ipath
-                        base_cand = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)$', '', clean_no_dis, flags=re.IGNORECASE)
-                        if base_cand != clean_no_dis and (os.path.isdir(base_cand) or os.path.isdir(base_cand + '.disabled')):
-                            is_valid_pkg_dir = True
                     if is_valid_pkg_dir:
                         clean_folder = item[:-9] if item.lower().endswith('.disabled') else item
                         clean_f_low = clean_folder.lower()
@@ -2744,7 +2777,7 @@ def run_scan():
         # Ignore uninstalled 3rd-party community packages and user backup copies left over in Content.xml
         if 'community' in p_lower or re.search(r'[-_\s](copy|copie|backup)(\b|\d*)', p_lower):
             continue
-        # In MSFS 2024, only genuine official streamed packages (fs20-, fs24-, asobo-, microsoft-) can exist without a physical folder on disk
+        # In MSFS 2024, genuine StreamedPackages (both Official Asobo/MS and Marketplace 3rd-party sceneries) are prefixed with fs20-/fs24-/asobo-/microsoft- in Content.xml
         if not p_lower.startswith(('fs20-', 'fs24-', 'asobo-', 'microsoft-')):
             continue
         fn_norm = _normalize_streamed_pkg(clean_f)
@@ -2771,9 +2804,15 @@ def run_scan():
 
         is_disabled = is_disabled_pkg
         
-        if (
+        is_explicit_airport_folder = (
+            any(w in fn_lower for w in ['-airport-', '_airport_', 'airport-', '-airfield-', '-aerodrome-', '-heliport-'])
+            and not any(lib_w in fn_lower for lib_w in ['modellib', 'model-lib', 'model_lib', 'commonlibrary', 'genericairports', 'generic-airports', 'projectairports', 'travelbook', 'landingchallenge', 'landing-challenge'])
+            and not fn_lower.endswith(('-models', '_models', '-library', '_library'))
+        )
+        if not is_explicit_airport_folder and (
             any(k in fn_lower for k in NON_AIRPORT_KEYWORDS)
-            or fn_lower.endswith(('-library', '_library', '-assetpack', '_assetpack', '-asset-pack', '-models'))
+            or fn_lower.endswith(('-library', '_library', '-assetpack', '_assetpack', '-asset-pack', '-models', '_models'))
+            or bool(re.search(r'(?:^|[-_\d])(models|modellib|model-lib|model_lib|library|libraries|assetpack|asset-pack|assets|objectlib|objects-lib)(?:$|[-_\d])', fn_lower))
             or '-livery-' in fn_lower
             or '-aircraft-' in fn_lower
         ):
@@ -2786,13 +2825,7 @@ def run_scan():
         
         inspect_path = full_path
         if full_path and not os.path.isdir(full_path):
-            clean_no_dis = full_path[:-9] if full_path.lower().endswith('.disabled') else full_path
-            base_cand = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)$', '', clean_no_dis, flags=re.IGNORECASE)
-            if base_cand != clean_no_dis:
-                if os.path.isdir(base_cand):
-                    inspect_path = base_cand
-                elif os.path.isdir(base_cand + '.disabled'):
-                    inspect_path = base_cand + '.disabled'
+            continue
 
         mpath = os.path.join(inspect_path, 'manifest.json')
         if not os.path.exists(mpath):
@@ -2818,7 +2851,7 @@ def run_scan():
 
         # ABSOLUTE IMMUNITY: Non-scenery packages (Aircraft, Liveries, Tools, Avionics, Core)
         # must NEVER be registered or treated as airports, regardless of folder name or title tokens.
-        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY', 'AVIONICS', 'MODEL', 'TEXTURE', 'UI']:
+        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'INSTRUMENT', 'CORE', 'LIBRARY', 'AVIONICS', 'MODEL', 'TEXTURE', 'UI'] or (manifest_ctype == 'MISC' and not has_scenery_dir):
             continue
 
         # Structural check: Any package containing aircraft, rotorcraft or boat SimObjects is strictly immune
@@ -2830,7 +2863,11 @@ def run_scan():
             or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Boats'))
             or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Boats.disabled'))
         )
-        if has_simobjects_aircraft:
+        if has_simobjects_aircraft and not (
+            manifest_ctype == 'SCENERY'
+            and has_scenery_dir
+            and not any(k in fn_lower for k in ['-aircraft-', '-livery-', 'fsltl', 'aig-', 'justflight-traffic', 'gaist', 'seafront'])
+        ):
             continue
 
         # Check if package is streamed, dynamically discovered from Content.xml, or packaged in .fsarchive containers
@@ -2865,6 +2902,32 @@ def run_scan():
                             break
                 if not has_bgl:
                     continue
+
+        # Structural check on layout.json: pure 3D model / asset library packages (containing only modellib/objectlib BGLs and no airport/scene BGLs) must be excluded
+        if inspect_path and not is_streamed and not has_fsarchive:
+            lpath_model_check = os.path.join(inspect_path, 'layout.json')
+            if not os.path.exists(lpath_model_check):
+                lpath_model_check = os.path.join(inspect_path, 'layout.json.disabled')
+            if os.path.exists(lpath_model_check):
+                try:
+                    with open(lpath_model_check, 'r', encoding='utf-8', errors='ignore') as f:
+                        ld_m = json.load(f)
+                    bgl_entries = [
+                        c.get('path', '').lower().replace('\\', '/')
+                        for c in ld_m.get('content', [])
+                        if c.get('path', '').lower().endswith(('.bgl', '.bgl.disabled'))
+                    ]
+                    if bgl_entries:
+                        def _is_pure_modellib_bgl(p):
+                            bname = p.rsplit('/', 1)[-1]
+                            return (
+                                any(tag in bname for tag in ('modellib', 'model_lib', 'model-lib', 'objectlib', 'object_lib', 'object-lib', 'assetlib', 'asset_lib', 'asset-lib', 'assetpack'))
+                                or bool(re.search(r'(?:^|/)models[a-z0-9_-]*/', p))
+                            )
+                        if all(_is_pure_modellib_bgl(p) for p in bgl_entries):
+                            continue
+                except Exception:
+                    pass
 
         tokens = re.split(r'[-_ ]+', fn_lower)
         # Never match ICAO on tokens that indicate aircraft models or liveries (e.g. fnxa320 -> FNXA)
@@ -2909,7 +2972,7 @@ def run_scan():
                     'sightseeing', 'city times', 'city wow', 'modern cities', 'city pack', 'city update',
                     'city landmarks', 'landmarks', 'landmark', 'point of interest', 'points of interest',
                     'photogrammetry', 'night lighting', 'night enhanced', 'night3d', 'terrain mesh', 'dem mesh',
-                    'elevation mesh', 'vessels', 'powerlines', 'obstacles', 'bridges', 'we love vfr'
+                    'elevation mesh', 'vessels', 'powerlines', 'obstacles', 'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport', 'we love vfr'
                 ]
             ):
                 continue
@@ -2944,22 +3007,45 @@ def run_scan():
                 if icao in airports:
                     found_ap_list.append((airports[icao], f"Special Bundle Map ({icao})"))
 
-        # Explicit "-airport-<code>" pattern matching (supports 3 or 4 char alphanumeric airport codes like N15, KEB, WX53)
+        def _resolve_ap_entry(code_u):
+            ap_obj = airports[code_u]
+            if len(code_u) == 4 and code_u.isalpha() and ap_obj.get('ident') != code_u:
+                return {**ap_obj, 'ident': code_u}
+            return ap_obj
+
+        # Explicit "-airport-<code>" pattern matching (supports 3 to 6 char alphanumeric airport codes like N15, KEB, WX53, JP0052)
         explicit_airport_code_token = None
-        m_ap_code = re.search(r'(?:^|[-_])airport[-_]([a-z0-9]{3,4})(?:[-_]|$)', fn_lower)
+        m_ap_code = re.search(r'(?:^|[-_])airport[-_]([a-z0-9]{3,6})(?:[-_](.+))?$', fn_lower)
         if m_ap_code:
             cand_ap_code = m_ap_code.group(1).upper()
-            if cand_ap_code.lower() not in EXCLUDE_WORDS and cand_ap_code.lower() not in VENDOR_MAP:
+            cand_tail = (m_ap_code.group(2) or '').replace('-', ' ').replace('_', ' ').strip().title()
+            if cand_ap_code.lower() not in EXCLUDE_WORDS and cand_ap_code.lower() not in VENDOR_MAP and cand_ap_code.lower() not in ('generic', 'glider', 'common', 'base', 'services'):
                 explicit_airport_code_token = cand_ap_code
-                if not found_ap_list and cand_ap_code in airports:
-                    found_ap_list.append((airports[cand_ap_code], f"Folder ICAO ({cand_ap_code})"))
+                if not found_ap_list:
+                    if cand_ap_code in airports:
+                        found_ap_list.append((_resolve_ap_entry(cand_ap_code), f"Folder ICAO ({cand_ap_code})"))
+                    elif any(ch.isdigit() for ch in cand_ap_code) or len(cand_ap_code) == 4:
+                        synth_name = manifest_title or (f"{cand_tail} Airport" if cand_tail else f"{cand_ap_code} Airport")
+                        synth_ap = {
+                            'ident': cand_ap_code,
+                            'name': synth_name,
+                            'city': cand_tail or cand_ap_code,
+                            'country': '',
+                            'lat': 0.0,
+                            'lon': 0.0,
+                            'elevation': 0,
+                            'type': 'small_airport',
+                            'iata': ''
+                        }
+                        airports[cand_ap_code] = synth_ap
+                        found_ap_list.append((synth_ap, f"Folder ICAO ({cand_ap_code})"))
 
         # Primary token matching on folder name
         if not found_ap_list:
             for t in safe_tokens:
                 t_upper = t.upper()
                 if len(t_upper) == 4 and t_upper in airports and t.lower() not in EXCLUDE_WORDS:
-                    found_ap_list.append((airports[t_upper], f"Folder ICAO ({t_upper})"))
+                    found_ap_list.append((_resolve_ap_entry(t_upper), f"Folder ICAO ({t_upper})"))
                     break
 
         # Folder prefix matching (e.g. lirflightfix20 -> LIRF)
@@ -2974,7 +3060,7 @@ def run_scan():
                         and not any(k in t.lower() for k in ['fnx', 'fenix', 'a320', 'a319', 'a321', 'a350', 'a220', 'b737', 'b738', 'fleet', 'livery'])
                         and not any(k in cand.lower() for k in ['fnx', 'fen'])
                     ):
-                        found_ap_list.append((airports[cand], f"Folder Prefix ICAO ({cand})"))
+                        found_ap_list.append((_resolve_ap_entry(cand), f"Folder Prefix ICAO ({cand})"))
                         break
 
         # Manifest Title explicit ICAO matching
@@ -2983,7 +3069,7 @@ def run_scan():
             for tok in m_tokens:
                 tok_u = tok.upper()
                 if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
-                    found_ap_list.append((airports[tok_u], f"Manifest Title ({tok_u})"))
+                    found_ap_list.append((_resolve_ap_entry(tok_u), f"Manifest Title ({tok_u})"))
                     break
 
         # Layout BGL path matching (only inspect actual compiled .bgl files)
@@ -3180,13 +3266,50 @@ def run_scan():
                 }
             else:
                 existing = detected_map[icao]
-                norm_full = os.path.normcase(os.path.abspath(full_path)) if full_path else ""
-                if not any(
-                    (os.path.normcase(os.path.abspath(s['package_path'])) == norm_full) if (norm_full and s.get('package_path'))
-                    else (s['folder_name'].lower() == folder_name.lower() and s.get('source_folder') == cat)
-                    for s in existing["all_sources"]
-                ):
+                def _canon_pkg_sig(src_obj):
+                    fn_raw = str(src_obj.get('folder_name', '')).strip()
+                    if fn_raw.lower().endswith('.disabled'):
+                        fn_raw = fn_raw[:-9]
+                    fn_raw = re.sub(r'[-_\s.(]+(copy|copie|backup|bak)(\b|\d*|\))*$', '', fn_raw, flags=re.IGNORECASE).strip()
+                    fn_clean = RE_CLEAN_PREFIX.sub('', fn_raw.lower())
+                    v_clean = str(src_obj.get('vendor', '')).strip().lower()
+                    ver_clean = str(src_obj.get('version', '')).strip().lower()
+                    return (fn_clean, v_clean, ver_clean)
+
+                def _norm_real(p_str):
+                    if not p_str:
+                        return ""
+                    try:
+                        return os.path.normcase(os.path.realpath(p_str))
+                    except Exception:
+                        return os.path.normcase(os.path.abspath(p_str))
+
+                norm_full = _norm_real(full_path)
+                new_sig = _canon_pkg_sig(new_source)
+                dup_idx = None
+                for idx_s, s in enumerate(existing["all_sources"]):
+                    s_real = _norm_real(s.get('package_path', ''))
+                    if norm_full and s_real and norm_full == s_real:
+                        dup_idx = idx_s
+                        break
+                    if s.get('is_asobo_official') and new_source.get('is_asobo_official'):
+                        dup_idx = idx_s
+                        break
+                    if _canon_pkg_sig(s) == new_sig and new_sig[0]:
+                        dup_idx = idx_s
+                        break
+
+                if dup_idx is None:
                     existing["all_sources"].append(new_source)
+                else:
+                    old_s = existing["all_sources"][dup_idx]
+                    # Prefer active over disabled, and primary Community over secondary/backup folders
+                    old_active = not old_s.get('is_disabled', False)
+                    new_active = not new_source.get('is_disabled', False)
+                    old_prio = get_source_priority(old_s.get('source_folder', '')) + (1 if old_s.get('source_folder', '').endswith('Community') else 0)
+                    new_prio = get_source_priority(new_source.get('source_folder', '')) + (1 if new_source.get('source_folder', '').endswith('Community') else 0)
+                    if (new_active and not old_active) or (new_active == old_active and new_prio > old_prio):
+                        existing["all_sources"][dup_idx] = new_source
 
                 p_existing = get_source_priority(existing["source_folder"])
                 p_new = get_source_priority(cat)
@@ -3682,18 +3805,15 @@ def build_library_snapshot(airports):
             fn_l = clean_fn.lower()
             pkg_path = s.get('package_path', '')
 
-            # In MSFS 2024 StreamedPackages, only skip base Asobo/Microsoft official streamed airports
-            # or ghost Content.xml entries without a physical folder on disk.
-            # Genuine Marketplace / Store 3rd-party airports in StreamedPackages MUST be tracked!
+            # In MSFS 2024 StreamedPackages, skip virtual base Asobo/Microsoft Content.xml entries without a physical folder on disk,
+            # while tracking all Marketplace 3rd-party streamed sceneries and all physical StreamedPackages folders.
             if 'streamed' in src_folder.lower():
-                is_asobo_base = (
+                is_asobo_virtual = (
                     s.get('is_asobo_official', False)
                     or s.get('pricing_type') in ('Asobo', 'Asobo / MS')
                     or fn_l.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
-                    or 'asobo-airport-' in fn_l
-                    or 'microsoft-airport-' in fn_l
                 )
-                if is_asobo_base or not pkg_path or not os.path.isdir(pkg_path):
+                if is_asobo_virtual and (not pkg_path or not os.path.isdir(pkg_path)):
                     continue
 
             clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_l)
@@ -3766,34 +3886,65 @@ def compute_scan_delta(new_airports, update_snapshot=True):
         print("Error reading library_snapshot.json:", e)
         prev_snapshot = {}
 
-    # Backward-compatible migration: if prev_snapshot was saved before StreamedPackages Store tracking,
-    # only report StreamedPackages folders created/updated within the last 12 hours as newly added,
-    # while silently seeding older pre-existing Store folders into the snapshot.
+    # Backward-compatible migration: if prev_snapshot was saved before StreamedPackages (or Asobo World Update StreamedPackages) tracking,
+    # only report StreamedPackages folders created/updated within the last 24 hours as newly added,
+    # while silently seeding older pre-existing folders into the snapshot.
     import time
     had_streamed_in_prev = any('streamed' in (v.get('source_folder') or '').lower() for v in prev_snapshot.values() if isinstance(v, dict))
+    had_asobo_streamed_in_prev = any(
+        'streamed' in (v.get('source_folder') or '').lower() and v.get('type') in ('Asobo', 'Asobo / MS')
+        for v in prev_snapshot.values() if isinstance(v, dict)
+    )
     now_ts = time.time()
 
     added = []
     for k, item in current_snapshot.items():
         if k not in prev_snapshot:
-            if not had_streamed_in_prev and 'streamed' in (item.get('source_folder') or '').lower():
+            is_streamed_item = 'streamed' in (item.get('source_folder') or '').lower()
+            is_asobo_item = item.get('type') in ('Asobo', 'Asobo / MS')
+            if is_streamed_item and ((not had_streamed_in_prev) or (is_asobo_item and not had_asobo_streamed_in_prev)):
                 p_path = item.get('package_path', '')
                 if p_path and os.path.exists(p_path):
                     try:
                         st = os.stat(p_path)
                         age_hours = (now_ts - max(st.st_ctime, st.st_mtime)) / 3600.0
-                        if age_hours > 12.0:
+                        if age_hours > 24.0:
                             continue
                     except Exception:
                         pass
+                else:
+                    continue
             added.append(item)
+
+    def _norm_snap_fn(fn_s):
+        s = (fn_s or '').lower().strip()
+        if s.endswith('.disabled'):
+            s = s[:-9]
+        s = re.sub(r'(?:[-_ ]+copy(?:\s*\(\d+\))?)+$', '', s, flags=re.I)
+        return re.sub(r'^(community|official)?(fs20|fs24)?-?', '', s)
+
+    # Precompute active (icao, clean_folder) pairs in current_snapshot to suppress false removals from deduplicated copies
+    current_clean_pairs = set()
+    for cur_item in current_snapshot.values():
+        if isinstance(cur_item, dict):
+            c_icao = (cur_item.get('icao') or '').upper()
+            c_fn = _norm_snap_fn(cur_item.get('folder_name') or '')
+            if c_icao and c_fn:
+                current_clean_pairs.add((c_icao, c_fn))
 
     removed = []
     for k, item in prev_snapshot.items():
         if not isinstance(item, dict):
             continue
+        fn_l = (item.get('folder_name') or '').lower()
+        # Never report filtered non-airport / model library packages as removed sceneries
+        if (
+            any(kw in fn_l for kw in NON_AIRPORT_KEYWORDS)
+            or fn_l.endswith(('-library', '_library', '-assetpack', '_assetpack', '-asset-pack', '-models', '_models'))
+            or bool(re.search(r'(?:^|[-_\d])(models|modellib|model-lib|model_lib|library|libraries|assetpack|asset-pack|assets|objectlib|objects-lib)(?:$|[-_\d])', fn_l))
+        ):
+            continue
         if 'streamed' in (item.get('source_folder') or '').lower():
-            fn_l = (item.get('folder_name') or '').lower()
             is_asobo_base = (
                 item.get('type') in ('Asobo', 'Asobo / MS')
                 or fn_l.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
@@ -3803,6 +3954,11 @@ def compute_scan_delta(new_airports, update_snapshot=True):
             if is_asobo_base:
                 continue
         if k not in current_snapshot:
+            # If the same airport still has this package installed (e.g., duplicate copy across folders was deduplicated), do not flag as removed
+            p_icao = (item.get('icao') or '').upper()
+            p_fn = _norm_snap_fn(fn_l)
+            if (p_icao, p_fn) in current_clean_pairs:
+                continue
             removed.append(item)
 
     delta = {
